@@ -1,0 +1,2 @@
+/* keep or add only custom CSS here; remove @tailwind rules while using CDN */
+html, body, #root { height: 100%; }
