@@ -21,7 +21,7 @@ import HistoryPage from './HistoryPage';
 // -------------------------------------
 // Helper utilities
 // -------------------------------------
-const API_BASE = (process.env.REACT_APP_API_BASE?.trim()) || 'http://localhost:5000/api';
+const API_BASE = (process.env.REACT_APP_API_BASE?.trim()) || 'https://jain-pathshala.vercel.app';
 const DEFAULT_DATE_OPTIONS = { day: 'numeric', month: 'long', year: 'numeric' };
 
 const coerceToDate = (input) => {
