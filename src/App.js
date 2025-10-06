@@ -131,7 +131,6 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
 
       if (!res.ok) {
         const errorText = await res.text();
-        // FIX: Added catch block for potential JSON parse error on non-JSON HTTP responses
         const errorData = errorText ? JSON.parse(errorText).catch(() => ({})) : {};
         throw new Error(errorData.error || `HTTP ${res.status}: Failed to load history.`);
       }
