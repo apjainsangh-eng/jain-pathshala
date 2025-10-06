@@ -131,6 +131,7 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
 
       if (!res.ok) {
         const errorText = await res.text();
+        // FIX: Added catch block for potential JSON parse error on non-JSON HTTP responses
         const errorData = errorText ? JSON.parse(errorText).catch(() => ({})) : {};
         throw new Error(errorData.error || `HTTP ${res.status}: Failed to load history.`);
       }
@@ -146,6 +147,7 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
     }
   };
 
+  // The dependencies are correct here: [selectedYear, selectedMonth]
   useEffect(() => {
     fetchHistory(selectedYear, selectedMonth);
   }, [selectedYear, selectedMonth]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -183,28 +185,27 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
     setSelectedDayDetails(null);
   };
 
-  // FIX: Access activityData directly to avoid unnecessary useMemo dependency chain
   const activityData = historyData?.dailyActivity ?? {};
 
-  // Filter to get only days where user was present
+  // FIX: Added activityData to dependencies
   const presentDays = useMemo(() => {
-    // FIX: Using activityData directly
     return Object.entries(activityData)
       .filter(([_, activity]) => activity?.present === true)
-      .sort((a, b) => new Date(b[0]) - new Date(a[0])); // Sort by date descending (newest first)
-  }, [activityData]); // Depend directly on activityData
+      .sort((a, b) => new Date(b[0]) - new Date(a[0]));
+  }, [activityData]);
 
+  // FIX: Added formatLocalDateString and today to dependencies
   const monthlySummary = useMemo(() => {
     let presentDays = 0;
     let absentDays = 0;
     let newGathas = 0;
     let revisionGathas = 0;
 
-    // FIX: Use activityData directly to satisfy useMemo dependency
     Object.entries(activityData).forEach(([dateStr, activity]) => {
       const normalized = activity || {};
       const gathas = normalized.gathas || { new: 0, revision: 0 };
       
+      // FIX: Added dependency on formatLocalDateString and today for this comparison
       if (formatLocalDateString(new Date(dateStr)) <= formatLocalDateString(today)) {
          if (normalized.present) {
             presentDays += 1;
@@ -226,7 +227,7 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
       newGathas,
       revisionGathas,
     };
-  }, [activityData]); // Depend directly on activityData
+  }, [activityData, formatLocalDateString, today]); // Corrected dependency array
 
   const renderSummaryCards = () => (
     <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
