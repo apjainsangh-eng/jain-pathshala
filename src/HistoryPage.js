@@ -1,6 +1,4 @@
-// HistoryPage.js
-
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   BookOpen,
   Calendar,
@@ -10,13 +8,58 @@ import {
   Clock,
   Heart,
   Plus,
-  X,
+  X as CloseIcon,
   TrendingUp,
+  AlertTriangle,
+  Trophy,
 } from 'lucide-react';
 
-const API_BASE = (process.env.REACT_APP_API_BASE?.trim()) || 'http://localhost:5000/api';
+// -------------------------------------
+// VERCEL DEPLOYMENT CONFIGURATION
+// Use relative path '/api' in Vercel production to hit the serverless function.
+// For local dev, fall back to localhost:5000/api
+// -------------------------------------
+const API_BASE = (process.env.NODE_ENV === 'production' ? '/api' : (process.env.REACT_APP_API_BASE?.trim() || 'http://localhost:5000/api'));
+const DEFAULT_DATE_OPTIONS = { day: 'numeric', month: 'long', year: 'numeric' };
 
-const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
+
+// -------------------------------------
+// Helper utilities (Needed for independent functioning)
+// These functions were previously external but are necessary for this component.
+// -------------------------------------
+const coerceToDate = (input) => {
+  if (input instanceof Date) return new Date(input.getTime());
+  if (typeof input === 'number') return new Date(input);
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    const isoLike = trimmed.length <= 10 ? `${trimmed}T00:00:00` : trimmed;
+    const parsed = new Date(isoLike);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
+};
+
+const formatLocalDateString = (input = new Date()) => {
+  const parsed = coerceToDate(input);
+  if (!parsed) return '';
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, '0');
+  const d = String(parsed.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const formatDateIn = (input, options = DEFAULT_DATE_OPTIONS) => {
+  const parsed = coerceToDate(input);
+  if (!parsed) return '';
+  // Note: Since 'en-IN' locale requires the options to be available, we merge default.
+  return parsed.toLocaleDateString('en-IN', { ...DEFAULT_DATE_OPTIONS, ...options });
+};
+
+// -------------------------------------
+// HistoryPage Component
+// -------------------------------------
+const HistoryPage = () => { // Note: Removed props since we included helpers directly
   const today = new Date();
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
@@ -31,7 +74,7 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
-  const fetchHistory = async (year, month) => {
+  const fetchHistory = useCallback(async (year, month) => {
     setIsLoading(true);
     setError(null);
     const token = localStorage.getItem('jainPathshalaToken');
@@ -42,7 +85,9 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
 
       if (!res.ok) {
         const errorText = await res.text();
-        throw new Error(`HTTP ${res.status}: ${errorText}`);
+        // Try to parse JSON error if available
+        const errorData = JSON.parse(errorText.split('\n')[0].trim()); 
+        throw new Error(errorData.error || `HTTP ${res.status}: Failed to load history.`);
       }
 
       const data = await res.json();
@@ -54,11 +99,11 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []); 
 
   useEffect(() => {
     fetchHistory(selectedYear, selectedMonth);
-  }, [selectedYear, selectedMonth]);
+  }, [selectedYear, selectedMonth, fetchHistory]);
 
   const handleMonthChange = (direction) => {
     let newMonth = selectedMonth + direction;
@@ -200,7 +245,7 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
     if (error) {
       return (
         <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-8 text-center">
-          <X size={48} className="mx-auto text-red-400 mb-3" />
+          <CloseIcon size={48} className="mx-auto text-red-400 mb-3" />
           <p className="text-red-700 font-semibold text-lg">{error}</p>
         </div>
       );
@@ -326,7 +371,7 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
               className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors" 
               aria-label="Close"
             >
-              <X size={24} />
+              <CloseIcon size={24} />
             </button>
           </div>
 
