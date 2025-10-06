@@ -2,18 +2,34 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "builds": [
+    // 1. Build the React Frontend (Assumes React project is in the root directory)
     {
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
         "distDir": "build"
       }
+    },
+    // 2. Build the Node.js Backend (Located in the backend folder)
+    {
+      "src": "backend/server.js",
+      "use": "@vercel/node",
+      "config": {
+        "maxDuration": 60 // Increase max duration for MongoDB connection stability
+      }
     }
   ],
-  "rewrites": [
+  "routes": [
+    // CRITICAL: Route all requests starting with /api/ to the Serverless Function file.
+    // The path here MUST match the src in the build step, prefixed with a slash.
     {
-      "source": "/api/:path*",
-      "destination": "/api"
+      "src": "/api/(.*)",
+      "dest": "/backend/server.js"
+    },
+    // Route all remaining traffic to the React application's index.html file.
+    {
+      "src": "/(.*)",
+      "dest": "/build/index.html"
     }
   ]
 }
