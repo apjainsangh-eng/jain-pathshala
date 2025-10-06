@@ -217,11 +217,8 @@ function authMiddleware(req, res, next) {
 
 // Register
 app.post('/api/register', withDatabaseErrorHandling(async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'username & password required' });
-
-  const existingUser = await db.collection('users').findOne({ username });
-  if (existingUser) return res.status(409).json({ error: 'Username already exists' });
 
   const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
 
@@ -236,9 +233,10 @@ app.post('/api/register', withDatabaseErrorHandling(async (req, res) => {
     username
   });
 }));
+
 // Login
 app.post('/api/login', withDatabaseErrorHandling(async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'username & password required' });
 
   const user = await db.collection('users').findOne({ username });
@@ -257,6 +255,7 @@ app.post('/api/login', withDatabaseErrorHandling(async (req, res) => {
     token
   });
 }));
+
 // WhoAmI
 app.get('/api/whoami', authMiddleware, (req, res) => {
   res.json({
@@ -735,7 +734,7 @@ process.on('SIGINT', async () => {
     await connectToDatabase();
     app.listen(PORT, () => {
       console.log(`🚀 Server listening on port ${PORT}`);
-      console.log(`📍 API Base: https://jain-pathshala.vercel.app`);
+      console.log(`📍 API Base: http://localhost:${PORT}/api`);
       console.log(` cavern: ${DB_NAME}`);
       console.log(`💡 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
@@ -743,6 +742,4 @@ process.on('SIGINT', async () => {
     console.error('Server startup failed:', err);
     process.exit(1);
   }
-
 })();
-
