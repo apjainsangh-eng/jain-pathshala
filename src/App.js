@@ -21,7 +21,7 @@ import HistoryPage from './HistoryPage';
 // -------------------------------------
 // Helper utilities
 // -------------------------------------
-const API_BASE = (process.env.REACT_APP_API_BASE?.trim()) || 'https://jain-pathshala.vercel.app';
+const API_BASE = (process.env.REACT_APP_API_BASE?.trim()) || 'http://localhost:5000/api';
 const DEFAULT_DATE_OPTIONS = { day: 'numeric', month: 'long', year: 'numeric' };
 
 const coerceToDate = (input) => {
@@ -312,11 +312,14 @@ export default function JainPathshalaApp() {
     setIsLoading(true);
     setLoginError('');
     try {
-   const response = await fetch(APIBASE + "apilogin", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ username: loginForm.username.trim(), password: loginForm.password }),
-});
+      const response = await fetch(`${API_BASE}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: loginForm.username.trim(),
+          password: loginForm.password,
+        }),
+      });
 
       const data = await response.json();
       if (!response.ok) {
