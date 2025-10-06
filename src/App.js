@@ -22,7 +22,6 @@ import {
 // -------------------------------------
 // Helper utilities
 // -------------------------------------
-// Use relative /api path for Vercel production deployment
 const API_BASE = (process.env.NODE_ENV === 'production' ? '/api' : (process.env.REACT_APP_API_BASE?.trim() || 'http://localhost:5000/api'));
 const DEFAULT_DATE_OPTIONS = { day: 'numeric', month: 'long', year: 'numeric' };
 
@@ -132,8 +131,7 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
 
       if (!res.ok) {
         const errorText = await res.text();
-        // Fallback check for empty response bodies which cause JSON parse errors
-        const errorData = errorText ? JSON.parse(errorText) : {};
+        const errorData = errorText ? JSON.parse(errorText).catch(() => ({})) : {};
         throw new Error(errorData.error || `HTTP ${res.status}: Failed to load history.`);
       }
 
@@ -185,14 +183,16 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
     setSelectedDayDetails(null);
   };
 
+  // FIX: Access activityData directly to avoid unnecessary useMemo dependency chain
   const activityData = historyData?.dailyActivity ?? {};
 
   // Filter to get only days where user was present
   const presentDays = useMemo(() => {
+    // FIX: Using activityData directly
     return Object.entries(activityData)
       .filter(([_, activity]) => activity?.present === true)
       .sort((a, b) => new Date(b[0]) - new Date(a[0])); // Sort by date descending (newest first)
-  }, [activityData]);
+  }, [activityData]); // Depend directly on activityData
 
   const monthlySummary = useMemo(() => {
     let presentDays = 0;
@@ -200,10 +200,11 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
     let newGathas = 0;
     let revisionGathas = 0;
 
+    // FIX: Use activityData directly to satisfy useMemo dependency
     Object.entries(activityData).forEach(([dateStr, activity]) => {
       const normalized = activity || {};
       const gathas = normalized.gathas || { new: 0, revision: 0 };
-      // Check if the date is in the future before counting as absent
+      
       if (formatLocalDateString(new Date(dateStr)) <= formatLocalDateString(today)) {
          if (normalized.present) {
             presentDays += 1;
@@ -225,7 +226,7 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
       newGathas,
       revisionGathas,
     };
-  }, [activityData]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activityData]); // Depend directly on activityData
 
   const renderSummaryCards = () => (
     <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -319,7 +320,7 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
     return (
       <div className="space-y-3">
         {presentDays.map(([dateStr, activity]) => {
-          const { gathas = { new: 0, revision: 0 }, details = [] } = activity;
+          const { gathas = { new: 0, revision: 0 } } = activity;
           const newCount = Number(gathas.new || 0);
           const revisionCount = Number(gathas.revision || 0);
           const totalCount = newCount + revisionCount;
