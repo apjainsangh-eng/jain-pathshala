@@ -312,14 +312,11 @@ export default function JainPathshalaApp() {
     setIsLoading(true);
     setLoginError('');
     try {
-      const response = await fetch(`${API_BASE}/api/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: loginForm.username.trim(),
-          password: loginForm.password,
-        }),
-      });
+   const response = await fetch(APIBASE + "apilogin", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ username: loginForm.username.trim(), password: loginForm.password }),
+});
 
       const data = await response.json();
       if (!response.ok) {
