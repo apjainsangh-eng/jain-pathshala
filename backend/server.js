@@ -4,9 +4,16 @@ const { MongoClient, ObjectId } = require('mongodb');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+// Import serverless-http for Vercel deployment
+const serverless = require('serverless-http');
 
 const app = express();
-app.use(cors());
+// Configure CORS to allow access from all origins (or your specific Vercel URL)
+app.use(cors({
+    origin: '*', // For development, you can use '*' or specify your Vercel domain here: https://your-app-name.vercel.app
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true,
+}));
 app.use(express.json());
 
 // --- Basic required env check ---
@@ -15,7 +22,10 @@ const missing = REQUIRED_ENVS.filter(k => !process.env[k]);
 if (missing.length) {
   console.error('FATAL: Missing required environment variables:', missing.join(', '));
   console.error('Please add them to your .env or environment and restart the server.');
-  process.exit(1);
+  // In a Vercel environment, we should proceed, as the project build might pass, but the function will fail at runtime
+  if (process.env.NODE_ENV !== 'production') {
+    process.exit(1);
+  }
 }
 
 // --- Config ---
@@ -42,109 +52,110 @@ async function createIndexes() {
   }
 }
 
+// Global flag to track connection status
+let isConnected = false;
+
 async function connectToDatabase() {
+  // Prevent connecting multiple times in a serverless environment
+  if (isConnected) return db;
+
   try {
-    // Enhanced MongoDB connection options for SSL/TLS
     const connectionOptions = {
-      // For mongodb+srv:// URIs, SSL/TLS is typically enabled by default.
-      // Explicitly setting `ssl: true` or `tls: true` is often redundant but harmless.
-      // Removed `tlsVersion` as it caused a parse error with your driver version.
-      // The driver will negotiate the strongest TLS version supported by Node.js and the server.
-      
       retryWrites: true,
       w: 'majority',
-      
-      // Connection pool settings
+
       maxPoolSize: 10,
       minPoolSize: 2,
       maxIdleTimeMS: 30000,
-      
-      // Timeout settings
-      serverSelectionTimeoutMS: 10000, // How long to wait for server selection to succeed
-      socketTimeoutMS: 45000, // How long to wait for a socket to return data
-      connectTimeoutMS: 10000, // How long to wait for connection to be established
-      
-      // Disable IPv6 family auto-selection (helps with some network issues)
+
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 10000,
+
       autoSelectFamily: false,
     };
 
     console.log('🔄 Attempting to connect to MongoDB...');
-    // Mask sensitive parts of the URI for logging
     console.log('📍 Connection URI format:', process.env.MONGODB_URI.replace(/\/\/.*@/, '//***:***@'));
 
     client = new MongoClient(process.env.MONGODB_URI, connectionOptions);
-    
-    // Connect with retry logic
+
     let retries = 3;
     while (retries > 0) {
       try {
         await client.connect();
-        break; // If connection is successful, break out of retry loop
+        break;
       } catch (err) {
         retries--;
         console.error(`❌ MongoDB connection attempt failed. Retries left: ${retries}`);
         console.error('Error details:', err.message);
-        
+
         if (retries === 0) {
           console.error('All connection retries exhausted. Exiting.');
-          throw err; // Re-throw the error after all retries fail
+          throw err;
         }
-        
-        // Wait before retry
+
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
 
-    // Ping the admin database to verify the connection is truly open
     await client.db('admin').command({ ping: 1 });
-    
+
     db = client.db(DB_NAME);
-    
+
     console.log('✅ MongoDB connected successfully');
     console.log(`📊 Connected to database: ${DB_NAME}`);
-    
-    // Create indexes for better performance
+
     await createIndexes();
+    isConnected = true; // Set global flag on success
     return db;
-    
+
   } catch (err) {
     console.error('❌ MongoDB connection failed:', err);
-    
-    // Provide specific guidance for common SSL/network errors
+
     if (err.message.includes('TLSV1_ALERT_INTERNAL_ERROR') || err.message.includes('SSL') || err.message.includes('ENOTFOUND') || err.message.includes('ETIMEDOUT') || err.message.includes('ECONNREFUSED')) {
       console.error('');
       console.error('🔧 SSL/TLS/Network Error Troubleshooting:');
       console.error('1. **MongoDB Atlas IP Whitelist:** Ensure your server\'s public IP address is added to the Network Access List in your MongoDB Atlas project. This is the MOST common cause.');
-      console.error('2. **Connection String:** Verify your MONGODB_URI in your .env file. It should start with `mongodb+srv://` and have the correct username, password, cluster name, and database name.');
-      console.error('3. **Network Firewall:** Check if any firewalls (local or cloud) are blocking outbound connections on port 27017.');
-      console.error('4. **MongoDB Atlas Status:** Confirm your MongoDB Atlas cluster is running and not paused.');
-      console.error('5. **Node.js/Driver Version:** Ensure your Node.js version is relatively recent (e.g., 16+) and you have the latest `mongodb` driver (`npm install mongodb@latest`).');
+      console.error('2. **Connection String:** Verify your MONGODB_URI in your Vercel environment variables. It should start with `mongodb+srv://`.');
+      console.error('3. **Node.js/Driver Version:** Ensure your driver version is recent.');
       console.error('');
     }
-    
+
     throw err;
   }
 }
 
 // Enhanced error handling wrapper for database operations
+// Added pre-check for DB connection
 function withDatabaseErrorHandling(operation) {
   return async (req, res, next) => {
+    // Ensure DB connection is active before proceeding with an API request
+    if (!db) {
+        try {
+            await connectToDatabase();
+        } catch (dbErr) {
+            console.error("Failed to connect to database during API request:", dbErr.message);
+            return res.status(503).json({
+                error: 'Service Unavailable. Database connection failed.',
+                code: 'DB_CONNECTION_FAILURE'
+            });
+        }
+    }
+    
     try {
       await operation(req, res, next);
     } catch (err) {
       console.error('Database operation error:', err.message);
-      
-      // Handle specific SSL/network errors
+
       if (err.message.includes('SSL') || err.message.includes('ENOTFOUND') || err.message.includes('ETIMEDOUT') || err.message.includes('ECONNREFUSED')) {
         return res.status(503).json({ 
           error: 'Database connection issue. Please try again later. Check server logs for details.',
           code: 'DB_CONNECTION_ERROR'
         });
       }
-      
-      // Handle MongoDB specific errors (e.g., duplicate key, validation errors)
+
       if (err.name === 'MongoError' || err.name === 'MongoServerError') {
-        // Example: Duplicate key error (E11000)
         if (err.code === 11000) {
           return res.status(409).json({ error: 'Duplicate data error.', code: 'DUPLICATE_KEY', details: err.message });
         }
@@ -154,8 +165,7 @@ function withDatabaseErrorHandling(operation) {
           details: err.message
         });
       }
-      
-      // Pass other errors to the next middleware (or default error handler)
+
       next(err);
     }
   };
@@ -519,7 +529,7 @@ app.get('/api/analytics/leaderboard', authMiddleware, withDatabaseErrorHandling(
 
   let gathaLeader = null;
   if (gathaCounts.length > 0) {
-    const top = [...gathaCounts].sort((a, b) => Number(b.gatha_count || 0) - Number(a.gatha_count || 0))[0]; // Added [0] to get the top element
+    const top = [...gathaCounts].sort((a, b) => Number(b.gatha_count || 0) - Number(a.gatha_count || 0))[0];
     gathaLeader = { username: top.username, count: Number(top.gatha_count || 0) };
   }
 
@@ -543,7 +553,7 @@ app.get('/api/analytics/leaderboard', authMiddleware, withDatabaseErrorHandling(
     }
   ]).toArray();
 
-  const userGathaTotal = (currentUserGathaCount.length > 0 ? currentUserGathaCount[0].total : 0) || 0; // Corrected access to total
+  const userGathaTotal = (currentUserGathaCount.length > 0 ? currentUserGathaCount[0].total : 0) || 0;
 
   res.json({
     attendanceLeader: leaderboard.length > 0 ? leaderboard[0] : { username: 'N/A', attendance_count: 0, gatha_count: 0 },
@@ -638,8 +648,9 @@ app.get('/api/history/:year/:month', authMiddleware, withDatabaseErrorHandling(a
 // --- Health check endpoint ---
 app.get('/api/health', async (req, res) => {
   try {
+    // Check if client is initialized, if not, try connecting
     if (!client || !db) {
-      return res.status(503).json({ status: 'error', message: 'Database client not initialized or connected' });
+        await connectToDatabase();
     }
     
     // Test database connection by pinging the admin database
@@ -672,9 +683,10 @@ app.use((req, res, next) => {
 });
 
 // Generic 404 for non-API routes
-app.use((req, res) => {
+// REMOVED: Vercel will handle static file serving/routing for the frontend
+/* app.use((req, res) => {
   res.status(404).send('Not found');
-});
+}); */
 
 // Global error handlers
 // Centralized error handling middleware
@@ -692,54 +704,76 @@ app.use((err, req, res, next) => {
   res.status(500).json(errorResponse);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  // Application specific logging, throwing an error, or other logic here
-  // For production, you might want to gracefully shut down or restart
-});
-
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-  // Perform graceful cleanup, then exit
-  if (client) {
-    client.close().then(() => {
-      console.log('✅ MongoDB connection closed due to uncaught exception.');
-      process.exit(1);
-    }).catch(e => {
-      console.warn('Error closing MongoDB client during uncaught exception:', e);
-      process.exit(1);
-    });
-  } else {
-    process.exit(1);
-  }
-});
-
-// Graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('🔄 Gracefully shutting down...');
-  if (client) {
-    try {
-      await client.close();
-      console.log('✅ MongoDB connection closed');
-    } catch (e) {
-      console.warn('Error closing MongoDB client:', e);
-    }
-  }
-  process.exit(0);
-});
+// REMOVED: Graceful shutdown handlers are not used in stateless Vercel Functions
+/*
+process.on('unhandledRejection', ...);
+process.on('uncaughtException', ...);
+process.on('SIGINT', ...);
+*/
 
 // --- Start server only after DB connects ---
-(async function start() {
-  try {
-    await connectToDatabase();
-    app.listen(PORT, () => {
-      console.log(`🚀 Server listening on port ${PORT}`);
-      console.log(`📍 API Base: http://localhost:${PORT}/api`);
-      console.log(` cavern: ${DB_NAME}`);
-      console.log(`💡 Environment: ${process.env.NODE_ENV || 'development'}`);
-    });
-  } catch (err) {
-    console.error('Server startup failed:', err);
-    process.exit(1);
-  }
-})();
+// MODIFIED: This entire block is replaced with conditional logic for Vercel
+if (process.env.VERCEL_ENV) {
+  // 1. For Vercel (Production/Preview)
+  // The DB connection must be initiated *before* the first request, 
+  // but Vercel's Serverless environment handles the listening port.
+  // We call the connect function immediately so the serverless function 
+  // can reuse the warm connection for subsequent requests.
+  connectToDatabase().catch(err => {
+    console.error('Vercel cold start DB connection failure:', err.message);
+    // Note: We don't exit here, we let the handler respond with 503 if DB is needed.
+  });
+
+  // Export the app wrapped in serverless-http
+  module.exports = serverless(app);
+
+} else {
+  // 2. For Local Development
+  (async function start() {
+    try {
+      await connectToDatabase();
+      app.listen(PORT, () => {
+        console.log(`🚀 Server listening on port ${PORT}`);
+        console.log(`📍 API Base: http://localhost:${PORT}/api`);
+        console.log(` cavern: ${DB_NAME}`);
+        console.log(`💡 Environment: ${process.env.NODE_ENV || 'development'}`);
+      });
+    } catch (err) {
+      console.error('Server startup failed:', err);
+      process.exit(1);
+    }
+  })();
+
+  // Keep process listeners for local dev graceful shutdown
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  });
+  
+  process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    if (client) {
+      client.close().then(() => {
+        console.log('✅ MongoDB connection closed due to uncaught exception.');
+        process.exit(1);
+      }).catch(e => {
+        console.warn('Error closing MongoDB client during uncaught exception:', e);
+        process.exit(1);
+      });
+    } else {
+      process.exit(1);
+    }
+  });
+  
+  process.on('SIGINT', async () => {
+    console.log('🔄 Gracefully shutting down...');
+    if (client) {
+      try {
+        await client.close();
+        console.log('✅ MongoDB connection closed');
+      } catch (e) {
+        console.warn('Error closing MongoDB client:', e);
+      }
+    }
+    process.exit(0);
+  });
+}
