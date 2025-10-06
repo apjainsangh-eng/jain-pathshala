@@ -2,27 +2,19 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "builds": [
-    // 1. Configuration to build the React application (Frontend static assets)
     {
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
         "distDir": "build"
       }
-    },
-    // 2. Configuration to treat the Node.js server.js file as a Serverless Function
-    {
-      "src": "backend/server.js",
-      "use": "@vercel/node"
     }
   ],
   "routes": [
-    // CRITICAL FIX: Use an absolute path for the destination to ensure Vercel executes the function.
     {
       "src": "/api/(.*)",
-      "dest": "/backend/server.js" 
+      "dest": "/api/index.js"
     },
-    // Route all other requests (your React pages) to the index.html file
     {
       "src": "/(.*)",
       "dest": "/"
