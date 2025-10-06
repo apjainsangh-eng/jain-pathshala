@@ -734,7 +734,7 @@ process.on('SIGINT', async () => {
     await connectToDatabase();
     app.listen(PORT, () => {
       console.log(`🚀 Server listening on port ${PORT}`);
-      console.log(`📍 API Base: http://localhost:${PORT}/api`);
+      console.log(`📍 API Base: https://jain-pathshala.vercel.app`);
       console.log(` cavern: ${DB_NAME}`);
       console.log(`💡 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
@@ -742,4 +742,5 @@ process.on('SIGINT', async () => {
     console.error('Server startup failed:', err);
     process.exit(1);
   }
+
 })();
