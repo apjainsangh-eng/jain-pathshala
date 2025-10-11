@@ -5,6 +5,7 @@ const { MongoClient, ObjectId } = require('mongodb');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const app = require('../server');
 
 const app = express();
 
@@ -716,3 +717,4 @@ app.use((err, req, res, next) => {
 
 // Export for Vercel
 module.exports = serverless(app);
+
