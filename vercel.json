@@ -2,18 +2,18 @@
   "version": 2,
   "functions": {
     "api/index.js": {
-      "memory": 1024,  // Adjust if needed for DB connections
-      "maxDuration": 60  // For long-running ops like DB connects
+      "memory": 1024,
+      "maxDuration": 60
     }
   },
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "/api/index.js"  // Routes everything under /api to your Express handler
+      "destination": "/api/index.js"
     },
     {
-      "source": "/(.*)",  // For your React app (client-side routing)
-      "destination": "/index.html"  // Assuming a single-page app build
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [
