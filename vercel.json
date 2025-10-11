@@ -1,35 +1,29 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "builds": [
-    // 1. Build the React Frontend (Assumes React project is in the root directory)
+  "functions": {
+    "api/index.js": {
+      "memory": 1024,  // Adjust if needed for DB connections
+      "maxDuration": 60  // For long-running ops like DB connects
+    }
+  },
+  "rewrites": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build"
-      }
+      "source": "/api/:path*",
+      "destination": "/api/index.js"  // Routes everything under /api to your Express handler
     },
-    // 2. Build the Node.js Backend (Located in the backend folder)
     {
-      "src": "backend/server.js",
-      "use": "@vercel/node",
-      "config": {
-        "maxDuration": 60 // Increase max duration for MongoDB connection stability
-      }
+      "source": "/(.*)",  // For your React app (client-side routing)
+      "destination": "/index.html"  // Assuming a single-page app build
     }
   ],
-  "routes": [
-    // CRITICAL: Route all requests starting with /api/ to the Serverless Function file.
-    // The path here MUST match the src in the build step, prefixed with a slash.
+  "headers": [
     {
-      "src": "/api/(.*)",
-      "dest": "/backend/server.js"
-    },
-    // Route all remaining traffic to the React application's index.html file.
-    {
-      "src": "/(.*)",
-      "dest": "/build/index.html"
+      "source": "/api/:path*",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PUT, DELETE, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
+      ]
     }
   ]
 }
