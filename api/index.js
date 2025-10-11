@@ -1,7 +1,6 @@
 
 // Import serverless-http for Vercel compatibility
-const serverless = require('serverless-http');
-
+import serverless from 'serverless-http';
 require('dotenv').config();
 const express = require('express');
 const { MongoClient, ObjectId } = require('mongodb');
@@ -772,3 +771,4 @@ if (isVercel) {
     }
   })();
 }
+
