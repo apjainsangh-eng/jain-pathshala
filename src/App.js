@@ -22,7 +22,7 @@ import {
 // -------------------------------------
 // Helper utilities
 // -------------------------------------
-const API_BASE = (process.env.NODE_ENV === 'production' ? '/api' : (process.env.REACT_APP_API_BASE?.trim() || 'http://localhost:5000/api'));
+const API_BASE = process.env.REACT_APP_API_BASE || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api');
 const DEFAULT_DATE_OPTIONS = { day: 'numeric', month: 'long', year: 'numeric' };
 
 const coerceToDate = (input) => {
@@ -809,7 +809,7 @@ export default function JainPathshalaApp() {
   // -------------------------------------
   // Auth handlers
   // -------------------------------------
-  const handleLogin = async (e) => {
+const handleLogin = async (e) => {
     if (e) e.preventDefault();
     if (!loginForm.username.trim() || !loginForm.password.trim()) {
       setLoginError('Please enter both username and password');
@@ -828,14 +828,28 @@ export default function JainPathshalaApp() {
         }),
       });
 
-      const data = await response.json().catch(() => {
-        // Handle unexpected end of JSON input (often seen with 405/404 errors)
-        setLoginError('Login failed. Server returned an unexpected response. Check API logs.');
-        throw new Error('JSON parse error');
-      });
+      // Get response text first
+      const responseText = await response.text();
+      
+      // Check if we got a response
+      if (!responseText) {
+        setLoginError('Server returned an empty response. Please check if the backend is running.');
+        return;
+      }
+
+      // Try to parse JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('JSON Parse Error:', parseError);
+        console.error('Response Text:', responseText);
+        setLoginError(`Server error: ${responseText.substring(0, 100)}`);
+        return;
+      }
 
       if (!response.ok) {
-        setLoginError(data.error || 'Login failed');
+        setLoginError(data.error || data.message || `Login failed (Status: ${response.status})`);
         return;
       }
 
@@ -855,9 +869,7 @@ export default function JainPathshalaApp() {
       }
     } catch (error) {
       console.error('Login error:', error);
-      if (error.message !== 'JSON parse error') {
-        setLoginError('Login failed. Network or configuration error.');
-      }
+      setLoginError(`Network error: ${error.message}. Please check if the backend is running.`);
     } finally {
       setIsLoading(false);
     }
