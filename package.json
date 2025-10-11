@@ -17,7 +17,7 @@
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.3.0",
-    "serverless-http": "^3.2.0"
+    "serverless-http": "^3.0.0"
   },
   "eslintConfig": {
     "extends": ["react-app"]
