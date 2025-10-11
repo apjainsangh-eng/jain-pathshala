@@ -2,10 +2,8 @@
   "name": "jain-pathshala",
   "version": "1.0.0",
   "description": "Jain Pathshala Portal",
-  "main": "api/index.js",
   "scripts": {
-    "start": "node api/index.js",
-    "dev": "nodemon api/index.js"
+    "build": "echo 'No build needed for API-only deployment'"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
@@ -15,10 +13,7 @@
     "mongodb": "^6.3.0",
     "serverless-http": "^3.2.0"
   },
-  "devDependencies": {
-    "nodemon": "^3.0.2"
-  },
   "engines": {
-    "node": ">=18.x"
+    "node": "18.x"
   }
 }
