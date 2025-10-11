@@ -19,6 +19,7 @@ app.use(cors({
 app.use(express.json());
 
 // --- Configuration ---
+const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
 const SALT_ROUNDS = 10;
 const DB_NAME = process.env.DB_NAME || 'jainpathshala';
@@ -35,18 +36,18 @@ async function connectToDatabase() {
   }
 
   // Validate environment variables
-  if (!process.env.MONGODB_URI) {
-    throw new Error('MONGODB_URI environment variable is not set');
+  if (!MONGODB_URI) {
+    throw new Error('MONGODB_URI environment variable is not set. Please configure it in Vercel dashboard.');
   }
 
   if (!JWT_SECRET) {
-    throw new Error('JWT_SECRET environment variable is not set');
+    throw new Error('JWT_SECRET environment variable is not set. Please configure it in Vercel dashboard.');
   }
 
   try {
     console.log('🔄 Creating new MongoDB connection...');
     
-    const client = new MongoClient(process.env.MONGODB_URI, {
+    const client = new MongoClient(MONGODB_URI, {
       maxPoolSize: 10,
       minPoolSize: 1,
       serverSelectionTimeoutMS: 10000,
@@ -91,8 +92,9 @@ async function ensureDbConnection(req, res, next) {
   } catch (error) {
     console.error('Database connection error:', error);
     return res.status(503).json({ 
-      error: 'Database connection failed. Please check server configuration.',
-      details: error.message 
+      error: 'Database connection failed',
+      details: error.message,
+      hint: 'Check if MONGODB_URI is set in Vercel environment variables'
     });
   }
 }
@@ -152,6 +154,26 @@ function safeDateString(value) {
   return s;
 }
 
+// --- DIAGNOSTIC ENDPOINT (Check this first!) ---
+app.get('/api/config-check', (req, res) => {
+  const config = {
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    vercel: process.env.VERCEL ? 'Yes' : 'No',
+    environmentVariables: {
+      MONGODB_URI: MONGODB_URI ? '✅ Set' : '❌ Missing',
+      JWT_SECRET: JWT_SECRET ? '✅ Set' : '❌ Missing',
+      DB_NAME: DB_NAME || 'jainpathshala'
+    },
+    database: {
+      hasConnection: cachedDb ? 'Yes' : 'No',
+      dbName: DB_NAME
+    }
+  };
+  
+  res.json(config);
+});
+
 // --- Health Check ---
 app.get('/api/health', async (req, res) => {
   try {
@@ -160,14 +182,16 @@ app.get('/api/health', async (req, res) => {
     res.json({ 
       status: 'ok', 
       timestamp: new Date().toISOString(),
-      database: 'connected'
+      database: 'connected',
+      dbName: DB_NAME
     });
   } catch (err) {
     console.error('Health check failed:', err);
     res.status(503).json({ 
       status: 'error', 
       message: 'Database connection failed',
-      error: err.message 
+      error: err.message,
+      hint: 'Check MONGODB_URI in Vercel environment variables'
     });
   }
 });
@@ -686,7 +710,7 @@ app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ 
     error: 'Internal server error', 
-    details: process.env.NODE_ENV === 'development' ? err.message : undefined 
+    details: process.env.NODE_ENV === 'development' ? err.message : 'An unexpected error occurred' 
   });
 });
 
