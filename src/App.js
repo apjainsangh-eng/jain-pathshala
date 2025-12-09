@@ -47,9 +47,6 @@ export default function App() {
     try {
       const endpoint = isAdminLogin ? '/admin/login' : '/login';
       
-      console.log('Attempting login to:', `${API_BASE}${endpoint}`);
-      console.log('With credentials:', { username: trimmedUsername, password: trimmedPassword });
-      
       const response = await fetch(`${API_BASE}${endpoint}`, {
         method: 'POST',
         headers: { 
@@ -62,19 +59,13 @@ export default function App() {
         }),
       });
 
-      console.log('Response status:', response.status);
-
-      // Handle non-JSON responses
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        const textResponse = await response.text();
-        console.error('Non-JSON response:', textResponse);
         setLoginError('Server error. Please try again.');
         return;
       }
 
       const data = await response.json();
-      console.log('Response data:', data);
 
       if (!response.ok) {
         setLoginError(data.error || 'Login failed');
@@ -93,12 +84,10 @@ export default function App() {
       }
     } catch (error) {
       console.error('Login error:', error);
-      
-      // More specific error messages
       if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
         setLoginError('Cannot connect to server. Please check your internet connection.');
       } else {
-        setLoginError(`Network error: ${error.message}`);
+        setLoginError('Network error. Please try again.');
       }
     } finally {
       setIsLoading(false);
@@ -181,14 +170,14 @@ export default function App() {
             <form onSubmit={handleLogin}>
               <div className="mb-4">
                 <label className="block text-gray-700 font-semibold mb-1.5 text-sm">
-                  {isAdminLogin ? 'Admin Username' : 'Student Username'}
+                  {isAdminLogin ? 'Admin Username' : 'Username'}
                 </label>
                 <input
                   type="text"
                   value={loginForm.username}
                   onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
                   className="w-full px-3 py-3 border-2 border-orange-200 rounded-xl focus:outline-none focus:border-orange-400 text-sm"
-                  placeholder={isAdminLogin ? 'e.g., admin1' : 'e.g., AaravSharma'}
+                  placeholder={isAdminLogin ? 'Enter admin username' : 'Enter your name'}
                   disabled={isLoading}
                   autoComplete="username"
                   required
@@ -196,13 +185,15 @@ export default function App() {
               </div>
 
               <div className="mb-6">
-                <label className="block text-gray-700 font-semibold mb-1.5 text-sm">Password</label>
+                <label className="block text-gray-700 font-semibold mb-1.5 text-sm">
+                  Password
+                </label>
                 <input
                   type="password"
                   value={loginForm.password}
                   onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                   className="w-full px-3 py-3 border-2 border-orange-200 rounded-xl focus:outline-none focus:border-orange-400 text-sm"
-                  placeholder={isAdminLogin ? 'e.g., Admin@123' : 'e.g., 2005-03-15'}
+                  placeholder="Enter your password"
                   disabled={isLoading}
                   autoComplete="current-password"
                   required
@@ -220,94 +211,16 @@ export default function App() {
                     Logging in...
                   </div>
                 ) : (
-                  `Login as ${isAdminLogin ? 'Admin' : 'Student'}`
+                  'Login'
                 )}
               </button>
             </form>
-
-            {/* Quick Fill Buttons for Testing */}
-            <div className="mt-4 space-y-2">
-              <p className="text-xs text-gray-500 text-center">Quick fill for testing:</p>
-              {isAdminLogin ? (
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setLoginForm({ username: 'admin1', password: 'Admin@123' })}
-                    className="flex-1 text-xs bg-indigo-100 text-indigo-700 py-2 rounded-lg hover:bg-indigo-200 transition-colors"
-                  >
-                    Admin 1
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLoginForm({ username: 'admin2', password: 'Admin@456' })}
-                    className="flex-1 text-xs bg-indigo-100 text-indigo-700 py-2 rounded-lg hover:bg-indigo-200 transition-colors"
-                  >
-                    Admin 2
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLoginForm({ username: 'admin3', password: 'Admin@789' })}
-                    className="flex-1 text-xs bg-indigo-100 text-indigo-700 py-2 rounded-lg hover:bg-indigo-200 transition-colors"
-                  >
-                    Admin 3
-                  </button>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setLoginForm({ username: 'AaravSharma', password: '2005-03-15' })}
-                    className="flex-1 text-xs bg-green-100 text-green-700 py-2 rounded-lg hover:bg-green-200 transition-colors"
-                  >
-                    Aarav
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLoginForm({ username: 'PriyaJain', password: '2004-07-22' })}
-                    className="flex-1 text-xs bg-green-100 text-green-700 py-2 rounded-lg hover:bg-green-200 transition-colors"
-                  >
-                    Priya
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLoginForm({ username: 'RohanGupta', password: '2005-11-08' })}
-                    className="flex-1 text-xs bg-green-100 text-green-700 py-2 rounded-lg hover:bg-green-200 transition-colors"
-                  >
-                    Rohan
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Help text */}
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs">
-              {isAdminLogin ? (
-                <>
-                  <p className="text-blue-700 font-semibold mb-1.5">Admin Credentials:</p>
-                  <div className="space-y-0.5 text-blue-600">
-                    <p>• <strong>admin1</strong> / Admin@123</p>
-                    <p>• <strong>admin2</strong> / Admin@456</p>
-                    <p>• <strong>admin3</strong> / Admin@789</p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p className="text-blue-700 font-semibold mb-1.5">Student Credentials:</p>
-                  <div className="space-y-0.5 text-blue-600">
-                    <p>• <strong>AaravSharma</strong> / 2005-03-15</p>
-                    <p>• <strong>PriyaJain</strong> / 2004-07-22</p>
-                    <p>• <strong>RohanGupta</strong> / 2005-11-08</p>
-                  </div>
-                  <p className="mt-2 text-gray-500 italic">Password = Date of Birth (YYYY-MM-DD)</p>
-                </>
-              )}
-            </div>
           </div>
         </div>
         
         {/* Footer */}
         <p className="text-center text-gray-500 text-xs mt-4">
-          © 2024 Jain Pathshala. All rights reserved.
+          © 2024 Jain Pathshala
         </p>
       </div>
     </div>
