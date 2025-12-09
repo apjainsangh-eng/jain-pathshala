@@ -22,7 +22,7 @@ import {
 // -------------------------------------
 // Helper utilities
 // -------------------------------------
-const API_BASE = process.env.REACT_APP_API_BASE || 'https://jain-pathshala-backend.vercel.app/api';
+const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.vercel.app/api';
 const DEFAULT_DATE_OPTIONS = { day: 'numeric', month: 'long', year: 'numeric' };
 
 const coerceToDate = (input) => {
