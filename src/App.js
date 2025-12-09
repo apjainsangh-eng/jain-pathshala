@@ -76,22 +76,22 @@ const ConfirmationModal = ({ title, message, onConfirm, onCancel }) => {
 
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 transform transition-all">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 transform transition-all">
         <div className="flex items-center mb-4">
-          <AlertTriangle className="w-6 h-6 text-yellow-500 mr-3" />
-          <h4 className="text-xl font-bold text-gray-800">{title}</h4>
+          <AlertTriangle className="w-6 h-6 text-yellow-500 mr-3 flex-shrink-0" />
+          <h4 className="text-lg font-bold text-gray-800">{title}</h4>
         </div>
-        <p className="text-gray-600 mb-6">{message}</p>
-        <div className="flex justify-end space-x-3">
+        <p className="text-gray-600 mb-6 text-sm">{message}</p>
+        <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-300 transition-colors"
+            className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-300 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 bg-red-500 text-white font-semibold rounded-xl hover:bg-red-600 transition-colors"
+            className="flex-1 px-4 py-3 bg-red-500 text-white font-semibold rounded-xl hover:bg-red-600 transition-colors"
           >
             Confirm
           </button>
@@ -146,10 +146,9 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
     }
   };
 
-  // The dependencies are correct here: [selectedYear, selectedMonth]
   useEffect(() => {
     fetchHistory(selectedYear, selectedMonth);
-  }, [selectedYear, selectedMonth]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedYear, selectedMonth]);
 
   const handleMonthChange = (direction) => {
     let newMonth = selectedMonth + direction;
@@ -186,14 +185,12 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
 
   const activityData = historyData?.dailyActivity ?? {};
 
-  // FIX: Added activityData to dependencies
   const presentDays = useMemo(() => {
     return Object.entries(activityData)
       .filter(([_, activity]) => activity?.present === true)
       .sort((a, b) => new Date(b[0]) - new Date(a[0]));
   }, [activityData]);
 
-  // FIX: Added formatLocalDateString and today to dependencies
   const monthlySummary = useMemo(() => {
     let presentDays = 0;
     let absentDays = 0;
@@ -204,7 +201,6 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
       const normalized = activity || {};
       const gathas = normalized.gathas || { new: 0, revision: 0 };
       
-      // FIX: Added dependency on formatLocalDateString and today for this comparison
       if (formatLocalDateString(new Date(dateStr)) <= formatLocalDateString(today)) {
          if (normalized.present) {
             presentDays += 1;
@@ -226,60 +222,52 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
       newGathas,
       revisionGathas,
     };
-  }, [activityData, formatLocalDateString, today]); // Corrected dependency array
+  }, [activityData, formatLocalDateString, today]);
 
   const renderSummaryCards = () => (
-    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-300 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+    <div className="grid grid-cols-2 gap-3 mb-6">
+      <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-300 rounded-xl p-4 shadow-sm">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs uppercase tracking-wide text-green-700 font-bold">Present Days</p>
-          <Calendar className="text-green-500" size={20} />
+          <p className="text-xs uppercase tracking-wide text-green-700 font-bold">Present</p>
+          <Calendar className="text-green-500" size={16} />
         </div>
-        <p className="text-4xl font-bold text-green-700 mb-1">
+        <p className="text-2xl font-bold text-green-700">
           {monthlySummary.presentDays || 0}
         </p>
-        <p className="text-sm text-green-600">
-          Days attended this month
-        </p>
+        <p className="text-xs text-green-600">Days attended</p>
       </div>
 
-      <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+      <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-xl p-4 shadow-sm">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs uppercase tracking-wide text-purple-700 font-bold">New Gathas</p>
-          <Plus className="text-purple-500" size={20} />
+          <p className="text-xs uppercase tracking-wide text-purple-700 font-bold">New</p>
+          <Plus className="text-purple-500" size={16} />
         </div>
-        <p className="text-4xl font-bold text-purple-700 mb-1">
+        <p className="text-2xl font-bold text-purple-700">
           {monthlySummary.newGathas || 0}
         </p>
-        <p className="text-sm text-purple-600">
-          Total new gathas learned
-        </p>
+        <p className="text-xs text-purple-600">Gathas learned</p>
       </div>
 
-      <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+      <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-xl p-4 shadow-sm">
         <div className="flex items-center justify-between mb-2">
           <p className="text-xs uppercase tracking-wide text-blue-700 font-bold">Revisions</p>
-          <Heart className="text-blue-500" size={20} />
+          <Heart className="text-blue-500" size={16} />
         </div>
-        <p className="text-4xl font-bold text-blue-700 mb-1">
+        <p className="text-2xl font-bold text-blue-700">
           {monthlySummary.revisionGathas || 0}
         </p>
-        <p className="text-sm text-blue-600">
-          Gathas revised this month
-        </p>
+        <p className="text-xs text-blue-600">Gathas revised</p>
       </div>
 
-      <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-300 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+      <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-300 rounded-xl p-4 shadow-sm">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs uppercase tracking-wide text-orange-700 font-bold">Total Gathas</p>
-          <TrendingUp className="text-orange-500" size={20} />
+          <p className="text-xs uppercase tracking-wide text-orange-700 font-bold">Total</p>
+          <TrendingUp className="text-orange-500" size={16} />
         </div>
-        <p className="text-4xl font-bold text-orange-700 mb-1">
+        <p className="text-2xl font-bold text-orange-700">
           {(monthlySummary.newGathas || 0) + (monthlySummary.revisionGathas || 0)}
         </p>
-        <p className="text-sm text-orange-600">
-          Combined practice count
-        </p>
+        <p className="text-xs text-orange-600">Combined count</p>
       </div>
     </div>
   );
@@ -287,28 +275,28 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
   const renderDailyHistory = () => {
     if (isLoading) {
       return (
-        <div className="text-center py-16">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-orange-200 border-t-orange-500"></div>
-          <p className="mt-4 text-gray-600 font-medium">Loading your history...</p>
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-orange-200 border-t-orange-500"></div>
+          <p className="mt-4 text-gray-600 font-medium text-sm">Loading history...</p>
         </div>
       );
     }
 
     if (error) {
       return (
-        <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-8 text-center">
-          <CloseIcon size={48} className="mx-auto text-red-400 mb-3" />
-          <p className="text-red-700 font-semibold text-lg">{error}</p>
+        <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6 text-center">
+          <CloseIcon size={40} className="mx-auto text-red-400 mb-3" />
+          <p className="text-red-700 font-semibold text-sm">{error}</p>
         </div>
       );
     }
 
     if (presentDays.length === 0) {
       return (
-        <div className="bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-3xl p-12 text-center">
-          <Calendar size={64} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-xl font-semibold text-gray-600 mb-2">No Activity This Month</p>
-          <p className="text-gray-500">
+        <div className="bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center">
+          <Calendar size={48} className="mx-auto text-gray-300 mb-4" />
+          <p className="text-lg font-semibold text-gray-600 mb-2">No Activity This Month</p>
+          <p className="text-gray-500 text-sm">
             Start attending classes and your progress will appear here!
           </p>
         </div>
@@ -327,60 +315,54 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
           const isToday = dateStr === todayIso;
 
           const weekdayLabel = formatDateIn(dateStr, { weekday: 'short' });
-          const friendlyDate = formatDateIn(dateStr, { day: 'numeric', month: 'long', year: 'numeric' });
+          const friendlyDate = formatDateIn(dateStr, { day: 'numeric', month: 'short' });
 
           return (
             <button
               key={dateStr}
               type="button"
               onClick={() => handleDayClick(dateStr, activity)}
-              className={`w-full text-left bg-white border-2 rounded-2xl px-5 py-4 shadow-sm transition-all hover:shadow-lg hover:border-orange-300 ${
+              className={`w-full text-left bg-white border-2 rounded-xl p-4 shadow-sm transition-all active:scale-[0.98] ${
                 isToday ? 'border-orange-400 ring-2 ring-orange-200' : 'border-green-200'
               }`}
             >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4 flex-1">
-                  <div className="w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br from-green-100 to-green-200 text-green-700 flex-shrink-0">
-                    <Check size={26} strokeWidth={3} />
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-green-100 to-green-200 text-green-700 flex-shrink-0">
+                  <Check size={22} strokeWidth={3} />
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-bold text-gray-800">
+                      {weekdayLabel}, {friendlyDate}
+                    </p>
+                    {isToday && (
+                      <span className="text-xs font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">
+                        TODAY
+                      </span>
+                    )}
                   </div>
                   
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-bold text-gray-800 text-lg">
-                        {weekdayLabel}
-                      </p>
-                      {isToday && (
-                        <span className="text-xs font-bold text-orange-600 bg-orange-100 px-2 py-1 rounded-full">
-                          TODAY
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600 mb-3">{friendlyDate}</p>
-                    
-                    <div className="flex flex-wrap gap-2">
-                      {newCount > 0 && (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-purple-700 bg-purple-100 px-3 py-1.5 rounded-full border border-purple-200">
-                          <Plus size={14} strokeWidth={3} /> {newCount} New Gatha{newCount > 1 ? 's' : ''}
-                        </span>
-                      )}
-                      {revisionCount > 0 && (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-100 px-3 py-1.5 rounded-full border border-blue-200">
-                          <Heart size={14} strokeWidth={3} /> {revisionCount} Revision{revisionCount > 1 ? 's' : ''}
-                        </span>
-                      )}
-                      {totalCount === 0 && (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1.5 rounded-full">
-                          <BookOpen size={14} /> No gathas recorded
-                        </span>
-                      )}
-                    </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {newCount > 0 && (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-1 rounded-full">
+                        <Plus size={12} strokeWidth={3} /> {newCount} New
+                      </span>
+                    )}
+                    {revisionCount > 0 && (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-1 rounded-full">
+                        <Heart size={12} strokeWidth={3} /> {revisionCount} Rev
+                      </span>
+                    )}
+                    {totalCount === 0 && (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                        No gathas
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex items-center text-sm text-gray-400 hover:text-orange-500 transition-colors">
-                  <span className="font-medium">View Details</span>
-                  <ChevronRight size={20} />
-                </div>
+                <ChevronRight size={20} className="text-gray-400 flex-shrink-0" />
               </div>
             </button>
           );
@@ -399,66 +381,53 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
 
     return (
       <div
-        className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4"
+        className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-3"
         onClick={closeModal}
       >
         <div
-          className="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
+          className="bg-white rounded-2xl p-4 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex justify-between items-start border-b-2 border-gray-100 pb-4 mb-6">
+          <div className="flex justify-between items-start border-b-2 border-gray-100 pb-3 mb-4">
             <div className="flex-1">
-              <h3 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-                <Calendar size={24} className="text-orange-500" />
-                {formatDateIn(dateStr, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              <h3 className="text-lg font-bold text-gray-800 mb-1 flex items-center gap-2">
+                <Calendar size={20} className="text-orange-500" />
+                {formatDateIn(dateStr, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
               </h3>
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 text-sm font-semibold text-green-700 bg-green-100 px-3 py-1 rounded-full">
-                  <Check size={14} /> Attendance Marked
-                </span>
-              </div>
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2 py-1 rounded-full">
+                <Check size={12} /> Present
+              </span>
             </div>
             <button 
               onClick={closeModal} 
-              className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors" 
+              className="text-gray-400 hover:text-gray-600 p-2 rounded-lg" 
               aria-label="Close"
             >
-              <CloseIcon size={24} />
+              <CloseIcon size={22} />
             </button>
           </div>
 
           <div className="space-y-4">
             {/* New Gathas Section */}
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-5 rounded-xl border-2 border-purple-200">
-              <h4 className="font-bold text-purple-800 mb-3 flex items-center gap-2 text-lg">
-                <Plus size={20} strokeWidth={3} /> New Gathas: {newCount}
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border-2 border-purple-200">
+              <h4 className="font-bold text-purple-800 mb-3 flex items-center gap-2">
+                <Plus size={18} strokeWidth={3} /> New Gathas: {newCount}
               </h4>
               {newGathas.length === 0 ? (
-                <p className="text-sm text-purple-600 bg-white bg-opacity-50 px-4 py-3 rounded-lg">
-                  No new gathas recorded on this day.
+                <p className="text-sm text-purple-600 bg-white bg-opacity-50 px-3 py-2 rounded-lg">
+                  No new gathas recorded.
                 </p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {newGathas.map((entry, index) => (
-                    <div key={entry.id} className="bg-white bg-opacity-70 border border-purple-200 rounded-lg p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <span className="text-xs font-bold text-purple-600 bg-purple-200 px-2 py-1 rounded">
-                          Entry #{index + 1}
-                        </span>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <p className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-700 min-w-[80px]">Sutra:</span>
-                          <span className="text-gray-800">{entry.sutra_name}</span>
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-700 min-w-[80px]">Gatha:</span>
-                          <span className="text-gray-800">{entry.which_gatha}</span>
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-700 min-w-[80px]">Count:</span>
-                          <span className="font-bold text-purple-700">{entry.total_gatha}</span>
-                        </p>
+                    <div key={entry.id} className="bg-white bg-opacity-70 border border-purple-200 rounded-lg p-3">
+                      <span className="text-xs font-bold text-purple-600 bg-purple-200 px-2 py-0.5 rounded mb-2 inline-block">
+                        #{index + 1}
+                      </span>
+                      <div className="space-y-1 text-sm">
+                        <p><span className="font-semibold">Sutra:</span> {entry.sutra_name}</p>
+                        <p><span className="font-semibold">Gatha:</span> {entry.which_gatha}</p>
+                        <p><span className="font-semibold">Count:</span> <span className="font-bold text-purple-700">{entry.total_gatha}</span></p>
                       </div>
                     </div>
                   ))}
@@ -467,36 +436,25 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
             </div>
 
             {/* Revision Gathas Section */}
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 rounded-xl border-2 border-blue-200">
-              <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2 text-lg">
-                <Heart size={20} strokeWidth={3} /> Revisions: {revisionCount}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border-2 border-blue-200">
+              <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2">
+                <Heart size={18} strokeWidth={3} /> Revisions: {revisionCount}
               </h4>
               {revisionGathas.length === 0 ? (
-                <p className="text-sm text-blue-600 bg-white bg-opacity-50 px-4 py-3 rounded-lg">
-                  No revisions recorded on this day.
+                <p className="text-sm text-blue-600 bg-white bg-opacity-50 px-3 py-2 rounded-lg">
+                  No revisions recorded.
                 </p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {revisionGathas.map((entry, index) => (
-                    <div key={entry.id} className="bg-white bg-opacity-70 border border-blue-200 rounded-lg p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <span className="text-xs font-bold text-blue-600 bg-blue-200 px-2 py-1 rounded">
-                          Entry #{index + 1}
-                        </span>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <p className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-700 min-w-[80px]">Sutra:</span>
-                          <span className="text-gray-800">{entry.sutra_name}</span>
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-700 min-w-[80px]">Gatha:</span>
-                          <span className="text-gray-800">{entry.which_gatha}</span>
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-700 min-w-[80px]">Count:</span>
-                          <span className="font-bold text-blue-700">{entry.total_gatha}</span>
-                        </p>
+                    <div key={entry.id} className="bg-white bg-opacity-70 border border-blue-200 rounded-lg p-3">
+                      <span className="text-xs font-bold text-blue-600 bg-blue-200 px-2 py-0.5 rounded mb-2 inline-block">
+                        #{index + 1}
+                      </span>
+                      <div className="space-y-1 text-sm">
+                        <p><span className="font-semibold">Sutra:</span> {entry.sutra_name}</p>
+                        <p><span className="font-semibold">Gatha:</span> {entry.which_gatha}</p>
+                        <p><span className="font-semibold">Count:</span> <span className="font-bold text-blue-700">{entry.total_gatha}</span></p>
                       </div>
                     </div>
                   ))}
@@ -505,12 +463,12 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
             </div>
           </div>
 
-          <div className="mt-6 pt-4 border-t-2 border-gray-100">
+          <div className="mt-4">
             <button
               onClick={closeModal}
-              className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-md hover:shadow-lg"
+              className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold py-3 px-6 rounded-xl shadow-md active:scale-[0.98]"
             >
-              Close Details
+              Close
             </button>
           </div>
         </div>
@@ -519,51 +477,45 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
   };
 
   return (
-    <div className="bg-white rounded-3xl shadow-xl p-8 border-4 border-orange-200 mb-6">
-      <h2 className="text-3xl font-bold text-gray-800 mb-6 border-b-2 border-gray-100 pb-4 flex items-center gap-3">
-        <Clock size={32} className="text-orange-500" /> Personal History
+    <div className="bg-white rounded-2xl shadow-xl p-4 border-4 border-orange-200 mb-4">
+      <h2 className="text-xl font-bold text-gray-800 mb-4 border-b-2 border-gray-100 pb-3 flex items-center gap-2">
+        <Clock size={24} className="text-orange-500" /> Personal History
       </h2>
 
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => handleMonthChange(-1)}
-            className="p-3 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 hover:from-orange-100 hover:to-orange-200 transition-all shadow-sm hover:shadow"
-            aria-label="Previous Month"
-          >
-            <ChevronLeft size={24} />
-          </button>
-          <div>
-            <h3 className="text-2xl font-bold text-orange-600">
-              {monthNames[selectedMonth - 1]} {selectedYear}
-            </h3>
-            <p className="text-sm text-gray-600">
-              Review your attendance and gatha practice
-            </p>
-          </div>
-          <button
-            onClick={() => handleMonthChange(1)}
-            className="p-3 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 hover:from-orange-100 hover:to-orange-200 transition-all shadow-sm hover:shadow disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:from-gray-100 disabled:hover:to-gray-200"
-            aria-label="Next Month"
-            disabled={
-              selectedMonth === today.getMonth() + 1 && selectedYear === today.getFullYear()
-            }
-          >
-            <ChevronRight size={24} />
-          </button>
+      {/* Month Navigation */}
+      <div className="flex items-center justify-between gap-2 mb-6 bg-orange-50 p-3 rounded-xl">
+        <button
+          onClick={() => handleMonthChange(-1)}
+          className="p-2 rounded-lg bg-white shadow-sm active:scale-95"
+          aria-label="Previous Month"
+        >
+          <ChevronLeft size={22} />
+        </button>
+        <div className="text-center">
+          <h3 className="text-lg font-bold text-orange-600">
+            {monthNames[selectedMonth - 1]} {selectedYear}
+          </h3>
+          <p className="text-xs text-gray-600">Tap day for details</p>
         </div>
+        <button
+          onClick={() => handleMonthChange(1)}
+          className="p-2 rounded-lg bg-white shadow-sm active:scale-95 disabled:opacity-40"
+          aria-label="Next Month"
+          disabled={
+            selectedMonth === today.getMonth() + 1 && selectedYear === today.getFullYear()
+          }
+        >
+          <ChevronRight size={22} />
+        </button>
       </div>
 
       {renderSummaryCards()}
       
-      <div className="mb-4">
-        <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-          <Calendar size={20} className="text-green-500" />
+      <div className="mb-3">
+        <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+          <Calendar size={18} className="text-green-500" />
           Days Attended ({presentDays.length})
         </h3>
-        <p className="text-sm text-gray-600 mt-1">
-          Click on any day to view detailed activity
-        </p>
       </div>
       
       {renderDailyHistory()}
@@ -608,9 +560,9 @@ export default function JainPathshalaApp() {
   const [currentMonthAnalytics, setCurrentMonthAnalytics] = useState({ attendanceLeader: null, gathaStats: null });
   const [isCurrentMonthLoading, setIsCurrentMonthLoading] = useState(false);
 
-  // UI feedback & Confirmation State (NEW)
+  // UI feedback & Confirmation State
   const [globalError, setGlobalError] = useState('');
-  const [confirmAction, setConfirmAction] = useState(null); // { title, message, handler, id? }
+  const [confirmAction, setConfirmAction] = useState(null);
 
   // Convenience
   const todayIso = formatLocalDateString(new Date());
@@ -748,7 +700,7 @@ export default function JainPathshalaApp() {
   // -------------------------------------
   useEffect(() => {
     fetchAnalytics();
-  }, [isLoggedIn, dateRange.start, dateRange.end]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, dateRange.start, dateRange.end]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -756,7 +708,7 @@ export default function JainPathshalaApp() {
       fetchUserYearlyStats();
       setCurrentPage(PAGES.DASHBOARD);
     }
-  }, [isLoggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -782,7 +734,6 @@ export default function JainPathshalaApp() {
         handleLogout();
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -809,7 +760,7 @@ export default function JainPathshalaApp() {
   // -------------------------------------
   // Auth handlers
   // -------------------------------------
-const handleLogin = async (e) => {
+  const handleLogin = async (e) => {
     if (e) e.preventDefault();
     if (!loginForm.username.trim() || !loginForm.password.trim()) {
       setLoginError('Please enter both username and password');
@@ -828,22 +779,18 @@ const handleLogin = async (e) => {
         }),
       });
 
-      // Get response text first
       const responseText = await response.text();
       
-      // Check if we got a response
       if (!responseText) {
-        setLoginError('Server returned an empty response. Please check if the backend is running.');
+        setLoginError('Server returned an empty response.');
         return;
       }
 
-      // Try to parse JSON
       let data;
       try {
         data = JSON.parse(responseText);
       } catch (parseError) {
         console.error('JSON Parse Error:', parseError);
-        console.error('Response Text:', responseText);
         setLoginError(`Server error: ${responseText.substring(0, 100)}`);
         return;
       }
@@ -869,7 +816,7 @@ const handleLogin = async (e) => {
       }
     } catch (error) {
       console.error('Login error:', error);
-      setLoginError(`Network error: ${error.message}. Please check if the backend is running.`);
+      setLoginError(`Network error: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -931,17 +878,16 @@ const handleLogin = async (e) => {
     }
   };
 
-  // MODIFIED to use custom modal
   const handleUnmarkRequest = () => {
     setConfirmAction({
       title: "Confirm Unmark",
-      message: "Are you sure you want to unmark today's attendance? This action cannot be undone.",
+      message: "Are you sure you want to unmark today's attendance?",
       handler: unmarkAttendance,
     });
   };
 
   const unmarkAttendance = async () => {
-    setConfirmAction(null); // Close modal
+    setConfirmAction(null);
     try {
       const token = localStorage.getItem('jainPathshalaToken');
       const response = await fetch(`${API_BASE}/attendance/unmark`, {
@@ -1025,18 +971,17 @@ const handleLogin = async (e) => {
     }
   };
 
-  // MODIFIED to use custom modal
   const handleRemoveGathaRequest = (id) => {
     setConfirmAction({
       title: "Confirm Deletion",
-      message: "Are you sure you want to delete this gatha entry? This action is permanent.",
+      message: "Are you sure you want to delete this gatha entry?",
       handler: () => removeGathaEntry(id),
       id: id
     });
   };
 
   const removeGathaEntry = async (id) => {
-    setConfirmAction(null); // Close modal
+    setConfirmAction(null);
     const token = localStorage.getItem('jainPathshalaToken');
 
     try {
@@ -1073,84 +1018,85 @@ const handleLogin = async (e) => {
   };
 
   // -------------------------------------
-  // Render helpers
+  // Render Dashboard
   // -------------------------------------
   const renderDashboard = () => (
     <>
-      <div className="grid lg:grid-cols-2 gap-6 mb-6">
+      {/* Attendance & Gatha Cards */}
+      <div className="grid grid-cols-1 gap-4 mb-4">
         {/* Attendance Card */}
-        <div className="bg-white rounded-3xl shadow-xl p-8 border-4 border-orange-200 transform transition-all hover:scale-[1.01]">
+        <div className="bg-white rounded-2xl shadow-xl p-5 border-4 border-orange-200">
           <div className="text-center">
-            <div className="w-24 h-24 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full mx-auto mb-6 flex items-center justify-center shadow-lg">
-              <Calendar className="w-12 h-12 text-white" />
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full mx-auto mb-4 flex items-center justify-center shadow-lg">
+              <Calendar className="w-8 h-8 text-white" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-800 mb-4">Mark Attendance</h3>
-            <p className="text-gray-600 mb-6">Record your presence for today's session</p>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Mark Attendance</h3>
+            <p className="text-gray-600 text-sm mb-4">Record your presence for today</p>
 
             {!todayAttendanceMarked ? (
               <button
                 onClick={markAttendance}
-                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-4 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg"
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 rounded-xl active:scale-[0.98] shadow-lg"
               >
                 Mark Present
               </button>
             ) : (
               <div>
-                <div className="bg-green-50 border-2 border-green-300 rounded-xl p-4 flex items-center justify-center gap-3 mb-4">
-                  <Check className="w-6 h-6 text-green-600" />
-                  <span className="text-green-700 font-bold text-lg">Attendance Marked!</span>
+                <div className="bg-green-50 border-2 border-green-300 rounded-xl p-3 flex items-center justify-center gap-2 mb-3">
+                  <Check className="w-5 h-5 text-green-600" />
+                  <span className="text-green-700 font-bold">Attendance Marked!</span>
                 </div>
                 <button
-                  onClick={handleUnmarkRequest} // MODIFIED
-                  className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-3 rounded-xl hover:from-red-600 hover:to-red-700 transition-all shadow-lg"
+                  onClick={handleUnmarkRequest}
+                  className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-2.5 rounded-xl active:scale-[0.98] shadow-lg text-sm"
                 >
                   Unmark Attendance
                 </button>
               </div>
             )}
 
-            <div className="mt-4 text-sm text-gray-500">Date: {formatDateIn(new Date())}</div>
+            <div className="mt-3 text-xs text-gray-500">{formatDateIn(new Date())}</div>
 
-            <div className="mt-6 pt-6 border-t-2 border-gray-100">
-              <div className="text-sm text-gray-600 mb-2">Total Days Present (This Year)</div>
-              <div className="text-3xl font-bold text-blue-600">{userYearlyAttendance}</div>
+            <div className="mt-4 pt-4 border-t-2 border-gray-100">
+              <div className="text-xs text-gray-600 mb-1">Total Days Present (This Year)</div>
+              <div className="text-2xl font-bold text-blue-600">{userYearlyAttendance}</div>
             </div>
           </div>
         </div>
 
         {/* Gatha Card */}
-        <div className="bg-white rounded-3xl shadow-xl p-8 border-4 border-orange-200">
+        <div className="bg-white rounded-2xl shadow-xl p-5 border-4 border-orange-200">
           <div className="text-center">
-            <div className="w-24 h-24 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full mx-auto mb-6 flex items-center justify-center shadow-lg">
-              <Heart className="w-12 h-12 text-white" />
+            <div className="w-16 h-16 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full mx-auto mb-4 flex items-center justify-center shadow-lg">
+              <Heart className="w-8 h-8 text-white" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-800 mb-4">Submit Gatha</h3>
-            <p className="text-gray-600 mb-6">Record your gatha learning progress</p>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Submit Gatha</h3>
+            <p className="text-gray-600 text-sm mb-4">Record your gatha progress</p>
 
             {todaysEntries.length > 0 && (
-              <div className="mb-6 space-y-3">
-                <h4 className="font-semibold text-gray-700 text-left">Today's Entries:</h4>
+              <div className="mb-4 space-y-2">
+                <h4 className="font-semibold text-gray-700 text-left text-sm">Today's Entries:</h4>
                 {todaysEntries.map((entry) => (
-                  <div key={entry.id} className="bg-green-50 border-2 border-green-300 rounded-xl p-4 text-left">
+                  <div key={entry.id} className="bg-green-50 border-2 border-green-300 rounded-xl p-3 text-left">
                     <div className="flex justify-between items-start mb-2">
-                      <span className="inline-block px-3 py-1 bg-purple-500 text-white text-xs font-bold rounded-full">
-                        {entry.type === 'new' ? 'New Gatha' : 'Revision'}
+                      <span className="inline-block px-2 py-0.5 bg-purple-500 text-white text-xs font-bold rounded-full">
+                        {entry.type === 'new' ? 'New' : 'Revision'}
                       </span>
                       <button
-                        onClick={() => handleRemoveGathaRequest(entry.id)} // MODIFIED
-                        className="text-red-500 hover:text-red-700"
+                        onClick={() => handleRemoveGathaRequest(entry.id)}
+                        className="text-red-500 p-1"
                         title="Delete"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                    <p className="text-sm text-gray-700">
+                    <p className="text-xs text-gray-700">
                       <span className="font-bold">Sutra:</span> {entry.sutra_name}
                     </p>
-                    <p className="text-sm text-gray-700">
+                    <p className="text-xs text-gray-700">
                       <span className="font-bold">Gatha:</span> {entry.which_gatha}
                     </p>
-                    <p className="text-sm text-gray-700">
+                    <p className="text-xs text-gray-700">
                       <span className="font-bold">Total:</span> {entry.total_gatha}
                     </p>
                   </div>
@@ -1161,7 +1107,7 @@ const handleLogin = async (e) => {
             {!showGathaForm && (
               <button
                 onClick={todaysEntries.length > 0 ? handleEditTodaysGathaClick : () => setShowGathaForm(true)}
-                className="w-full bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold py-4 rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all shadow-lg flex items-center justify-center gap-2"
+                className="w-full bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold py-3 rounded-xl active:scale-[0.98] shadow-lg flex items-center justify-center gap-2"
               >
                 <Plus className="w-5 h-5" />
                 {todaysEntries.length > 0 ? "Edit Today's Gatha" : 'Add Gatha Entry'}
@@ -1169,12 +1115,12 @@ const handleLogin = async (e) => {
             )}
 
             {showGathaForm && (
-              <div className="space-y-6 text-left">
+              <div className="space-y-4 text-left">
                 <div className="bg-purple-50 rounded-xl p-4 border-2 border-purple-200">
-                  <h4 className="font-bold text-purple-700 mb-3">
+                  <h4 className="font-bold text-purple-700 mb-3 text-sm">
                     New Gatha {hasTodaysNewGatha && '(Editing)'}
                   </h4>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <input
                       type="text"
                       value={gathaForm.newGatha.sutraName}
@@ -1184,8 +1130,8 @@ const handleLogin = async (e) => {
                           newGatha: { ...prev.newGatha, sutraName: e.target.value },
                         }))
                       }
-                      className="w-full px-3 py-2 border-2 border-purple-200 rounded-lg focus:outline-none focus:border-purple-400 text-sm"
-                      placeholder="Enter sutra name"
+                      className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg focus:outline-none focus:border-purple-400 text-sm"
+                      placeholder="Sutra name"
                     />
                     <input
                       type="text"
@@ -1196,7 +1142,7 @@ const handleLogin = async (e) => {
                           newGatha: { ...prev.newGatha, whichGatha: e.target.value },
                         }))
                       }
-                      className="w-full px-3 py-2 border-2 border-purple-200 rounded-lg focus:outline-none focus:border-purple-400 text-sm"
+                      className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg focus:outline-none focus:border-purple-400 text-sm"
                       placeholder="e.g., Gatha 1, 2, 3"
                     />
                     <input
@@ -1208,18 +1154,18 @@ const handleLogin = async (e) => {
                           newGatha: { ...prev.newGatha, totalGatha: e.target.value },
                         }))
                       }
-                      className="w-full px-3 py-2 border-2 border-purple-200 rounded-lg focus:outline-none focus:border-purple-400 text-sm"
-                      placeholder="Enter total count"
+                      className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg focus:outline-none focus:border-purple-400 text-sm"
+                      placeholder="Total count"
                       min="1"
                     />
                   </div>
                 </div>
 
                 <div className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
-                  <h4 className="font-bold text-blue-700 mb-3">
+                  <h4 className="font-bold text-blue-700 mb-3 text-sm">
                     Revision {hasTodaysRevision && '(Editing)'}
                   </h4>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <input
                       type="text"
                       value={gathaForm.revision.sutraName}
@@ -1229,8 +1175,8 @@ const handleLogin = async (e) => {
                           revision: { ...prev.revision, sutraName: e.target.value },
                         }))
                       }
-                      className="w-full px-3 py-2 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
-                      placeholder="Enter sutra name"
+                      className="w-full px-3 py-2.5 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
+                      placeholder="Sutra name"
                     />
                     <input
                       type="text"
@@ -1241,7 +1187,7 @@ const handleLogin = async (e) => {
                           revision: { ...prev.revision, whichGatha: e.target.value },
                         }))
                       }
-                      className="w-full px-3 py-2 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
+                      className="w-full px-3 py-2.5 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
                       placeholder="e.g., Gatha 1, 2, 3"
                     />
                     <input
@@ -1253,8 +1199,8 @@ const handleLogin = async (e) => {
                           revision: { ...prev.revision, totalGatha: e.target.value },
                         }))
                       }
-                      className="w-full px-3 py-2 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
-                      placeholder="Enter total count"
+                      className="w-full px-3 py-2.5 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
+                      placeholder="Total count"
                       min="1"
                     />
                   </div>
@@ -1269,7 +1215,7 @@ const handleLogin = async (e) => {
                         revision: { sutraName: '', whichGatha: '', totalGatha: '' },
                       });
                     }}
-                    className="bg-gray-300 text-gray-700 font-bold py-3 rounded-xl hover:bg-gray-400 transition-all"
+                    className="bg-gray-300 text-gray-700 font-bold py-3 rounded-xl active:scale-[0.98]"
                   >
                     Cancel
                   </button>
@@ -1283,7 +1229,7 @@ const handleLogin = async (e) => {
                         gathaForm.revision.totalGatha
                       )
                     }
-                    className="bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold py-3 rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold py-3 rounded-xl active:scale-[0.98] shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {hasTodaysNewGatha || hasTodaysRevision ? 'Update' : 'Submit'}
                   </button>
@@ -1294,93 +1240,119 @@ const handleLogin = async (e) => {
         </div>
       </div>
 
-      {/* Top Analytics Section */}
-      <div className="bg-white rounded-3xl shadow-xl p-8 border-4 border-orange-200 mb-6">
-        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg">
-              <BarChart3 className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold text-gray-800">Pathshala Analytics</h3>
-              <p className="text-gray-600">Performance for the selected period</p>
-            </div>
+      {/* Pathshala Analytics Section - MOBILE OPTIMIZED */}
+      <div className="bg-white rounded-2xl shadow-xl p-4 border-4 border-orange-200 mb-4">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg flex-shrink-0">
+            <BarChart3 className="w-6 h-6 text-white" />
           </div>
-          <div className="flex items-end gap-3 bg-green-50 p-2 rounded-xl border-2 border-green-200">
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">Pathshala Analytics</h3>
+            <p className="text-xs text-gray-600">Performance for selected period</p>
+          </div>
+        </div>
+
+        {/* Date Picker Section - MOBILE OPTIMIZED */}
+        <div className="bg-green-50 p-3 rounded-xl border-2 border-green-200 mb-4">
+          <div className="space-y-3">
+            {/* Start Date */}
             <div>
-              <label htmlFor="startDate" className="text-xs font-semibold text-gray-600">
-                Start Date{' '}
-                <span className="font-normal text-green-700">({formatDateIn(dateRange.start) || 'N/A'})</span>
+              <label htmlFor="startDate" className="text-xs font-semibold text-gray-600 block mb-1">
+                Start Date
               </label>
               <input
                 type="date"
                 id="startDate"
                 value={dateRange.start}
                 onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                className="p-1 rounded-lg border-gray-300 focus:ring-green-500 focus:border-green-500 text-sm"
+                className="w-full px-3 py-2.5 rounded-lg border-2 border-green-200 focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm bg-white"
               />
+              <span className="text-xs text-green-700 mt-1 block">
+                {formatDateIn(dateRange.start) || 'Select date'}
+              </span>
             </div>
+
+            {/* End Date */}
             <div>
-              <label htmlFor="endDate" className="text-xs font-semibold text-gray-600">
-                End Date{' '}
-                <span className="font-normal text-green-700">({formatDateIn(dateRange.end) || 'N/A'})</span>
+              <label htmlFor="endDate" className="text-xs font-semibold text-gray-600 block mb-1">
+                End Date
               </label>
               <input
                 type="date"
                 id="endDate"
                 value={dateRange.end}
                 onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                className="p-1 rounded-lg border-gray-300 focus:ring-green-500 focus:border-green-500 text-sm"
+                className="w-full px-3 py-2.5 rounded-lg border-2 border-green-200 focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm bg-white"
               />
+              <span className="text-xs text-green-700 mt-1 block">
+                {formatDateIn(dateRange.end) || 'Select date'}
+              </span>
             </div>
-            <button
-              onClick={() => {
-                const today = formatLocalDateString(new Date());
-                setDateRange({ start: today, end: today });
-              }}
-              className="bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600 text-sm"
-            >
-              Today
-            </button>
+
+            {/* Quick Actions */}
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => {
+                  const today = formatLocalDateString(new Date());
+                  setDateRange({ start: today, end: today });
+                }}
+                className="flex-1 bg-blue-500 text-white px-3 py-2.5 rounded-lg active:scale-[0.98] text-sm font-medium"
+              >
+                Today
+              </button>
+              <button
+                onClick={() => setDateRange(getMonthDateRange())}
+                className="flex-1 bg-green-500 text-white px-3 py-2.5 rounded-lg active:scale-[0.98] text-sm font-medium"
+              >
+                This Month
+              </button>
+            </div>
           </div>
         </div>
 
+        {/* Analytics Cards */}
         {isAnalyticsLoading ? (
-          <div className="text-center py-16">Loading Analytics...</div>
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-green-200 border-t-green-500"></div>
+            <p className="mt-3 text-gray-600 text-sm">Loading Analytics...</p>
+          </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-yellow-50 border-2 border-yellow-300 p-6 rounded-2xl text-center">
-              <Trophy className="w-10 h-10 mx-auto text-yellow-500 mb-3" />
-              <h4 className="font-bold text-gray-700">Attendance Leader</h4>
-              <p className="text-3xl font-bold text-yellow-600">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-yellow-50 border-2 border-yellow-300 p-3 rounded-xl text-center">
+              <Trophy className="w-8 h-8 mx-auto text-yellow-500 mb-2" />
+              <h4 className="font-bold text-gray-700 text-xs">Attendance Leader</h4>
+              <p className="text-lg font-bold text-yellow-600 truncate">
                 {analyticsData.attendanceLeader?.username || 'N/A'}
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-xs text-gray-500">
                 {analyticsData.attendanceLeader?.attendance_count || 0} days
               </p>
-              <p className="text-xs text-gray-500">Tie-break by new gathas</p>
             </div>
-            <div className="bg-blue-50 border-2 border-blue-300 p-6 rounded-2xl text-center">
-              <User className="w-10 h-10 mx-auto text-blue-500 mb-3" />
-              <h4 className="font-bold text-gray-700">Your New Gathas</h4>
-              <p className="text-3xl font-bold text-blue-600">{userNewGathasCount}</p>
-              <p className="text-sm text-gray-500">in this period</p>
+            
+            <div className="bg-blue-50 border-2 border-blue-300 p-3 rounded-xl text-center">
+              <User className="w-8 h-8 mx-auto text-blue-500 mb-2" />
+              <h4 className="font-bold text-gray-700 text-xs">Your New Gathas</h4>
+              <p className="text-lg font-bold text-blue-600">{userNewGathasCount}</p>
+              <p className="text-xs text-gray-500">in this period</p>
             </div>
-            <div className="bg-purple-50 border-2 border-purple-300 p-6 rounded-2xl text-center">
-              <BookOpen className="w-10 h-10 mx-auto text-purple-500 mb-3" />
-              <h4 className="font-bold text-gray-700">Pathshala's Total Gathas</h4>
-              <p className="text-3xl font-bold text-purple-600">
+            
+            <div className="bg-purple-50 border-2 border-purple-300 p-3 rounded-xl text-center">
+              <BookOpen className="w-8 h-8 mx-auto text-purple-500 mb-2" />
+              <h4 className="font-bold text-gray-700 text-xs">Total Gathas</h4>
+              <p className="text-lg font-bold text-purple-600">
                 {analyticsData.gathaStats?.totalPathshalaGathas || 0}
               </p>
-              <p className="text-sm text-gray-500">learned together</p>
+              <p className="text-xs text-gray-500">learned together</p>
             </div>
-            <div className="bg-red-50 border-2 border-red-300 p-6 rounded-2xl text-center">
-              <Crown className="w-10 h-10 mx-auto text-red-500 mb-3" />
-              <h4 className="font-bold text-gray-700">Gatha Leader</h4>
-              <p className="text-3xl font-bold text-red-600">
+            
+            <div className="bg-red-50 border-2 border-red-300 p-3 rounded-xl text-center">
+              <Crown className="w-8 h-8 mx-auto text-red-500 mb-2" />
+              <h4 className="font-bold text-gray-700 text-xs">Gatha Leader</h4>
+              <p className="text-lg font-bold text-red-600 truncate">
                 {analyticsData.gathaStats?.gathaLeader?.username || 'N/A'}
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-xs text-gray-500">
                 {analyticsData.gathaStats?.gathaLeader?.count || 0} gathas
               </p>
             </div>
@@ -1388,57 +1360,63 @@ const handleLogin = async (e) => {
         )}
       </div>
 
-      {/* Current Month Summary */}
-      <div className="bg-white rounded-3xl shadow-xl p-8 border-4 border-orange-200 mb-6">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="w-16 h-16 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-full flex items-center justify-center shadow-lg">
-            <Calendar className="w-8 h-8 text-white" />
+      {/* Current Month Summary - MOBILE OPTIMIZED */}
+      <div className="bg-white rounded-2xl shadow-xl p-4 border-4 border-orange-200 mb-4">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-full flex items-center justify-center shadow-lg flex-shrink-0">
+            <Calendar className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h3 className="text-2xl font-bold text-gray-800">Current Month Summary</h3>
-            <p className="text-gray-600">
-              Performance for {formatDateIn(new Date(), { month: 'long', year: 'numeric' })}
+            <h3 className="text-lg font-bold text-gray-800">Current Month</h3>
+            <p className="text-xs text-gray-600">
+              {formatDateIn(new Date(), { month: 'long', year: 'numeric' })}
             </p>
           </div>
         </div>
 
         {isCurrentMonthLoading ? (
-          <div className="text-center py-16">Loading Current Month Analytics...</div>
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-cyan-200 border-t-cyan-500"></div>
+            <p className="mt-3 text-gray-600 text-sm">Loading...</p>
+          </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-cyan-50 border-2 border-cyan-300 p-6 rounded-2xl text-center">
-              <Trophy className="w-10 h-10 mx-auto text-cyan-500 mb-3" />
-              <h4 className="font-bold text-gray-700">Attendance Leader</h4>
-              <p className="text-3xl font-bold text-cyan-600">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-cyan-50 border-2 border-cyan-300 p-3 rounded-xl text-center">
+              <Trophy className="w-8 h-8 mx-auto text-cyan-500 mb-2" />
+              <h4 className="font-bold text-gray-700 text-xs">Attendance Leader</h4>
+              <p className="text-lg font-bold text-cyan-600 truncate">
                 {currentMonthAnalytics.attendanceLeader?.username || 'N/A'}
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-xs text-gray-500">
                 {currentMonthAnalytics.attendanceLeader?.attendance_count || 0} days
               </p>
             </div>
-            <div className="bg-blue-50 border-2 border-blue-300 p-6 rounded-2xl text-center">
-              <User className="w-10 h-10 mx-auto text-blue-500 mb-3" />
-              <h4 className="font-bold text-gray-700">Total Attendance of All Students</h4>
-              <p className="text-3xl font-bold text-blue-600">
+            
+            <div className="bg-blue-50 border-2 border-blue-300 p-3 rounded-xl text-center">
+              <User className="w-8 h-8 mx-auto text-blue-500 mb-2" />
+              <h4 className="font-bold text-gray-700 text-xs">Total Attendance</h4>
+              <p className="text-lg font-bold text-blue-600">
                 {currentMonthAnalytics.gathaStats?.totalAttendance || 0}
               </p>
-              <p className="text-sm text-gray-500">for this month</p>
+              <p className="text-xs text-gray-500">all students</p>
             </div>
-            <div className="bg-purple-50 border-2 border-purple-300 p-6 rounded-2xl text-center">
-              <BookOpen className="w-10 h-10 mx-auto text-purple-500 mb-3" />
-              <h4 className="font-bold text-gray-700">Pathshala's Total Gathas</h4>
-              <p className="text-3xl font-bold text-purple-600">
+            
+            <div className="bg-purple-50 border-2 border-purple-300 p-3 rounded-xl text-center">
+              <BookOpen className="w-8 h-8 mx-auto text-purple-500 mb-2" />
+              <h4 className="font-bold text-gray-700 text-xs">Total Gathas</h4>
+              <p className="text-lg font-bold text-purple-600">
                 {currentMonthAnalytics.gathaStats?.totalPathshalaGathas || 0}
               </p>
-              <p className="text-sm text-gray-500">learned this month</p>
+              <p className="text-xs text-gray-500">this month</p>
             </div>
-            <div className="bg-red-50 border-2 border-red-300 p-6 rounded-2xl text-center">
-              <Crown className="w-10 h-10 mx-auto text-red-500 mb-3" />
-              <h4 className="font-bold text-gray-700">Gatha Leader</h4>
-              <p className="text-3xl font-bold text-red-600">
+            
+            <div className="bg-red-50 border-2 border-red-300 p-3 rounded-xl text-center">
+              <Crown className="w-8 h-8 mx-auto text-red-500 mb-2" />
+              <h4 className="font-bold text-gray-700 text-xs">Gatha Leader</h4>
+              <p className="text-lg font-bold text-red-600 truncate">
                 {currentMonthAnalytics.gathaStats?.gathaLeader?.username || 'N/A'}
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-xs text-gray-500">
                 {currentMonthAnalytics.gathaStats?.gathaLeader?.count || 0} gathas
               </p>
             </div>
@@ -1456,46 +1434,46 @@ const handleLogin = async (e) => {
     );
 
   // -------------------------------------
-  // JSX
+  // Login Screen - MOBILE OPTIMIZED
   // -------------------------------------
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border-4 border-orange-200">
-            <div className="bg-gradient-to-r from-orange-400 to-amber-500 p-8 text-white text-center">
-              <div className="w-20 h-20 bg-white rounded-full mx-auto mb-4 flex items-center justify-center">
-                <BookOpen className="w-10 h-10 text-orange-500" />
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 flex items-center justify-center p-3">
+        <div className="w-full max-w-sm">
+          <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border-4 border-orange-200">
+            <div className="bg-gradient-to-r from-orange-400 to-amber-500 p-6 text-white text-center">
+              <div className="w-16 h-16 bg-white rounded-full mx-auto mb-3 flex items-center justify-center">
+                <BookOpen className="w-8 h-8 text-orange-500" />
               </div>
-              <h1 className="text-3xl font-bold mb-2">जय जिनेंद्र</h1>
-              <p className="text-orange-100">Jain Pathshala Portal</p>
+              <h1 className="text-2xl font-bold mb-1">जय जिनेंद्र</h1>
+              <p className="text-orange-100 text-sm">Jain Pathshala Portal</p>
             </div>
-            <div className="p-8">
+            <div className="p-5">
               {loginError && (
-                <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-400 text-red-700 rounded">
-                  <p className="text-sm">{loginError}</p>
+                <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-400 text-red-700 rounded">
+                  <p className="text-xs">{loginError}</p>
                 </div>
               )}
               <form onSubmit={handleLogin}>
-                <div className="mb-6">
-                  <label className="block text-gray-700 font-semibold mb-2">Username</label>
+                <div className="mb-4">
+                  <label className="block text-gray-700 font-semibold mb-1.5 text-sm">Username</label>
                   <input
                     type="text"
                     value={loginForm.username}
                     onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-orange-200 rounded-xl focus:outline-none focus:border-orange-400 transition-colors"
+                    className="w-full px-3 py-3 border-2 border-orange-200 rounded-xl focus:outline-none focus:border-orange-400 transition-colors text-sm"
                     placeholder="Enter your username"
                     disabled={isLoading}
                     required
                   />
                 </div>
-                <div className="mb-8">
-                  <label className="block text-gray-700 font-semibold mb-2">Password</label>
+                <div className="mb-6">
+                  <label className="block text-gray-700 font-semibold mb-1.5 text-sm">Password</label>
                   <input
                     type="password"
                     value={loginForm.password}
                     onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-orange-200 rounded-xl focus:outline-none focus:border-orange-400 transition-colors"
+                    className="w-full px-3 py-3 border-2 border-orange-200 rounded-xl focus:outline-none focus:border-orange-400 transition-colors text-sm"
                     placeholder="Enter your password"
                     disabled={isLoading}
                     required
@@ -1504,11 +1482,11 @@ const handleLogin = async (e) => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold py-4 rounded-xl hover:from-orange-600 hover:to-amber-600 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold py-3.5 rounded-xl active:scale-[0.98] shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
                     <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3" />
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
                       Logging in...
                     </div>
                   ) : (
@@ -1517,9 +1495,9 @@ const handleLogin = async (e) => {
                 </button>
               </form>
 
-              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-                <p className="text-blue-700 font-semibold mb-2">Available Test Accounts:</p>
-                <div className="space-y-1 text-blue-600">
+              <div className="mt-5 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs">
+                <p className="text-blue-700 font-semibold mb-1.5">Test Accounts:</p>
+                <div className="space-y-0.5 text-blue-600">
                   <p>• AaravSharma / 2005-03-15</p>
                   <p>• PriyaJain / 2004-07-22</p>
                   <p>• RohanGupta / 2005-11-08</p>
@@ -1532,58 +1510,61 @@ const handleLogin = async (e) => {
     );
   }
 
+  // -------------------------------------
+  // Main App Screen - MOBILE OPTIMIZED
+  // -------------------------------------
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 p-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 p-3">
+      <div className="max-w-lg mx-auto">
         {/* Header */}
-        <div className="bg-white rounded-3xl shadow-xl p-6 mb-6 border-4 border-orange-200">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center shadow-inner">
-                <User className="w-8 h-8 text-white" />
+        <div className="bg-white rounded-2xl shadow-xl p-4 mb-4 border-4 border-orange-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center shadow-inner">
+                <User className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-800">
-                  जay Jinendra, {currentUser?.name || currentUser?.username}
+                <h2 className="text-base font-bold text-gray-800">
+                  जय जिनेंद्र, {currentUser?.name || currentUser?.username}
                 </h2>
-                <p className="text-gray-600">Welcome to Pathshala</p>
+                <p className="text-xs text-gray-600">Welcome to Pathshala</p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 bg-red-500 text-white px-6 py-3 rounded-xl hover:bg-red-600 transition-colors shadow-md"
+              className="flex items-center gap-1 bg-red-500 text-white px-3 py-2 rounded-xl active:scale-[0.98] shadow-md text-sm"
             >
-              <LogOut className="w-5 h-5" />
-              Logout
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>
 
         {/* Global error banner */}
         {globalError && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-2xl mb-6 flex items-start gap-3 text-red-700 shadow">
+          <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-xl mb-4 flex items-start gap-2 text-red-700 shadow">
             <div className="flex-1">
-              <p className="font-semibold text-sm">Heads up!</p>
-              <p className="text-sm">{globalError}</p>
+              <p className="font-semibold text-xs">Error!</p>
+              <p className="text-xs">{globalError}</p>
             </div>
             <button
               onClick={clearGlobalError}
-              className="text-red-600 hover:text-red-800"
-              aria-label="Dismiss message"
+              className="text-red-600 p-1"
+              aria-label="Dismiss"
             >
-              <CloseIcon size={18} />
+              <CloseIcon size={16} />
             </button>
           </div>
         )}
 
         {/* Navigation Bar */}
-        <div className="flex space-x-4 mb-6">
+        <div className="flex gap-2 mb-4">
           <button
             onClick={() => setCurrentPage(PAGES.DASHBOARD)}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold transition-colors active:scale-[0.98] ${
               currentPage === PAGES.DASHBOARD
                 ? 'bg-orange-500 text-white shadow-lg'
-                : 'bg-white text-gray-600 hover:bg-orange-50 border border-orange-200'
+                : 'bg-white text-gray-600 border-2 border-orange-200'
             }`}
           >
             <BarChart3 className="w-5 h-5" />
@@ -1591,10 +1572,10 @@ const handleLogin = async (e) => {
           </button>
           <button
             onClick={() => setCurrentPage(PAGES.HISTORY)}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold transition-colors active:scale-[0.98] ${
               currentPage === PAGES.HISTORY
                 ? 'bg-orange-500 text-white shadow-lg'
-                : 'bg-white text-gray-600 hover:bg-orange-50 border border-orange-200'
+                : 'bg-white text-gray-600 border-2 border-orange-200'
             }`}
           >
             <Clock className="w-5 h-5" />
@@ -1606,14 +1587,14 @@ const handleLogin = async (e) => {
         {renderContent()}
 
         {/* Footer */}
-        <div className="bg-gradient-to-r from-orange-400 to-amber-500 rounded-3xl shadow-xl p-8 text-center text-white mt-6">
-          <BookOpen className="w-12 h-12 mx-auto mb-4" />
-          <h3 className="text-2xl font-bold mb-2">अहिंसा परमो धर्मः</h3>
-          <p className="text-orange-100">Non-violence is the supreme religion</p>
+        <div className="bg-gradient-to-r from-orange-400 to-amber-500 rounded-2xl shadow-xl p-6 text-center text-white mt-4">
+          <BookOpen className="w-10 h-10 mx-auto mb-3" />
+          <h3 className="text-xl font-bold mb-1">अहिंसा परमो धर्मः</h3>
+          <p className="text-orange-100 text-sm">Non-violence is the supreme religion</p>
         </div>
       </div>
       
-      {/* Confirmation Modal Render */}
+      {/* Confirmation Modal */}
       <ConfirmationModal
         title={confirmAction?.title}
         message={confirmAction?.message}
