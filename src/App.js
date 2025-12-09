@@ -33,7 +33,10 @@ export default function App() {
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
     
-    if (!loginForm.username.trim() || !loginForm.password.trim()) {
+    const trimmedUsername = loginForm.username.trim();
+    const trimmedPassword = loginForm.password.trim();
+    
+    if (!trimmedUsername || !trimmedPassword) {
       setLoginError('Please enter both username and password');
       return;
     }
@@ -43,16 +46,35 @@ export default function App() {
 
     try {
       const endpoint = isAdminLogin ? '/admin/login' : '/login';
+      
+      console.log('Attempting login to:', `${API_BASE}${endpoint}`);
+      console.log('With credentials:', { username: trimmedUsername, password: trimmedPassword });
+      
       const response = await fetch(`${API_BASE}${endpoint}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
-          username: loginForm.username.trim(),
-          password: loginForm.password,
+          username: trimmedUsername,
+          password: trimmedPassword,
         }),
       });
 
+      console.log('Response status:', response.status);
+
+      // Handle non-JSON responses
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textResponse = await response.text();
+        console.error('Non-JSON response:', textResponse);
+        setLoginError('Server error. Please try again.');
+        return;
+      }
+
       const data = await response.json();
+      console.log('Response data:', data);
 
       if (!response.ok) {
         setLoginError(data.error || 'Login failed');
@@ -65,12 +87,19 @@ export default function App() {
         setCurrentUser(data.user);
         setIsLoggedIn(true);
         setLoginForm({ username: '', password: '' });
+        setLoginError('');
       } else {
         setLoginError('Invalid response from server');
       }
     } catch (error) {
       console.error('Login error:', error);
-      setLoginError('Network error. Please try again.');
+      
+      // More specific error messages
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        setLoginError('Cannot connect to server. Please check your internet connection.');
+      } else {
+        setLoginError(`Network error: ${error.message}`);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -82,6 +111,7 @@ export default function App() {
     setIsLoggedIn(false);
     setCurrentUser(null);
     setLoginError('');
+    setLoginForm({ username: '', password: '' });
   };
 
   // Show appropriate dashboard based on role
@@ -109,7 +139,12 @@ export default function App() {
           {/* Toggle Admin/Student Login */}
           <div className="flex border-b-2 border-orange-100">
             <button
-              onClick={() => { setIsAdminLogin(false); setLoginError(''); }}
+              type="button"
+              onClick={() => { 
+                setIsAdminLogin(false); 
+                setLoginError(''); 
+                setLoginForm({ username: '', password: '' });
+              }}
               className={`flex-1 py-3 text-sm font-bold transition-colors ${
                 !isAdminLogin
                   ? 'bg-orange-500 text-white'
@@ -119,7 +154,12 @@ export default function App() {
               Student Login
             </button>
             <button
-              onClick={() => { setIsAdminLogin(true); setLoginError(''); }}
+              type="button"
+              onClick={() => { 
+                setIsAdminLogin(true); 
+                setLoginError(''); 
+                setLoginForm({ username: '', password: '' });
+              }}
               className={`flex-1 py-3 text-sm font-bold transition-colors ${
                 isAdminLogin
                   ? 'bg-orange-500 text-white'
@@ -148,8 +188,9 @@ export default function App() {
                   value={loginForm.username}
                   onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
                   className="w-full px-3 py-3 border-2 border-orange-200 rounded-xl focus:outline-none focus:border-orange-400 text-sm"
-                  placeholder={isAdminLogin ? 'Enter admin username' : 'Enter student username'}
+                  placeholder={isAdminLogin ? 'e.g., admin1' : 'e.g., AaravSharma'}
                   disabled={isLoading}
+                  autoComplete="username"
                   required
                 />
               </div>
@@ -161,8 +202,9 @@ export default function App() {
                   value={loginForm.password}
                   onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                   className="w-full px-3 py-3 border-2 border-orange-200 rounded-xl focus:outline-none focus:border-orange-400 text-sm"
-                  placeholder={isAdminLogin ? 'Enter admin password' : 'Enter your DOB (YYYY-MM-DD)'}
+                  placeholder={isAdminLogin ? 'e.g., Admin@123' : 'e.g., 2005-03-15'}
                   disabled={isLoading}
+                  autoComplete="current-password"
                   required
                 />
               </div>
@@ -170,7 +212,7 @@ export default function App() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold py-3.5 rounded-xl active:scale-[0.98] shadow-lg disabled:opacity-50"
+                className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold py-3.5 rounded-xl active:scale-[0.98] shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-transform"
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center">
@@ -183,30 +225,90 @@ export default function App() {
               </button>
             </form>
 
+            {/* Quick Fill Buttons for Testing */}
+            <div className="mt-4 space-y-2">
+              <p className="text-xs text-gray-500 text-center">Quick fill for testing:</p>
+              {isAdminLogin ? (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLoginForm({ username: 'admin1', password: 'Admin@123' })}
+                    className="flex-1 text-xs bg-indigo-100 text-indigo-700 py-2 rounded-lg hover:bg-indigo-200 transition-colors"
+                  >
+                    Admin 1
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoginForm({ username: 'admin2', password: 'Admin@456' })}
+                    className="flex-1 text-xs bg-indigo-100 text-indigo-700 py-2 rounded-lg hover:bg-indigo-200 transition-colors"
+                  >
+                    Admin 2
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoginForm({ username: 'admin3', password: 'Admin@789' })}
+                    className="flex-1 text-xs bg-indigo-100 text-indigo-700 py-2 rounded-lg hover:bg-indigo-200 transition-colors"
+                  >
+                    Admin 3
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLoginForm({ username: 'AaravSharma', password: '2005-03-15' })}
+                    className="flex-1 text-xs bg-green-100 text-green-700 py-2 rounded-lg hover:bg-green-200 transition-colors"
+                  >
+                    Aarav
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoginForm({ username: 'PriyaJain', password: '2004-07-22' })}
+                    className="flex-1 text-xs bg-green-100 text-green-700 py-2 rounded-lg hover:bg-green-200 transition-colors"
+                  >
+                    Priya
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoginForm({ username: 'RohanGupta', password: '2005-11-08' })}
+                    className="flex-1 text-xs bg-green-100 text-green-700 py-2 rounded-lg hover:bg-green-200 transition-colors"
+                  >
+                    Rohan
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Help text */}
-            <div className="mt-5 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs">
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs">
               {isAdminLogin ? (
                 <>
-                  <p className="text-blue-700 font-semibold mb-1.5">Admin Accounts:</p>
+                  <p className="text-blue-700 font-semibold mb-1.5">Admin Credentials:</p>
                   <div className="space-y-0.5 text-blue-600">
-                    <p>• admin1 / Admin@123</p>
-                    <p>• admin2 / Admin@456</p>
-                    <p>• admin3 / Admin@789</p>
+                    <p>• <strong>admin1</strong> / Admin@123</p>
+                    <p>• <strong>admin2</strong> / Admin@456</p>
+                    <p>• <strong>admin3</strong> / Admin@789</p>
                   </div>
                 </>
               ) : (
                 <>
-                  <p className="text-blue-700 font-semibold mb-1.5">Student Test Accounts:</p>
+                  <p className="text-blue-700 font-semibold mb-1.5">Student Credentials:</p>
                   <div className="space-y-0.5 text-blue-600">
-                    <p>• AaravSharma / 2005-03-15</p>
-                    <p>• PriyaJain / 2004-07-22</p>
-                    <p>• RohanGupta / 2005-11-08</p>
+                    <p>• <strong>AaravSharma</strong> / 2005-03-15</p>
+                    <p>• <strong>PriyaJain</strong> / 2004-07-22</p>
+                    <p>• <strong>RohanGupta</strong> / 2005-11-08</p>
                   </div>
+                  <p className="mt-2 text-gray-500 italic">Password = Date of Birth (YYYY-MM-DD)</p>
                 </>
               )}
             </div>
           </div>
         </div>
+        
+        {/* Footer */}
+        <p className="text-center text-gray-500 text-xs mt-4">
+          © 2024 Jain Pathshala. All rights reserved.
+        </p>
       </div>
     </div>
   );
