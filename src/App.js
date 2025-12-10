@@ -206,7 +206,7 @@ export default function App() {
         </div>
         
         <p className="text-center text-gray-400 text-xs mt-4">
-          © 2024 Jain Pathshala
+          © આદિનાથ પાર્શ્વનાથ જૈન સંઘ
         </p>
       </div>
     </div>
