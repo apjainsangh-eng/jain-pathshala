@@ -1529,9 +1529,9 @@ export default function StudentDashboard({ user, onLogout }) {
               </div>
               <div>
                 <h2 className="text-base font-bold text-gray-800">
-                  जय जिनेंद्र, {user?.name || user?.username}
+                  પ્રણામ, {user?.name || user?.username}
                 </h2>
-                <p className="text-xs text-gray-600">Welcome to Pathshala</p>
+                <p className="text-xs text-gray-600">શ્રી સોમચીન્તામણી વસુપૂજ્યસ્વામી જૈન પાઠશાળા</p>
               </div>
             </div>
             <button
