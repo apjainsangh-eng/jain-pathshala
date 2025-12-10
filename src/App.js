@@ -107,8 +107,8 @@ export default function App() {
             <div className="w-16 h-16 bg-white rounded-full mx-auto mb-3 flex items-center justify-center">
               <BookOpen className="w-8 h-8 text-orange-500" />
             </div>
-            <h1 className="text-2xl font-bold mb-1">जय जिनेंद्र</h1>
-            <p className="text-orange-100 text-sm">Jain Pathshala Portal</p>
+            <h1 className="text-2xl font-bold mb-1">પ્રણામ</h1>
+            <p className="text-orange-100 text-sm">શ્રી શોંચીન્તામણી વસુપૂજ્યસ્વામી જૈન પાઠશાળા</p>
           </div>
 
           {/* Toggle Buttons */}
