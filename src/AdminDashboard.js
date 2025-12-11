@@ -13,6 +13,15 @@ import {
   RefreshCw,
   Users,
   Shield,
+  TrendingUp,
+  Award,
+  BarChart3,
+  Eye,
+  Filter,
+  Download,
+  ChevronDown,
+  ChevronUp,
+  Search,
 } from 'lucide-react';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.vercel.app/api';
@@ -26,6 +35,24 @@ const formatDate = (dateStr) => {
   });
 };
 
+const formatLocalDateString = (input = new Date()) => {
+  const parsed = input instanceof Date ? input : new Date(input);
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, '0');
+  const d = String(parsed.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const getMonthDateRange = () => {
+  const today = new Date();
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  return {
+    start: formatLocalDateString(startOfMonth),
+    end: formatLocalDateString(endOfMonth),
+  };
+};
+
 export default function AdminDashboard({ user, onLogout }) {
   const [pendingData, setPendingData] = useState({ attendance: [], gatha: [] });
   const [stats, setStats] = useState(null);
@@ -33,7 +60,17 @@ export default function AdminDashboard({ user, onLogout }) {
   const [actionLoading, setActionLoading] = useState(null);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [activeTab, setActiveTab] = useState('attendance');
+  const [activeTab, setActiveTab] = useState('overview');
+  
+  // Analytics state
+  const [students, setStudents] = useState([]);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [studentDetail, setStudentDetail] = useState(null);
+  const [dateRange, setDateRange] = useState(getMonthDateRange());
+  const [leaderboardData, setLeaderboardData] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('attendance');
+  const [expandedStudent, setExpandedStudent] = useState(null);
 
   const fetchPendingData = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
@@ -67,9 +104,67 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   }, []);
 
+  const fetchStudents = useCallback(async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    try {
+      const res = await fetch(`${API_BASE}/admin/students`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setStudents(data);
+      }
+    } catch (err) {
+      console.error('Error fetching students:', err);
+    }
+  }, []);
+
+  const fetchLeaderboard = useCallback(async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    try {
+      const res = await fetch(
+        `${API_BASE}/analytics/leaderboard?startDate=${dateRange.start}&endDate=${dateRange.end}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setLeaderboardData(data);
+      }
+    } catch (err) {
+      console.error('Error fetching leaderboard:', err);
+    }
+  }, [dateRange]);
+
+  const fetchStudentDetail = useCallback(async (studentId) => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    setIsLoading(true);
+    try {
+      const res = await fetch(
+        `${API_BASE}/admin/student/${studentId}/activity?startDate=${dateRange.start}&endDate=${dateRange.end}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setStudentDetail(data);
+      }
+    } catch (err) {
+      console.error('Error fetching student detail:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [dateRange]);
+
   useEffect(() => {
     fetchPendingData();
-  }, [fetchPendingData]);
+    fetchStudents();
+    fetchLeaderboard();
+  }, [fetchPendingData, fetchStudents, fetchLeaderboard]);
+
+  useEffect(() => {
+    if (selectedStudent) {
+      fetchStudentDetail(selectedStudent);
+    }
+  }, [selectedStudent, fetchStudentDetail]);
 
   const handleApprove = async (type, id) => {
     const token = localStorage.getItem('jainPathshalaToken');
@@ -167,266 +262,418 @@ export default function AdminDashboard({ user, onLogout }) {
 
   const totalPending = pendingData.attendance.length + pendingData.gatha.length;
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-3">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-2xl shadow-xl p-4 mb-4 border-4 border-indigo-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-inner">
-                <Shield className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-gray-800">
-                  Admin: {user.name}
-                </h2>
-                <p className="text-xs text-gray-600">Approval Dashboard</p>
-              </div>
-            </div>
-            <button
-              onClick={onLogout}
-              className="flex items-center gap-1 bg-red-500 text-white px-3 py-2 rounded-xl active:scale-[0.98] text-sm"
-            >
-              <LogOut className="w-4 h-4" />
-              Logout
-            </button>
+  // Filter and sort students
+  const filteredStudents = students
+    .filter(student => 
+      student.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.username?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (sortBy === 'attendance') {
+        return (b.attendance_count || 0) - (a.attendance_count || 0);
+      } else if (sortBy === 'gatha') {
+        return (b.total_gathas || 0) - (a.total_gathas || 0);
+      }
+      return 0;
+    });
+
+  const renderOverview = () => (
+    <div className="space-y-4">
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border-2 border-blue-200">
+          <div className="flex items-center gap-2 mb-2">
+            <Users className="w-5 h-5 text-blue-600" />
+            <span className="text-xs font-bold text-blue-800">Total Students</span>
           </div>
+          <p className="text-3xl font-bold text-blue-700">{students.length}</p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-white rounded-xl p-4 border-2 border-yellow-200 shadow">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="w-5 h-5 text-yellow-500" />
-              <span className="text-xs font-bold text-gray-600">Pending</span>
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border-2 border-green-200">
+          <div className="flex items-center gap-2 mb-2">
+            <Calendar className="w-5 h-5 text-green-600" />
+            <span className="text-xs font-bold text-green-800">Today Present</span>
+          </div>
+          <p className="text-3xl font-bold text-green-700">{stats?.today_attendance || 0}</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border-2 border-purple-200">
+          <div className="flex items-center gap-2 mb-2">
+            <BookOpen className="w-5 h-5 text-purple-600" />
+            <span className="text-xs font-bold text-purple-800">Total Gathas</span>
+          </div>
+          <p className="text-3xl font-bold text-purple-700">
+            {leaderboardData?.gathaStats?.totalPathshalaGathas || 0}
+          </p>
+        </div>
+
+        <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-4 border-2 border-yellow-200">
+          <div className="flex items-center gap-2 mb-2">
+            <Clock className="w-5 h-5 text-yellow-600" />
+            <span className="text-xs font-bold text-yellow-800">Pending</span>
+          </div>
+          <p className="text-3xl font-bold text-yellow-700">{totalPending}</p>
+        </div>
+      </div>
+
+      {/* Leaderboard */}
+      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200">
+        <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <Award className="w-5 h-5 text-yellow-500" />
+          Top Performers
+        </h3>
+        
+        <div className="space-y-3">
+          <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Award className="w-4 h-4 text-yellow-600" />
+              <span className="text-xs font-bold text-yellow-800">Attendance Leader</span>
             </div>
-            <p className="text-2xl font-bold text-yellow-600">{totalPending}</p>
+            <p className="text-lg font-bold text-gray-800">
+              {leaderboardData?.attendanceLeader?.username || 'N/A'}
+            </p>
+            <p className="text-xs text-gray-600">
+              {leaderboardData?.attendanceLeader?.attendance_count || 0} days
+            </p>
           </div>
 
-          <div className="bg-white rounded-xl p-4 border-2 border-green-200 shadow">
-            <div className="flex items-center gap-2 mb-2">
-              <Users className="w-5 h-5 text-green-500" />
-              <span className="text-xs font-bold text-gray-600">Today</span>
+          <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Award className="w-4 h-4 text-purple-600" />
+              <span className="text-xs font-bold text-purple-800">Gatha Leader</span>
             </div>
-            <p className="text-2xl font-bold text-green-600">
-              {stats?.today_attendance || 0}
+            <p className="text-lg font-bold text-gray-800">
+              {leaderboardData?.gathaStats?.gathaLeader?.username || 'N/A'}
+            </p>
+            <p className="text-xs text-gray-600">
+              {leaderboardData?.gathaStats?.gathaLeader?.count || 0} gathas
             </p>
           </div>
         </div>
+      </div>
 
-        {/* Messages */}
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-xl mb-4 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
-            <p className="text-sm text-red-700">{error}</p>
-            <button onClick={() => setError('')} className="ml-auto">
-              <CloseIcon className="w-4 h-4 text-red-500" />
-            </button>
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="bg-green-50 border-l-4 border-green-500 p-3 rounded-xl mb-4 flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-            <p className="text-sm text-green-700">{successMessage}</p>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex gap-2 mb-4">
+      {/* Quick Actions */}
+      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200">
+        <h3 className="text-lg font-bold text-gray-800 mb-3">Quick Actions</h3>
+        <div className="space-y-2">
           <button
-            onClick={fetchPendingData}
-            disabled={isLoading}
-            className="flex items-center gap-2 bg-indigo-500 text-white px-4 py-2 rounded-xl active:scale-[0.98] text-sm font-bold"
+            onClick={() => setActiveTab('approvals')}
+            className="w-full flex items-center justify-between bg-yellow-50 border-2 border-yellow-200 rounded-lg p-3 active:scale-[0.98]"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-
-          {totalPending > 0 && (
-            <button
-              onClick={handleApproveAll}
-              disabled={actionLoading === 'approve-all'}
-              className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-xl active:scale-[0.98] text-sm font-bold"
-            >
-              <Check className="w-4 h-4" />
-              {actionLoading === 'approve-all' ? 'Approving...' : 'Approve All'}
-            </button>
-          )}
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => setActiveTab('attendance')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-sm ${
-              activeTab === 'attendance'
-                ? 'bg-indigo-500 text-white shadow-lg'
-                : 'bg-white text-gray-600 border-2 border-indigo-200'
-            }`}
-          >
-            <Calendar className="w-4 h-4" />
-            Attendance ({pendingData.attendance.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('gatha')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-sm ${
-              activeTab === 'gatha'
-                ? 'bg-indigo-500 text-white shadow-lg'
-                : 'bg-white text-gray-600 border-2 border-indigo-200'
-            }`}
-          >
-            <BookOpen className="w-4 h-4" />
-            Gatha ({pendingData.gatha.length})
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="bg-white rounded-2xl shadow-xl p-4 border-4 border-indigo-200">
-          {isLoading ? (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-indigo-200 border-t-indigo-500"></div>
-              <p className="mt-4 text-gray-600 text-sm">Loading...</p>
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-yellow-600" />
+              <span className="font-bold text-gray-800">Pending Approvals</span>
             </div>
-          ) : activeTab === 'attendance' ? (
-            // Attendance List
-            pendingData.attendance.length === 0 ? (
-              <div className="text-center py-12">
-                <Calendar className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500">No pending attendance</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {pendingData.attendance.map((item) => (
-                  <div
-                    key={item.id}
-                    className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <User className="w-4 h-4 text-indigo-500" />
-                          <span className="font-bold text-gray-800">
-                            {item.student_name}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-500">@{item.student_username}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <Calendar className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-700">
-                            {formatDate(item.date)}
-                          </span>
-                        </div>
-                      </div>
+            <span className="bg-yellow-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+              {totalPending}
+            </span>
+          </button>
 
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleApprove('attendance', item.id)}
-                          disabled={actionLoading === `approve-attendance-${item.id}`}
-                          className="p-2 bg-green-500 text-white rounded-lg active:scale-95"
-                        >
-                          {actionLoading === `approve-attendance-${item.id}` ? (
-                            <RefreshCw className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <Check className="w-5 h-5" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleReject('attendance', item.id)}
-                          disabled={actionLoading === `reject-attendance-${item.id}`}
-                          className="p-2 bg-red-500 text-white rounded-lg active:scale-95"
-                        >
-                          {actionLoading === `reject-attendance-${item.id}` ? (
-                            <RefreshCw className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <XCircle className="w-5 h-5" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
-          ) : (
-            // Gatha List
-            pendingData.gatha.length === 0 ? (
-              <div className="text-center py-12">
-                <BookOpen className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500">No pending gatha entries</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {pendingData.gatha.map((item) => (
-                  <div
-                    key={item.id}
-                    className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <User className="w-4 h-4 text-indigo-500" />
-                          <span className="font-bold text-gray-800">
-                            {item.student_name}
-                          </span>
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                            item.type === 'new' 
-                              ? 'bg-purple-500 text-white' 
-                              : 'bg-blue-500 text-white'
-                          }`}>
-                            {item.type === 'new' ? 'New' : 'Revision'}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-500 mb-2">@{item.student_username}</p>
-                        
-                        <div className="bg-white rounded-lg p-2 text-sm space-y-1">
-                          <p><span className="font-semibold">Sutra:</span> {item.sutra_name}</p>
-                          <p><span className="font-semibold">Gatha:</span> {item.which_gatha}</p>
-                          <p><span className="font-semibold">Total:</span> {item.total_gatha}</p>
-                          <p className="text-xs text-gray-500">{formatDate(item.date)}</p>
-                        </div>
-                      </div>
+          <button
+            onClick={() => setActiveTab('students')}
+            className="w-full flex items-center justify-between bg-blue-50 border-2 border-blue-200 rounded-lg p-3 active:scale-[0.98]"
+          >
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-blue-600" />
+              <span className="font-bold text-gray-800">View All Students</span>
+            </div>
+            <ChevronDown className="w-5 h-5 text-gray-400" />
+          </button>
 
-                      <div className="flex flex-col gap-2">
-                        <button
-                          onClick={() => handleApprove('gatha', item.id)}
-                          disabled={actionLoading === `approve-gatha-${item.id}`}
-                          className="p-2 bg-green-500 text-white rounded-lg active:scale-95"
-                        >
-                          {actionLoading === `approve-gatha-${item.id}` ? (
-                            <RefreshCw className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <Check className="w-5 h-5" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleReject('gatha', item.id)}
-                          disabled={actionLoading === `reject-gatha-${item.id}`}
-                          className="p-2 bg-red-500 text-white rounded-lg active:scale-95"
-                        >
-                          {actionLoading === `reject-gatha-${item.id}` ? (
-                            <RefreshCw className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <XCircle className="w-5 h-5" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl shadow-xl p-6 text-center text-white mt-4">
-          <Shield className="w-10 h-10 mx-auto mb-3" />
-          <h3 className="text-xl font-bold mb-1">Admin Portal</h3>
-          <p className="text-indigo-100 text-sm">Managing Jain Pathshala</p>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className="w-full flex items-center justify-between bg-green-50 border-2 border-green-200 rounded-lg p-3 active:scale-[0.98]"
+          >
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-green-600" />
+              <span className="font-bold text-gray-800">Analytics Dashboard</span>
+            </div>
+            <ChevronDown className="w-5 h-5 text-gray-400" />
+          </button>
         </div>
       </div>
     </div>
   );
-}
+
+  const renderApprovals = () => (
+    <div className="space-y-4">
+      {/* Action Buttons */}
+      <div className="flex gap-2">
+        <button
+          onClick={fetchPendingData}
+          disabled={isLoading}
+          className="flex items-center gap-2 bg-indigo-500 text-white px-4 py-2 rounded-xl active:scale-[0.98] text-sm font-bold"
+        >
+          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
+
+        {totalPending > 0 && (
+          <button
+            onClick={handleApproveAll}
+            disabled={actionLoading === 'approve-all'}
+            className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-xl active:scale-[0.98] text-sm font-bold"
+          >
+            <Check className="w-4 h-4" />
+            {actionLoading === 'approve-all' ? 'Approving...' : 'Approve All'}
+          </button>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveTab('approvals-attendance')}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-sm ${
+            activeTab === 'approvals-attendance'
+              ? 'bg-indigo-500 text-white shadow-lg'
+              : 'bg-white text-gray-600 border-2 border-indigo-200'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          Attendance ({pendingData.attendance.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('approvals-gatha')}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-sm ${
+            activeTab === 'approvals-gatha'
+              ? 'bg-indigo-500 text-white shadow-lg'
+              : 'bg-white text-gray-600 border-2 border-indigo-200'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          Gatha ({pendingData.gatha.length})
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200">
+        {isLoading ? (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-indigo-200 border-t-indigo-500"></div>
+            <p className="mt-4 text-gray-600 text-sm">Loading...</p>
+          </div>
+        ) : activeTab === 'approvals-attendance' || activeTab === 'approvals' ? (
+          pendingData.attendance.length === 0 ? (
+            <div className="text-center py-12">
+              <Calendar className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+              <p className="text-gray-500">No pending attendance</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingData.attendance.map((item) => (
+                <div key={item.id} className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <User className="w-4 h-4 text-indigo-500" />
+                        <span className="font-bold text-gray-800">{item.student_name}</span>
+                      </div>
+                      <p className="text-xs text-gray-500">@{item.student_username}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-700">{formatDate(item.date)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApprove('attendance', item.id)}
+                        disabled={actionLoading === `approve-attendance-${item.id}`}
+                        className="p-2 bg-green-500 text-white rounded-lg active:scale-95"
+                      >
+                        {actionLoading === `approve-attendance-${item.id}` ? (
+                          <RefreshCw className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Check className="w-5 h-5" />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleReject('attendance', item.id)}
+                        disabled={actionLoading === `reject-attendance-${item.id}`}
+                        className="p-2 bg-red-500 text-white rounded-lg active:scale-95"
+                      >
+                        {actionLoading === `reject-attendance-${item.id}` ? (
+                          <RefreshCw className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <XCircle className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        ) : (
+          pendingData.gatha.length === 0 ? (
+            <div className="text-center py-12">
+              <BookOpen className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+              <p className="text-gray-500">No pending gatha entries</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingData.gatha.map((item) => (
+                <div key={item.id} className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <User className="w-4 h-4 text-indigo-500" />
+                        <span className="font-bold text-gray-800">{item.student_name}</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          item.type === 'new' ? 'bg-purple-500 text-white' : 'bg-blue-500 text-white'
+                        }`}>
+                          {item.type === 'new' ? 'New' : 'Revision'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-2">@{item.student_username}</p>
+                      
+                      <div className="bg-white rounded-lg p-2 text-sm space-y-1">
+                        <p><span className="font-semibold">Sutra:</span> {item.sutra_name}</p>
+                        <p><span className="font-semibold">Gatha:</span> {item.which_gatha}</p>
+                        <p><span className="font-semibold">Total:</span> {item.total_gatha}</p>
+                        <p className="text-xs text-gray-500">{formatDate(item.date)}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => handleApprove('gatha', item.id)}
+                        disabled={actionLoading === `approve-gatha-${item.id}`}
+                        className="p-2 bg-green-500 text-white rounded-lg active:scale-95"
+                      >
+                        {actionLoading === `approve-gatha-${item.id}` ? (
+                          <RefreshCw className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Check className="w-5 h-5" />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleReject('gatha', item.id)}
+                        disabled={actionLoading === `reject-gatha-${item.id}`}
+                        className="p-2 bg-red-500 text-white rounded-lg active:scale-95"
+                      >
+                        {actionLoading === `reject-gatha-${item.id}` ? (
+                          <RefreshCw className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <XCircle className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  );
+
+  const renderStudentsList = () => (
+    <div className="space-y-4">
+      {/* Search and Filters */}
+      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200">
+        <div className="flex items-center gap-2 mb-3">
+          <Search className="w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search students..."
+            className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm"
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => setSortBy('attendance')}
+            className={`flex-1 px-3 py-2 rounded-lg text-xs font-bold ${
+              sortBy === 'attendance'
+                ? 'bg-indigo-500 text-white'
+                : 'bg-gray-100 text-gray-600'
+            }`}
+          >
+            Sort by Attendance
+          </button>
+          <button
+            onClick={() => setSortBy('gatha')}
+            className={`flex-1 px-3 py-2 rounded-lg text-xs font-bold ${
+              sortBy === 'gatha'
+                ? 'bg-indigo-500 text-white'
+                : 'bg-gray-100 text-gray-600'
+            }`}
+          >
+            Sort by Gatha
+          </button>
+        </div>
+      </div>
+
+      {/* Students List */}
+      <div className="space-y-3">
+        {filteredStudents.map((student) => (
+          <div key={student.id} className="bg-white rounded-xl border-2 border-indigo-200 overflow-hidden">
+            <button
+              onClick={() => {
+                if (expandedStudent === student.id) {
+                  setExpandedStudent(null);
+                  setSelectedStudent(null);
+                } else {
+                  setExpandedStudent(student.id);
+                  setSelectedStudent(student.id);
+                }
+              }}
+              className="w-full p-4 text-left active:bg-gray-50"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center">
+                    <User className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-800">{student.name}</p>
+                    <p className="text-xs text-gray-500">@{student.username}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">Attendance</p>
+                    <p className="text-lg font-bold text-green-600">{student.attendance_count || 0}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">Gathas</p>
+                    <p className="text-lg font-bold text-purple-600">{student.total_gathas || 0}</p>
+                  </div>
+                  {expandedStudent === student.id ? (
+                    <ChevronUp className="w-5 h-5 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                  )}
+                </div>
+              </div>
+            </button>
+
+            {expandedStudent === student.id && studentDetail && (
+              <div className="border-t-2 border-indigo-100 p-4 bg-indigo-50">
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="bg-white rounded-lg p-3 border border-green-200">
+                    <p className="text-xs text-gray-600 mb-1">Total Attendance</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {studentDetail.attendance?.length || 0}
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-purple-200">
+                    <p className="text-xs text-gray-600 mb-1">New Gathas</p>
+                    <p className="text-2xl font-bold text-purple-600">
+                      {studentDetail.gathaStats?.new || 0}
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-blue-200">
+                    <p className="text-xs text-gray-600 mb-1">Revisions</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {studentDetail.gathaStats?.revision || 0}
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-orange-200">
+                    <p className="text-
