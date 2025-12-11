@@ -27,14 +27,12 @@ import {
   CalendarDays,
   UserCheck,
   BookMarked,
-  ArrowUpRight,
-  ArrowDownRight,
-  Minus,
 } from 'lucide-react';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.vercel.app/api';
 
 const formatDate = (dateStr) => {
+  if (!dateStr) return '';
   const date = new Date(dateStr);
   return date.toLocaleDateString('en-IN', {
     day: 'numeric',
@@ -87,6 +85,11 @@ const getDateRangePreset = (preset) => {
         start: formatLocalDateString(startOfYear),
         end: formatLocalDateString(today),
       };
+    case 'all':
+      return {
+        start: '2020-01-01',
+        end: '2099-12-31',
+      };
     default:
       return getDateRangePreset('month');
   }
@@ -110,19 +113,21 @@ export default function AdminDashboard({ user, onLogout }) {
   const [successMessage, setSuccessMessage] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
   
-  // Analytics state
+  // Students & Analytics state
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentDetail, setStudentDetail] = useState(null);
-  const [dateRange, setDateRange] = useState(getDateRangePreset('month'));
-  const [datePreset, setDatePreset] = useState('month');
-  const [leaderboardData, setLeaderboardData] = useState(null);
+  const [dateRange, setDateRange] = useState(getDateRangePreset('all'));
+  const [datePreset, setDatePreset] = useState('all');
+  const [topStudents, setTopStudents] = useState({ topAttendance: [], topGatha: [] });
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [expandedStudent, setExpandedStudent] = useState(null);
   const [studentFilter, setStudentFilter] = useState('all');
   const [approvalFilter, setApprovalFilter] = useState('all');
+  const [detailLoading, setDetailLoading] = useState(false);
 
+  // Fetch pending data and stats
   const fetchPendingData = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     setIsLoading(true);
@@ -155,12 +160,14 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   }, []);
 
+  // Fetch all students with stats
   const fetchStudents = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
-      const res = await fetch(`${API_BASE}/admin/students`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${API_BASE}/admin/students?startDate=${dateRange.start}&endDate=${dateRange.end}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       if (res.ok) {
         const data = await res.json();
         setStudents(data);
@@ -168,27 +175,29 @@ export default function AdminDashboard({ user, onLogout }) {
     } catch (err) {
       console.error('Error fetching students:', err);
     }
-  }, []);
+  }, [dateRange]);
 
-  const fetchLeaderboard = useCallback(async () => {
+  // Fetch top students
+  const fetchTopStudents = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
       const res = await fetch(
-        `${API_BASE}/analytics/leaderboard?startDate=${dateRange.start}&endDate=${dateRange.end}`,
+        `${API_BASE}/admin/top-students?startDate=${dateRange.start}&endDate=${dateRange.end}&limit=5`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
         const data = await res.json();
-        setLeaderboardData(data);
+        setTopStudents(data);
       }
     } catch (err) {
-      console.error('Error fetching leaderboard:', err);
+      console.error('Error fetching top students:', err);
     }
   }, [dateRange]);
 
+  // Fetch single student details
   const fetchStudentDetail = useCallback(async (studentId) => {
     const token = localStorage.getItem('jainPathshalaToken');
-    setIsLoading(true);
+    setDetailLoading(true);
     try {
       const res = await fetch(
         `${API_BASE}/admin/student/${studentId}/activity?startDate=${dateRange.start}&endDate=${dateRange.end}`,
@@ -201,28 +210,38 @@ export default function AdminDashboard({ user, onLogout }) {
     } catch (err) {
       console.error('Error fetching student detail:', err);
     } finally {
-      setIsLoading(false);
+      setDetailLoading(false);
     }
   }, [dateRange]);
 
+  // Initial data fetch
   useEffect(() => {
     fetchPendingData();
-    fetchStudents();
-    fetchLeaderboard();
-  }, [fetchPendingData, fetchStudents, fetchLeaderboard]);
+  }, [fetchPendingData]);
 
+  // Fetch students when date range changes
+  useEffect(() => {
+    fetchStudents();
+    fetchTopStudents();
+  }, [fetchStudents, fetchTopStudents]);
+
+  // Fetch student detail when selected
   useEffect(() => {
     if (selectedStudent) {
       fetchStudentDetail(selectedStudent);
+    } else {
+      setStudentDetail(null);
     }
   }, [selectedStudent, fetchStudentDetail]);
 
+  // Update date range when preset changes
   useEffect(() => {
     if (datePreset !== 'custom') {
       setDateRange(getDateRangePreset(datePreset));
     }
   }, [datePreset]);
 
+  // Approval handlers
   const handleApprove = async (type, id) => {
     const token = localStorage.getItem('jainPathshalaToken');
     setActionLoading(`approve-${type}-${id}`);
@@ -246,6 +265,7 @@ export default function AdminDashboard({ user, onLogout }) {
       setSuccessMessage('✅ Entry approved!');
       setTimeout(() => setSuccessMessage(''), 3000);
       fetchPendingData();
+      fetchStudents();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -306,6 +326,7 @@ export default function AdminDashboard({ user, onLogout }) {
       setSuccessMessage(`✅ Approved ${data.approved.attendance} attendance + ${data.approved.gatha} gatha!`);
       setTimeout(() => setSuccessMessage(''), 5000);
       fetchPendingData();
+      fetchStudents();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -354,9 +375,14 @@ export default function AdminDashboard({ user, onLogout }) {
     (s.attendance_count || 0) + (s.total_gathas || 0) > 0
   ).length;
   
+  const totalAttendanceCount = students.reduce((sum, s) => sum + (s.attendance_count || 0), 0);
+  const totalGathaCount = students.reduce((sum, s) => sum + (s.total_gathas || 0), 0);
+
   const attendanceRate = students.length > 0 
     ? Math.round((stats?.today_attendance || 0) / students.length * 100)
     : 0;
+
+  // ==================== RENDER FUNCTIONS ====================
 
   const renderOverview = () => (
     <div className="space-y-4">
@@ -379,9 +405,9 @@ export default function AdminDashboard({ user, onLogout }) {
             <p className="text-xs opacity-80">Present</p>
           </div>
           <div className="bg-white/20 backdrop-blur rounded-xl p-3 text-center">
-            <BookMarked className="w-6 h-6 mx-auto mb-1" />
-            <p className="text-2xl font-bold">{stats?.today_gathas || 0}</p>
-            <p className="text-xs opacity-80">Gathas</p>
+            <Users className="w-6 h-6 mx-auto mb-1" />
+            <p className="text-2xl font-bold">{students.length}</p>
+            <p className="text-xs opacity-80">Students</p>
           </div>
           <div className="bg-white/20 backdrop-blur rounded-xl p-3 text-center">
             <Clock className="w-6 h-6 mx-auto mb-1" />
@@ -424,10 +450,8 @@ export default function AdminDashboard({ user, onLogout }) {
             <BookOpen className="w-8 h-8 text-purple-500" />
             <Flame className="w-5 h-5 text-orange-500" />
           </div>
-          <p className="text-3xl font-bold text-gray-800">
-            {leaderboardData?.gathaStats?.totalPathshalaGathas || 0}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">Total Gathas (This Month)</p>
+          <p className="text-3xl font-bold text-gray-800">{totalGathaCount}</p>
+          <p className="text-xs text-gray-500 mt-1">Total Gathas (All Time)</p>
         </div>
 
         <button
@@ -459,9 +483,9 @@ export default function AdminDashboard({ user, onLogout }) {
           </h3>
           <button
             onClick={() => setActiveTab('analytics')}
-            className="text-xs text-indigo-600 font-bold flex items-center gap-1"
+            className="text-xs text-indigo-600 font-bold"
           >
-            View All <ArrowUpRight className="w-3 h-3" />
+            View All →
           </button>
         </div>
         
@@ -470,12 +494,12 @@ export default function AdminDashboard({ user, onLogout }) {
             <div className="absolute top-2 right-2 text-3xl">🏆</div>
             <p className="text-xs font-bold text-yellow-800 mb-1">Attendance King</p>
             <p className="text-lg font-bold text-gray-800 truncate pr-8">
-              {leaderboardData?.attendanceLeader?.name || leaderboardData?.attendanceLeader?.username || 'N/A'}
+              {topStudents.topAttendance?.[0]?.name || 'N/A'}
             </p>
             <div className="flex items-center gap-1 mt-2">
               <Calendar className="w-4 h-4 text-yellow-600" />
               <span className="text-sm font-bold text-yellow-700">
-                {leaderboardData?.attendanceLeader?.attendance_count || 0} days
+                {topStudents.topAttendance?.[0]?.count || 0} days
               </span>
             </div>
           </div>
@@ -484,12 +508,12 @@ export default function AdminDashboard({ user, onLogout }) {
             <div className="absolute top-2 right-2 text-3xl">📚</div>
             <p className="text-xs font-bold text-purple-800 mb-1">Gatha Master</p>
             <p className="text-lg font-bold text-gray-800 truncate pr-8">
-              {leaderboardData?.gathaStats?.gathaLeader?.name || leaderboardData?.gathaStats?.gathaLeader?.username || 'N/A'}
+              {topStudents.topGatha?.[0]?.name || 'N/A'}
             </p>
             <div className="flex items-center gap-1 mt-2">
               <BookOpen className="w-4 h-4 text-purple-600" />
               <span className="text-sm font-bold text-purple-700">
-                {leaderboardData?.gathaStats?.gathaLeader?.count || 0} gathas
+                {topStudents.topGatha?.[0]?.count || 0} gathas
               </span>
             </div>
           </div>
@@ -558,9 +582,7 @@ export default function AdminDashboard({ user, onLogout }) {
         <button
           onClick={() => setApprovalFilter('all')}
           className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-all ${
-            approvalFilter === 'all'
-              ? 'bg-white text-gray-800 shadow'
-              : 'text-gray-600'
+            approvalFilter === 'all' ? 'bg-white text-gray-800 shadow' : 'text-gray-600'
           }`}
         >
           All ({totalPending})
@@ -568,31 +590,25 @@ export default function AdminDashboard({ user, onLogout }) {
         <button
           onClick={() => setApprovalFilter('attendance')}
           className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-all ${
-            approvalFilter === 'attendance'
-              ? 'bg-white text-gray-800 shadow'
-              : 'text-gray-600'
+            approvalFilter === 'attendance' ? 'bg-white text-gray-800 shadow' : 'text-gray-600'
           }`}
         >
-          <Calendar className="w-4 h-4 inline mr-1" />
-          ({pendingData.attendance.length})
+          📅 ({pendingData.attendance.length})
         </button>
         <button
           onClick={() => setApprovalFilter('gatha')}
           className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-all ${
-            approvalFilter === 'gatha'
-              ? 'bg-white text-gray-800 shadow'
-              : 'text-gray-600'
+            approvalFilter === 'gatha' ? 'bg-white text-gray-800 shadow' : 'text-gray-600'
           }`}
         >
-          <BookOpen className="w-4 h-4 inline mr-1" />
-          ({pendingData.gatha.length})
+          📖 ({pendingData.gatha.length})
         </button>
       </div>
 
       {/* Content */}
       {isLoading ? (
         <div className="bg-white rounded-xl p-8 border-2 border-indigo-200 text-center">
-          <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-indigo-200 border-t-indigo-500"></div>
+          <RefreshCw className="w-10 h-10 animate-spin text-indigo-500 mx-auto" />
           <p className="mt-4 text-gray-600 text-sm">Loading...</p>
         </div>
       ) : totalPending === 0 ? (
@@ -613,7 +629,7 @@ export default function AdminDashboard({ user, onLogout }) {
                       <Calendar className="w-4 h-4 text-yellow-600" />
                     </div>
                     <div>
-                      <span className="font-bold text-gray-800">{item.student_name}</span>
+                      <span className="font-bold text-gray-800">{item.student_name || item.username}</span>
                       <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full ml-2">
                         Attendance
                       </span>
@@ -621,6 +637,7 @@ export default function AdminDashboard({ user, onLogout }) {
                   </div>
                   <div className="ml-10 text-sm text-gray-600">
                     <p>📅 {formatDate(item.date)}</p>
+                    {item.formatted_time && <p className="text-xs text-gray-400">⏰ {item.formatted_time}</p>}
                   </div>
                 </div>
 
@@ -662,11 +679,9 @@ export default function AdminDashboard({ user, onLogout }) {
                       <BookOpen className="w-4 h-4 text-purple-600" />
                     </div>
                     <div>
-                      <span className="font-bold text-gray-800">{item.student_name}</span>
+                      <span className="font-bold text-gray-800">{item.student_name || item.username}</span>
                       <span className={`text-xs px-2 py-0.5 rounded-full ml-2 ${
-                        item.type === 'new' 
-                          ? 'bg-purple-500 text-white' 
-                          : 'bg-blue-500 text-white'
+                        item.type === 'new' ? 'bg-purple-500 text-white' : 'bg-blue-500 text-white'
                       }`}>
                         {item.type === 'new' ? '✨ New' : '🔄 Revision'}
                       </span>
@@ -723,7 +738,7 @@ export default function AdminDashboard({ user, onLogout }) {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name or username..."
+            placeholder="Search by name..."
             className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400 text-sm"
           />
         </div>
@@ -752,7 +767,7 @@ export default function AdminDashboard({ user, onLogout }) {
       <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
         {[
           { key: 'name', label: 'A-Z', icon: '🔤' },
-          { key: 'attendance', label: 'Attendance', icon: '📅' },
+          { key: 'attendance', label: 'Days', icon: '📅' },
           { key: 'gatha', label: 'Gatha', icon: '📖' },
           { key: 'total', label: 'Total', icon: '⭐' },
         ].map((option) => (
@@ -760,9 +775,7 @@ export default function AdminDashboard({ user, onLogout }) {
             key={option.key}
             onClick={() => setSortBy(option.key)}
             className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold transition-all ${
-              sortBy === option.key
-                ? 'bg-white text-gray-800 shadow'
-                : 'text-gray-600'
+              sortBy === option.key ? 'bg-white text-gray-800 shadow' : 'text-gray-600'
             }`}
           >
             {option.icon} {option.label}
@@ -789,7 +802,7 @@ export default function AdminDashboard({ user, onLogout }) {
                     setSelectedStudent(null);
                   } else {
                     setExpandedStudent(student.id);
-                    setSelectedStudent(student.id);
+                    setSelectedStudent(student.username);
                   }
                 }}
                 className="w-full p-4 text-left active:bg-gray-50"
@@ -800,11 +813,12 @@ export default function AdminDashboard({ user, onLogout }) {
                       <div className={`w-12 h-12 bg-gradient-to-br ${badge.color} rounded-full flex items-center justify-center text-xl shadow-md`}>
                         {badge.icon}
                       </div>
-                      <span className="absolute -bottom-1 -right-1 text-sm">{index + 1}</span>
+                      <span className="absolute -bottom-1 -right-1 bg-white text-xs font-bold px-1.5 rounded-full border">
+                        {index + 1}
+                      </span>
                     </div>
                     <div>
                       <p className="font-bold text-gray-800">{student.name}</p>
-                      <p className="text-xs text-gray-500">@{student.username}</p>
                       <span className={`inline-block text-xs mt-1 px-2 py-0.5 rounded-full bg-gradient-to-r ${badge.color} text-white font-bold`}>
                         {badge.label}
                       </span>
@@ -831,9 +845,10 @@ export default function AdminDashboard({ user, onLogout }) {
 
               {expandedStudent === student.id && (
                 <div className="border-t-2 border-indigo-100 p-4 bg-gradient-to-br from-indigo-50 to-purple-50">
-                  {isLoading ? (
+                  {detailLoading ? (
                     <div className="text-center py-4">
                       <RefreshCw className="w-6 h-6 animate-spin text-indigo-500 mx-auto" />
+                      <p className="text-xs text-gray-500 mt-2">Loading details...</p>
                     </div>
                   ) : studentDetail ? (
                     <>
@@ -841,7 +856,7 @@ export default function AdminDashboard({ user, onLogout }) {
                         <div className="bg-white rounded-xl p-3 border-2 border-green-200 text-center">
                           <Calendar className="w-6 h-6 text-green-500 mx-auto mb-1" />
                           <p className="text-2xl font-bold text-green-600">
-                            {studentDetail.attendance?.length || 0}
+                            {studentDetail.summary?.totalAttendance || studentDetail.attendance?.length || 0}
                           </p>
                           <p className="text-xs text-gray-500">Attendance</p>
                         </div>
@@ -862,7 +877,8 @@ export default function AdminDashboard({ user, onLogout }) {
                         <div className="bg-white rounded-xl p-3 border-2 border-orange-200 text-center">
                           <Flame className="w-6 h-6 text-orange-500 mx-auto mb-1" />
                           <p className="text-2xl font-bold text-orange-600">
-                            {(studentDetail.gathaStats?.new || 0) + (studentDetail.gathaStats?.revision || 0)}
+                            {studentDetail.summary?.totalGathas || 
+                              ((studentDetail.gathaStats?.new || 0) + (studentDetail.gathaStats?.revision || 0))}
                           </p>
                           <p className="text-xs text-gray-500">Total</p>
                         </div>
@@ -875,27 +891,33 @@ export default function AdminDashboard({ user, onLogout }) {
                             Recent Activity
                           </h4>
                           <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {studentDetail.recentActivity.slice(0, 5).map((activity, idx) => (
+                            {studentDetail.recentActivity.slice(0, 10).map((activity, idx) => (
                               <div key={idx} className="bg-white rounded-lg p-3 border border-gray-200">
                                 <div className="flex items-center justify-between">
                                   <span className="font-semibold text-gray-700 text-sm flex items-center gap-2">
                                     {activity.type === 'attendance' ? (
                                       <><Calendar className="w-4 h-4 text-green-500" /> Attended</>
                                     ) : (
-                                      <><BookOpen className="w-4 h-4 text-purple-500" /> Gatha</>
+                                      <><BookOpen className="w-4 h-4 text-purple-500" /> 
+                                        {activity.gatha_type === 'new' ? 'New Gatha' : 'Revision'}
+                                      </>
                                     )}
                                   </span>
                                   <span className="text-xs text-gray-500">{formatDate(activity.date)}</span>
                                 </div>
                                 {activity.type === 'gatha' && (
                                   <p className="text-xs text-gray-600 mt-1 ml-6">
-                                    {activity.sutra_name} • {activity.which_gatha}
+                                    {activity.sutra_name} • {activity.which_gatha} ({activity.total_gatha})
                                   </p>
                                 )}
                               </div>
                             ))}
                           </div>
                         </div>
+                      )}
+
+                      {(!studentDetail.recentActivity || studentDetail.recentActivity.length === 0) && (
+                        <p className="text-center text-gray-500 py-4 text-sm">No recent activity</p>
                       )}
                     </>
                   ) : (
@@ -931,9 +953,8 @@ export default function AdminDashboard({ user, onLogout }) {
             { key: 'today', label: 'Today' },
             { key: 'week', label: 'This Week' },
             { key: 'month', label: 'This Month' },
-            { key: 'lastMonth', label: 'Last Month' },
             { key: 'year', label: 'This Year' },
-            { key: 'custom', label: 'Custom' },
+            { key: 'all', label: 'All Time' },
           ].map((preset) => (
             <button
               key={preset.key}
@@ -949,32 +970,9 @@ export default function AdminDashboard({ user, onLogout }) {
           ))}
         </div>
 
-        {datePreset === 'custom' && (
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-gray-600 block mb-1">Start</label>
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-600 block mb-1">End</label>
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm"
-              />
-            </div>
-          </div>
-        )}
-
         <button
-          onClick={fetchLeaderboard}
-          className="w-full mt-3 bg-indigo-500 text-white py-2 rounded-lg active:scale-[0.98] text-sm font-bold flex items-center justify-center gap-2"
+          onClick={() => { fetchStudents(); fetchTopStudents(); }}
+          className="w-full bg-indigo-500 text-white py-2 rounded-lg active:scale-[0.98] text-sm font-bold flex items-center justify-center gap-2"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh Data
@@ -985,26 +983,20 @@ export default function AdminDashboard({ user, onLogout }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl p-4 text-white shadow-lg">
           <Calendar className="w-8 h-8 mb-2 opacity-80" />
-          <p className="text-3xl font-bold">
-            {leaderboardData?.gathaStats?.totalAttendance || 0}
-          </p>
+          <p className="text-3xl font-bold">{totalAttendanceCount}</p>
           <p className="text-xs opacity-80">Total Attendance</p>
         </div>
 
         <div className="bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl p-4 text-white shadow-lg">
           <BookOpen className="w-8 h-8 mb-2 opacity-80" />
-          <p className="text-3xl font-bold">
-            {leaderboardData?.gathaStats?.totalPathshalaGathas || 0}
-          </p>
+          <p className="text-3xl font-bold">{totalGathaCount}</p>
           <p className="text-xs opacity-80">Total Gathas</p>
         </div>
 
         <div className="bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl p-4 text-white shadow-lg">
           <TrendingUp className="w-8 h-8 mb-2 opacity-80" />
           <p className="text-3xl font-bold">
-            {students.length > 0 
-              ? Math.round((leaderboardData?.gathaStats?.totalPathshalaGathas || 0) / students.length)
-              : 0}
+            {students.length > 0 ? Math.round(totalGathaCount / students.length) : 0}
           </p>
           <p className="text-xs opacity-80">Avg Gathas/Student</p>
         </div>
@@ -1016,112 +1008,77 @@ export default function AdminDashboard({ user, onLogout }) {
         </div>
       </div>
 
-      {/* Leaderboard */}
-      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-sm">
-        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <Award className="w-5 h-5 text-yellow-500" />
-          Champions
+      {/* Top 5 Students - Attendance */}
+      <div className="bg-white rounded-xl p-4 border-2 border-yellow-200 shadow-sm">
+        <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+          🏆 Top 5 - Attendance
         </h3>
-
-        <div className="space-y-4">
-          {/* Attendance Champion */}
-          <div className="bg-gradient-to-r from-yellow-50 via-yellow-100 to-orange-100 border-2 border-yellow-300 rounded-xl p-4 relative overflow-hidden">
-            <div className="absolute top-0 right-0 text-6xl opacity-20">🏆</div>
-            <div className="relative">
-              <span className="text-xs font-bold text-yellow-800 bg-yellow-200 px-2 py-1 rounded-full">
-                #1 Attendance
-              </span>
-              <div className="flex items-center gap-4 mt-3">
-                <div className="w-14 h-14 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-2xl shadow-lg">
-                  🥇
+        <div className="space-y-2">
+          {topStudents.topAttendance?.slice(0, 5).map((student, index) => {
+            const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+            return (
+              <div
+                key={student.username}
+                className={`flex items-center justify-between p-3 rounded-xl ${
+                  index === 0 ? 'bg-yellow-50 border-2 border-yellow-200' :
+                  index === 1 ? 'bg-gray-50 border-2 border-gray-200' :
+                  index === 2 ? 'bg-orange-50 border-2 border-orange-200' :
+                  'bg-gray-50 border border-gray-200'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{medals[index]}</span>
+                  <span className="font-bold text-gray-800">{student.name}</span>
                 </div>
-                <div className="flex-1">
-                  <p className="text-xl font-bold text-gray-800">
-                    {leaderboardData?.attendanceLeader?.name || leaderboardData?.attendanceLeader?.username || 'N/A'}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    {leaderboardData?.attendanceLeader?.attendance_count || 0} days present
-                  </p>
-                </div>
+                <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold text-sm">
+                  {student.count} days
+                </span>
               </div>
-            </div>
-          </div>
-
-          {/* Gatha Champion */}
-          <div className="bg-gradient-to-r from-purple-50 via-purple-100 to-pink-100 border-2 border-purple-300 rounded-xl p-4 relative overflow-hidden">
-            <div className="absolute top-0 right-0 text-6xl opacity-20">📚</div>
-            <div className="relative">
-              <span className="text-xs font-bold text-purple-800 bg-purple-200 px-2 py-1 rounded-full">
-                #1 Gatha Master
-              </span>
-              <div className="flex items-center gap-4 mt-3">
-                <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center text-2xl shadow-lg">
-                  📖
-                </div>
-                <div className="flex-1">
-                  <p className="text-xl font-bold text-gray-800">
-                    {leaderboardData?.gathaStats?.gathaLeader?.name || leaderboardData?.gathaStats?.gathaLeader?.username || 'N/A'}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    {leaderboardData?.gathaStats?.gathaLeader?.count || 0} gathas learned
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+            );
+          })}
+          {(!topStudents.topAttendance || topStudents.topAttendance.length === 0) && (
+            <p className="text-center text-gray-500 py-4">No data available</p>
+          )}
         </div>
       </div>
 
-      {/* Top 5 Students */}
-      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-sm">
+      {/* Top 5 Students - Gatha */}
+      <div className="bg-white rounded-xl p-4 border-2 border-purple-200 shadow-sm">
         <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-          <Star className="w-5 h-5 text-yellow-500" />
-          Top 5 Students
+          📚 Top 5 - Gathas
         </h3>
-
         <div className="space-y-2">
-          {students
-            .sort((a, b) => {
-              const totalA = (a.attendance_count || 0) + (a.total_gathas || 0);
-              const totalB = (b.attendance_count || 0) + (b.total_gathas || 0);
-              return totalB - totalA;
-            })
-            .slice(0, 5)
-            .map((student, index) => {
-              const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
-              const total = (student.attendance_count || 0) + (student.total_gathas || 0);
-              
-              return (
-                <div
-                  key={student.id}
-                  className={`flex items-center justify-between p-3 rounded-xl ${
-                    index === 0 ? 'bg-yellow-50 border-2 border-yellow-200' :
-                    index === 1 ? 'bg-gray-50 border-2 border-gray-200' :
-                    index === 2 ? 'bg-orange-50 border-2 border-orange-200' :
-                    'bg-gray-50 border border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{medals[index]}</span>
-                    <div>
-                      <p className="font-bold text-gray-800">{student.name}</p>
-                      <p className="text-xs text-gray-500">@{student.username}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm">
-                    <span className="text-green-600 font-bold">{student.attendance_count || 0}📅</span>
-                    <span className="text-purple-600 font-bold">{student.total_gathas || 0}📖</span>
-                    <span className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-bold text-xs">
-                      {total}
-                    </span>
-                  </div>
+          {topStudents.topGatha?.slice(0, 5).map((student, index) => {
+            const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+            return (
+              <div
+                key={student.username}
+                className={`flex items-center justify-between p-3 rounded-xl ${
+                  index === 0 ? 'bg-purple-50 border-2 border-purple-200' :
+                  index === 1 ? 'bg-gray-50 border-2 border-gray-200' :
+                  index === 2 ? 'bg-pink-50 border-2 border-pink-200' :
+                  'bg-gray-50 border border-gray-200'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{medals[index]}</span>
+                  <span className="font-bold text-gray-800">{student.name}</span>
                 </div>
-              );
-            })}
+                <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-bold text-sm">
+                  {student.count} gathas
+                </span>
+              </div>
+            );
+          })}
+          {(!topStudents.topGatha || topStudents.topGatha.length === 0) && (
+            <p className="text-center text-gray-500 py-4">No data available</p>
+          )}
         </div>
       </div>
     </div>
   );
+
+  // ==================== MAIN RETURN ====================
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-3 pb-6">
@@ -1160,7 +1117,7 @@ export default function AdminDashboard({ user, onLogout }) {
         )}
 
         {successMessage && (
-          <div className="bg-green-50 border-l-4 border-green-500 p-3 rounded-xl mb-4 flex items-center gap-2 shadow-sm animate-pulse">
+          <div className="bg-green-50 border-l-4 border-green-500 p-3 rounded-xl mb-4 flex items-center gap-2 shadow-sm">
             <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
             <p className="text-sm text-green-700 font-semibold">{successMessage}</p>
           </div>
@@ -1178,7 +1135,7 @@ export default function AdminDashboard({ user, onLogout }) {
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`relative flex flex-col items-center gap-1 p-3 rounded-xl font-bold text-xs transition-all ${
-                activeTab === tab.key || (tab.key === 'approvals' && activeTab.startsWith('approvals'))
+                activeTab === tab.key
                   ? 'bg-indigo-500 text-white shadow-lg scale-105'
                   : 'bg-white text-gray-600 border-2 border-indigo-200'
               }`}
@@ -1196,7 +1153,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
         {/* Content */}
         {activeTab === 'overview' && renderOverview()}
-        {(activeTab === 'approvals' || activeTab.startsWith('approvals-')) && renderApprovals()}
+        {activeTab === 'approvals' && renderApprovals()}
         {activeTab === 'students' && renderStudentsList()}
         {activeTab === 'analytics' && renderAnalytics()}
       </div>
