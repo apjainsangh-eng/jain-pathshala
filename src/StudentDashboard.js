@@ -1142,33 +1142,6 @@ const deletePendingGatha = async (id) => {
     });
   };
 
-  // Delete pending gatha - actual delete
-  const deletePendingGatha = async (id) => {
-    setConfirmAction(null);
-    const token = localStorage.getItem('jainPathshalaToken');
-    setIsSubmitting(true);
-
-    try {
-      const res = await fetch(`${API_BASE}/gatha/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Delete failed' }));
-        throw new Error(err.error || 'Failed to delete entry');
-      }
-
-      showSuccess('Gatha entry deleted successfully');
-      await fetchPendingStatus();
-      await fetchGathaEntries();
-    } catch (error) {
-      console.error('deletePendingGatha error:', error);
-      setGlobalError(error.message || 'Failed to delete gatha entry');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   // Delete approved gatha
   const handleRemoveGathaRequest = (id) => {
