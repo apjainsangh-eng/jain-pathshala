@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Clock,
   Crown,
+  Edit2,
   Heart,
   LogOut,
   Plus,
@@ -546,7 +547,7 @@ const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
 // -------------------------------------
 // Pending Page Component
 // -------------------------------------
-const PendingPage = ({ pendingStatus, onRefresh }) => {
+const PendingPage = ({ pendingStatus, onRefresh, onEditGatha }) => {
   const todayIso = formatLocalDateString(new Date());
 
   const pendingAttendance = pendingStatus.attendance?.filter(p => p.status === 'pending') || [];
@@ -599,15 +600,15 @@ const PendingPage = ({ pendingStatus, onRefresh }) => {
               </div>
             ))}
 
-            {/* Pending Gatha */}
+            {/* Pending Gatha with Edit Button */}
             {pendingGatha.map((item) => (
               <div key={`gatha-${item.id}`} className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-3 flex-1">
                     <div className="w-10 h-10 bg-purple-200 rounded-lg flex items-center justify-center flex-shrink-0">
                       <BookOpen size={20} className="text-purple-700" />
                     </div>
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <p className="font-bold text-gray-800">Gatha</p>
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
@@ -623,7 +624,16 @@ const PendingPage = ({ pendingStatus, onRefresh }) => {
                       <p className="text-xs text-gray-400 mt-1">{formatDateIn(item.date)}</p>
                     </div>
                   </div>
-                  <PendingBadge status="pending" />
+                  <div className="flex flex-col items-end gap-2">
+                    <PendingBadge status="pending" />
+                    <button
+                      onClick={() => onEditGatha(item)}
+                      className="flex items-center gap-1 text-xs font-semibold text-blue-600 bg-blue-100 px-3 py-1.5 rounded-lg hover:bg-blue-200 transition-colors"
+                    >
+                      <Edit2 size={14} />
+                      Edit
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -704,6 +714,14 @@ export default function StudentDashboard({ user, onLogout }) {
   const [gathaForm, setGathaForm] = useState({
     newGatha: { sutraName: '', whichGatha: '', totalGatha: '' },
     revision: { sutraName: '', whichGatha: '', totalGatha: '' },
+  });
+  
+  // Edit mode state
+  const [editingGatha, setEditingGatha] = useState(null); // {id, type, sutra_name, which_gatha, total_gatha}
+  const [editForm, setEditForm] = useState({
+    sutraName: '',
+    whichGatha: '',
+    totalGatha: '',
   });
 
   // Analytics
@@ -1024,6 +1042,64 @@ export default function StudentDashboard({ user, onLogout }) {
     }
   };
 
+  // Handle edit gatha - open edit modal
+  const handleEditGatha = (entry) => {
+    setEditingGatha(entry);
+    setEditForm({
+      sutraName: entry.sutra_name || '',
+      whichGatha: entry.which_gatha || '',
+      totalGatha: String(entry.total_gatha || ''),
+    });
+  };
+
+  // Close edit modal
+  const closeEditModal = () => {
+    setEditingGatha(null);
+    setEditForm({
+      sutraName: '',
+      whichGatha: '',
+      totalGatha: '',
+    });
+  };
+
+  // Submit edited gatha
+  const submitEditedGatha = async () => {
+    if (!editingGatha) return;
+    
+    const token = localStorage.getItem('jainPathshalaToken');
+    setIsSubmitting(true);
+    setGlobalError('');
+
+    try {
+      const payload = {
+        sutra_name: editForm.sutraName,
+        which_gatha: editForm.whichGatha,
+        total_gatha: Number(editForm.totalGatha),
+      };
+
+      const res = await fetch(`${API_BASE}/gatha/${editingGatha.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to update gatha');
+      }
+
+      showSuccess('Gatha updated successfully!');
+      closeEditModal();
+      await fetchPendingStatus();
+      await fetchGathaEntries();
+    } catch (error) {
+      console.error('updateGatha error:', error);
+      setGlobalError(error.message || 'Failed to update gatha');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleRemoveGathaRequest = (id) => {
     setConfirmAction({
       title: "Confirm Deletion",
@@ -1052,6 +1128,119 @@ export default function StudentDashboard({ user, onLogout }) {
       console.error('removeGathaEntry error:', error);
       setGlobalError(error.message || 'Failed to delete gatha entry');
     }
+  };
+
+  // Edit Modal Component
+  const renderEditModal = () => {
+    if (!editingGatha) return null;
+
+    const typeLabel = editingGatha.type === 'new' ? 'New Gatha' : 'Revision';
+    const typeColor = editingGatha.type === 'new' ? 'purple' : 'blue';
+
+    return (
+      <div
+        className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4"
+        onClick={closeEditModal}
+      >
+        <div
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 transform transition-all"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-4 border-b-2 border-gray-100 pb-3">
+            <div className="flex items-center gap-2">
+              <Edit2 className={`w-5 h-5 text-${typeColor}-500`} />
+              <h3 className="text-lg font-bold text-gray-800">Edit {typeLabel}</h3>
+            </div>
+            <button
+              onClick={closeEditModal}
+              className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+              aria-label="Close"
+            >
+              <CloseIcon size={22} />
+            </button>
+          </div>
+
+          <div className={`bg-${typeColor}-50 rounded-xl p-4 border-2 border-${typeColor}-200 mb-4`}>
+            <div className="flex items-center gap-2 mb-3">
+              <span className={`inline-block px-2 py-0.5 bg-${typeColor}-500 text-white text-xs font-bold rounded-full`}>
+                {typeLabel}
+              </span>
+              <PendingBadge status="pending" />
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">
+                  Sutra Name
+                </label>
+                <input
+                  type="text"
+                  value={editForm.sutraName}
+                  onChange={(e) => setEditForm({ ...editForm, sutraName: e.target.value })}
+                  className={`w-full px-3 py-2.5 border-2 border-${typeColor}-200 rounded-lg focus:outline-none focus:border-${typeColor}-400 text-sm`}
+                  placeholder="Enter sutra name"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">
+                  Which Gatha
+                </label>
+                <input
+                  type="text"
+                  value={editForm.whichGatha}
+                  onChange={(e) => setEditForm({ ...editForm, whichGatha: e.target.value })}
+                  className={`w-full px-3 py-2.5 border-2 border-${typeColor}-200 rounded-lg focus:outline-none focus:border-${typeColor}-400 text-sm`}
+                  placeholder="e.g., Gatha 1, 2, 3"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">
+                  Total Gatha Count
+                </label>
+                <input
+                  type="number"
+                  value={editForm.totalGatha}
+                  onChange={(e) => setEditForm({ ...editForm, totalGatha: e.target.value })}
+                  className={`w-full px-3 py-2.5 border-2 border-${typeColor}-200 rounded-lg focus:outline-none focus:border-${typeColor}-400 text-sm`}
+                  placeholder="Enter total count"
+                  min="1"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={closeEditModal}
+              className="bg-gray-200 text-gray-700 font-bold py-3 rounded-xl active:scale-[0.98]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={submitEditedGatha}
+              disabled={
+                isSubmitting ||
+                !editForm.sutraName.trim() ||
+                !editForm.whichGatha.trim() ||
+                !editForm.totalGatha.trim()
+              }
+              className={`bg-gradient-to-r from-${typeColor}-500 to-${typeColor}-600 text-white font-bold py-3 rounded-xl active:scale-[0.98] shadow-lg disabled:opacity-50 flex items-center justify-center gap-2`}
+            >
+              {isSubmitting ? (
+                <Loader className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  <Check size={18} />
+                  Save
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // -------------------------------------
@@ -1160,7 +1349,7 @@ export default function StudentDashboard({ user, onLogout }) {
               </div>
             )}
 
-            {/* Show pending entries */}
+            {/* Show pending entries with edit button */}
             {todaysPendingGatha.length > 0 && (
               <div className="mb-4 space-y-2">
                 <h4 className="font-semibold text-gray-700 text-left text-sm flex items-center gap-2">
@@ -1173,6 +1362,14 @@ export default function StudentDashboard({ user, onLogout }) {
                       <span className="inline-block px-2 py-0.5 bg-yellow-500 text-white text-xs font-bold rounded-full">
                         {entry.type === 'new' ? 'New' : 'Revision'} ⏳
                       </span>
+                      <button
+                        onClick={() => handleEditGatha(entry)}
+                        className="flex items-center gap-1 text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-1 rounded-lg hover:bg-blue-200 transition-colors"
+                        title="Edit"
+                      >
+                        <Edit2 size={12} />
+                        Edit
+                      </button>
                     </div>
                     <p className="text-xs text-gray-700">
                       <span className="font-bold">Sutra:</span> {entry.sutra_name}
@@ -1508,7 +1705,13 @@ export default function StudentDashboard({ user, onLogout }) {
       case PAGES.HISTORY:
         return <HistoryPage formatDateIn={formatDateIn} formatLocalDateString={formatLocalDateString} />;
       case PAGES.PENDING:
-        return <PendingPage pendingStatus={pendingStatus} onRefresh={fetchPendingStatus} />;
+        return (
+          <PendingPage 
+            pendingStatus={pendingStatus} 
+            onRefresh={fetchPendingStatus}
+            onEditGatha={handleEditGatha}
+          />
+        );
       default:
         return renderDashboard();
     }
@@ -1628,6 +1831,9 @@ export default function StudentDashboard({ user, onLogout }) {
         onConfirm={confirmAction?.handler}
         onCancel={() => setConfirmAction(null)}
       />
+      
+      {/* Edit Gatha Modal */}
+      {renderEditModal()}
     </div>
   );
 }
