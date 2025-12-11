@@ -1064,42 +1064,73 @@ export default function StudentDashboard({ user, onLogout }) {
   };
 
   // Submit edited gatha
-  const submitEditedGatha = async () => {
-    if (!editingGatha) return;
-    
-    const token = localStorage.getItem('jainPathshalaToken');
-    setIsSubmitting(true);
-    setGlobalError('');
+  // Submit edited gatha - use pending endpoint
+const submitEditedGatha = async () => {
+  if (!editingGatha) return;
+  
+  const token = localStorage.getItem('jainPathshalaToken');
+  setIsSubmitting(true);
+  setGlobalError('');
 
-    try {
-      const payload = {
-        sutra_name: editForm.sutraName,
-        which_gatha: editForm.whichGatha,
-        total_gatha: Number(editForm.totalGatha),
-      };
+  try {
+    const payload = {
+      sutra_name: editForm.sutraName,
+      which_gatha: editForm.whichGatha,
+      total_gatha: Number(editForm.totalGatha),
+    };
 
-      const res = await fetch(`${API_BASE}/gatha/${editingGatha.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload),
-      });
+    // Use /api/gatha/pending/:id for pending entries
+    const res = await fetch(`${API_BASE}/gatha/pending/${editingGatha.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
 
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || 'Failed to update gatha');
-      }
-
-      showSuccess('Gatha updated successfully!');
-      closeEditModal();
-      await fetchPendingStatus();
-      await fetchGathaEntries();
-    } catch (error) {
-      console.error('updateGatha error:', error);
-      setGlobalError(error.message || 'Failed to update gatha');
-    } finally {
-      setIsSubmitting(false);
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || 'Failed to update gatha');
     }
-  };
+
+    showSuccess('Gatha updated successfully!');
+    closeEditModal();
+    await fetchPendingStatus();
+    await fetchGathaEntries();
+  } catch (error) {
+    console.error('updateGatha error:', error);
+    setGlobalError(error.message || 'Failed to update gatha');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
+// Delete pending gatha - use pending endpoint
+const deletePendingGatha = async (id) => {
+  setConfirmAction(null);
+  const token = localStorage.getItem('jainPathshalaToken');
+  setIsSubmitting(true);
+
+  try {
+    // Use /api/gatha/pending/:id for pending entries
+    const res = await fetch(`${API_BASE}/gatha/pending/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Delete failed' }));
+      throw new Error(err.error || 'Failed to delete entry');
+    }
+
+    showSuccess('Gatha entry deleted successfully');
+    await fetchPendingStatus();
+    await fetchGathaEntries();
+  } catch (error) {
+    console.error('deletePendingGatha error:', error);
+    setGlobalError(error.message || 'Failed to delete gatha entry');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   // Delete pending gatha - show confirmation
   const handleDeletePendingGathaRequest = (id) => {
