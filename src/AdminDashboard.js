@@ -16,12 +16,20 @@ import {
   TrendingUp,
   Award,
   BarChart3,
-  Eye,
-  Filter,
-  Download,
   ChevronDown,
   ChevronUp,
   Search,
+  Flame,
+  Star,
+  Activity,
+  Target,
+  Zap,
+  CalendarDays,
+  UserCheck,
+  BookMarked,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
 } from 'lucide-react';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.vercel.app/api';
@@ -43,14 +51,54 @@ const formatLocalDateString = (input = new Date()) => {
   return `${y}-${m}-${d}`;
 };
 
-const getMonthDateRange = () => {
+const getDateRangePreset = (preset) => {
   const today = new Date();
-  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  return {
-    start: formatLocalDateString(startOfMonth),
-    end: formatLocalDateString(endOfMonth),
-  };
+  
+  switch (preset) {
+    case 'today':
+      return {
+        start: formatLocalDateString(today),
+        end: formatLocalDateString(today),
+      };
+    case 'week':
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - today.getDay());
+      return {
+        start: formatLocalDateString(startOfWeek),
+        end: formatLocalDateString(today),
+      };
+    case 'month':
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      return {
+        start: formatLocalDateString(startOfMonth),
+        end: formatLocalDateString(endOfMonth),
+      };
+    case 'lastMonth':
+      const startLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const endLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+      return {
+        start: formatLocalDateString(startLastMonth),
+        end: formatLocalDateString(endLastMonth),
+      };
+    case 'year':
+      const startOfYear = new Date(today.getFullYear(), 0, 1);
+      return {
+        start: formatLocalDateString(startOfYear),
+        end: formatLocalDateString(today),
+      };
+    default:
+      return getDateRangePreset('month');
+  }
+};
+
+const getPerformanceBadge = (attendance, gatha) => {
+  const total = (attendance || 0) + (gatha || 0);
+  if (total >= 50) return { label: 'Champion', color: 'from-yellow-400 to-orange-500', icon: '🏆' };
+  if (total >= 30) return { label: 'Star', color: 'from-purple-400 to-pink-500', icon: '⭐' };
+  if (total >= 15) return { label: 'Rising', color: 'from-blue-400 to-indigo-500', icon: '🚀' };
+  if (total >= 5) return { label: 'Active', color: 'from-green-400 to-emerald-500', icon: '✨' };
+  return { label: 'New', color: 'from-gray-400 to-gray-500', icon: '🌱' };
 };
 
 export default function AdminDashboard({ user, onLogout }) {
@@ -66,11 +114,14 @@ export default function AdminDashboard({ user, onLogout }) {
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentDetail, setStudentDetail] = useState(null);
-  const [dateRange, setDateRange] = useState(getMonthDateRange());
+  const [dateRange, setDateRange] = useState(getDateRangePreset('month'));
+  const [datePreset, setDatePreset] = useState('month');
   const [leaderboardData, setLeaderboardData] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('attendance');
+  const [sortBy, setSortBy] = useState('name');
   const [expandedStudent, setExpandedStudent] = useState(null);
+  const [studentFilter, setStudentFilter] = useState('all');
+  const [approvalFilter, setApprovalFilter] = useState('all');
 
   const fetchPendingData = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
@@ -166,6 +217,12 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   }, [selectedStudent, fetchStudentDetail]);
 
+  useEffect(() => {
+    if (datePreset !== 'custom') {
+      setDateRange(getDateRangePreset(datePreset));
+    }
+  }, [datePreset]);
+
   const handleApprove = async (type, id) => {
     const token = localStorage.getItem('jainPathshalaToken');
     setActionLoading(`approve-${type}-${id}`);
@@ -186,7 +243,7 @@ export default function AdminDashboard({ user, onLogout }) {
         throw new Error(data.error || 'Approval failed');
       }
 
-      setSuccessMessage('Entry approved successfully!');
+      setSuccessMessage('✅ Entry approved!');
       setTimeout(() => setSuccessMessage(''), 3000);
       fetchPendingData();
     } catch (err) {
@@ -220,7 +277,7 @@ export default function AdminDashboard({ user, onLogout }) {
         throw new Error(data.error || 'Rejection failed');
       }
 
-      setSuccessMessage('Entry rejected!');
+      setSuccessMessage('❌ Entry rejected!');
       setTimeout(() => setSuccessMessage(''), 3000);
       fetchPendingData();
     } catch (err) {
@@ -231,9 +288,7 @@ export default function AdminDashboard({ user, onLogout }) {
   };
 
   const handleApproveAll = async () => {
-    if (!window.confirm('Are you sure you want to approve ALL pending entries?')) {
-      return;
-    }
+    if (!window.confirm('Approve ALL pending entries?')) return;
 
     const token = localStorage.getItem('jainPathshalaToken');
     setActionLoading('approve-all');
@@ -245,12 +300,10 @@ export default function AdminDashboard({ user, onLogout }) {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) {
-        throw new Error('Bulk approval failed');
-      }
+      if (!res.ok) throw new Error('Bulk approval failed');
 
       const data = await res.json();
-      setSuccessMessage(`Approved ${data.approved.attendance} attendance + ${data.approved.gatha} gatha entries!`);
+      setSuccessMessage(`✅ Approved ${data.approved.attendance} attendance + ${data.approved.gatha} gatha!`);
       setTimeout(() => setSuccessMessage(''), 5000);
       fetchPendingData();
     } catch (err) {
@@ -262,670 +315,883 @@ export default function AdminDashboard({ user, onLogout }) {
 
   const totalPending = pendingData.attendance.length + pendingData.gatha.length;
 
-  // Filter and sort students
+  // Filter and sort students - ALPHABETICALLY by default
   const filteredStudents = students
-    .filter(student => 
-      student.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.username?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    .filter(student => {
+      const matchesSearch = student.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        student.username?.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      if (!matchesSearch) return false;
+      
+      if (studentFilter === 'active') {
+        return (student.attendance_count || 0) + (student.total_gathas || 0) > 0;
+      } else if (studentFilter === 'inactive') {
+        return (student.attendance_count || 0) + (student.total_gathas || 0) === 0;
+      }
+      return true;
+    })
     .sort((a, b) => {
-      if (sortBy === 'attendance') {
+      if (sortBy === 'name') {
+        return (a.name || '').localeCompare(b.name || '');
+      } else if (sortBy === 'attendance') {
         return (b.attendance_count || 0) - (a.attendance_count || 0);
       } else if (sortBy === 'gatha') {
         return (b.total_gathas || 0) - (a.total_gathas || 0);
+      } else if (sortBy === 'total') {
+        const totalA = (a.attendance_count || 0) + (a.total_gathas || 0);
+        const totalB = (b.attendance_count || 0) + (b.total_gathas || 0);
+        return totalB - totalA;
       }
       return 0;
     });
 
+  // Filter pending items
+  const filteredPendingAttendance = approvalFilter === 'gatha' ? [] : pendingData.attendance;
+  const filteredPendingGatha = approvalFilter === 'attendance' ? [] : pendingData.gatha;
+
+  // Calculate stats
+  const activeStudentsCount = students.filter(s => 
+    (s.attendance_count || 0) + (s.total_gathas || 0) > 0
+  ).length;
+  
+  const attendanceRate = students.length > 0 
+    ? Math.round((stats?.today_attendance || 0) / students.length * 100)
+    : 0;
+
   const renderOverview = () => (
     <div className="space-y-4">
-      {/* Quick Stats */}
+      {/* Today's Summary Card */}
+      <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl p-4 text-white shadow-lg">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Activity className="w-5 h-5" />
+            <span className="font-bold">Today's Summary</span>
+          </div>
+          <span className="text-xs bg-white/20 px-2 py-1 rounded-full">
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}
+          </span>
+        </div>
+        
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-white/20 backdrop-blur rounded-xl p-3 text-center">
+            <UserCheck className="w-6 h-6 mx-auto mb-1" />
+            <p className="text-2xl font-bold">{stats?.today_attendance || 0}</p>
+            <p className="text-xs opacity-80">Present</p>
+          </div>
+          <div className="bg-white/20 backdrop-blur rounded-xl p-3 text-center">
+            <BookMarked className="w-6 h-6 mx-auto mb-1" />
+            <p className="text-2xl font-bold">{stats?.today_gathas || 0}</p>
+            <p className="text-xs opacity-80">Gathas</p>
+          </div>
+          <div className="bg-white/20 backdrop-blur rounded-xl p-3 text-center">
+            <Clock className="w-6 h-6 mx-auto mb-1" />
+            <p className="text-2xl font-bold">{totalPending}</p>
+            <p className="text-xs opacity-80">Pending</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Stats Grid */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border-2 border-blue-200">
-          <div className="flex items-center gap-2 mb-2">
-            <Users className="w-5 h-5 text-blue-600" />
-            <span className="text-xs font-bold text-blue-800">Total Students</span>
+        <div className="bg-white rounded-xl p-4 border-2 border-blue-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <Users className="w-8 h-8 text-blue-500" />
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-bold">
+              {activeStudentsCount} active
+            </span>
           </div>
-          <p className="text-3xl font-bold text-blue-700">{students.length}</p>
+          <p className="text-3xl font-bold text-gray-800">{students.length}</p>
+          <p className="text-xs text-gray-500 mt-1">Total Students</p>
         </div>
 
-        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border-2 border-green-200">
-          <div className="flex items-center gap-2 mb-2">
-            <Calendar className="w-5 h-5 text-green-600" />
-            <span className="text-xs font-bold text-green-800">Today Present</span>
+        <div className="bg-white rounded-xl p-4 border-2 border-green-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <Target className="w-8 h-8 text-green-500" />
+            <span className={`text-xs px-2 py-1 rounded-full font-bold ${
+              attendanceRate >= 70 ? 'bg-green-100 text-green-700' :
+              attendanceRate >= 40 ? 'bg-yellow-100 text-yellow-700' :
+              'bg-red-100 text-red-700'
+            }`}>
+              {attendanceRate}%
+            </span>
           </div>
-          <p className="text-3xl font-bold text-green-700">{stats?.today_attendance || 0}</p>
+          <p className="text-3xl font-bold text-gray-800">{stats?.today_attendance || 0}/{students.length}</p>
+          <p className="text-xs text-gray-500 mt-1">Today's Attendance</p>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border-2 border-purple-200">
-          <div className="flex items-center gap-2 mb-2">
-            <BookOpen className="w-5 h-5 text-purple-600" />
-            <span className="text-xs font-bold text-purple-800">Total Gathas</span>
+        <div className="bg-white rounded-xl p-4 border-2 border-purple-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <BookOpen className="w-8 h-8 text-purple-500" />
+            <Flame className="w-5 h-5 text-orange-500" />
           </div>
-          <p className="text-3xl font-bold text-purple-700">
+          <p className="text-3xl font-bold text-gray-800">
             {leaderboardData?.gathaStats?.totalPathshalaGathas || 0}
           </p>
+          <p className="text-xs text-gray-500 mt-1">Total Gathas (This Month)</p>
         </div>
 
-        <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-4 border-2 border-yellow-200">
-          <div className="flex items-center gap-2 mb-2">
-            <Clock className="w-5 h-5 text-yellow-600" />
-            <span className="text-xs font-bold text-yellow-800">Pending</span>
+        <button
+          onClick={() => setActiveTab('approvals')}
+          className="bg-white rounded-xl p-4 border-2 border-yellow-200 shadow-sm text-left relative overflow-hidden active:scale-[0.98]"
+        >
+          {totalPending > 0 && (
+            <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-400 transform rotate-45 translate-x-10 -translate-y-10"></div>
+          )}
+          <div className="flex items-center justify-between mb-2">
+            <Clock className="w-8 h-8 text-yellow-500" />
+            {totalPending > 0 && (
+              <span className="relative z-10 animate-pulse">
+                <Zap className="w-5 h-5 text-yellow-600" />
+              </span>
+            )}
           </div>
-          <p className="text-3xl font-bold text-yellow-700">{totalPending}</p>
-        </div>
+          <p className="text-3xl font-bold text-gray-800">{totalPending}</p>
+          <p className="text-xs text-gray-500 mt-1">Pending Approvals →</p>
+        </button>
       </div>
 
-      {/* Leaderboard */}
-      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200">
-        <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-          <Award className="w-5 h-5 text-yellow-500" />
-          Top Performers
-        </h3>
-        
-        <div className="space-y-3">
-          <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Award className="w-4 h-4 text-yellow-600" />
-              <span className="text-xs font-bold text-yellow-800">Attendance Leader</span>
-            </div>
-            <p className="text-lg font-bold text-gray-800">
-              {leaderboardData?.attendanceLeader?.username || 'N/A'}
-            </p>
-            <p className="text-xs text-gray-600">
-              {leaderboardData?.attendanceLeader?.attendance_count || 0} days
-            </p>
-          </div>
-
-          <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Award className="w-4 h-4 text-purple-600" />
-              <span className="text-xs font-bold text-purple-800">Gatha Leader</span>
-            </div>
-            <p className="text-lg font-bold text-gray-800">
-              {leaderboardData?.gathaStats?.gathaLeader?.username || 'N/A'}
-            </p>
-            <p className="text-xs text-gray-600">
-              {leaderboardData?.gathaStats?.gathaLeader?.count || 0} gathas
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200">
-        <h3 className="text-lg font-bold text-gray-800 mb-3">Quick Actions</h3>
-        <div className="space-y-2">
-          <button
-            onClick={() => setActiveTab('approvals')}
-            className="w-full flex items-center justify-between bg-yellow-50 border-2 border-yellow-200 rounded-lg p-3 active:scale-[0.98]"
-          >
-            <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-yellow-600" />
-              <span className="font-bold text-gray-800">Pending Approvals</span>
-            </div>
-            <span className="bg-yellow-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-              {totalPending}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('students')}
-            className="w-full flex items-center justify-between bg-blue-50 border-2 border-blue-200 rounded-lg p-3 active:scale-[0.98]"
-          >
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-blue-600" />
-              <span className="font-bold text-gray-800">View All Students</span>
-            </div>
-            <ChevronDown className="w-5 h-5 text-gray-400" />
-          </button>
-
+      {/* Top Performers */}
+      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <Award className="w-5 h-5 text-yellow-500" />
+            Top Performers
+          </h3>
           <button
             onClick={() => setActiveTab('analytics')}
-            className="w-full flex items-center justify-between bg-green-50 border-2 border-green-200 rounded-lg p-3 active:scale-[0.98]"
+            className="text-xs text-indigo-600 font-bold flex items-center gap-1"
           >
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-green-600" />
-              <span className="font-bold text-gray-800">Analytics Dashboard</span>
-            </div>
-            <ChevronDown className="w-5 h-5 text-gray-400" />
+            View All <ArrowUpRight className="w-3 h-3" />
           </button>
         </div>
+        
+        <div className="grid grid-cols-2 gap-3">
+          <div className="relative bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-xl p-4 overflow-hidden">
+            <div className="absolute top-2 right-2 text-3xl">🏆</div>
+            <p className="text-xs font-bold text-yellow-800 mb-1">Attendance King</p>
+            <p className="text-lg font-bold text-gray-800 truncate pr-8">
+              {leaderboardData?.attendanceLeader?.name || leaderboardData?.attendanceLeader?.username || 'N/A'}
+            </p>
+            <div className="flex items-center gap-1 mt-2">
+              <Calendar className="w-4 h-4 text-yellow-600" />
+              <span className="text-sm font-bold text-yellow-700">
+                {leaderboardData?.attendanceLeader?.attendance_count || 0} days
+              </span>
+            </div>
+          </div>
+
+          <div className="relative bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-300 rounded-xl p-4 overflow-hidden">
+            <div className="absolute top-2 right-2 text-3xl">📚</div>
+            <p className="text-xs font-bold text-purple-800 mb-1">Gatha Master</p>
+            <p className="text-lg font-bold text-gray-800 truncate pr-8">
+              {leaderboardData?.gathaStats?.gathaLeader?.name || leaderboardData?.gathaStats?.gathaLeader?.username || 'N/A'}
+            </p>
+            <div className="flex items-center gap-1 mt-2">
+              <BookOpen className="w-4 h-4 text-purple-600" />
+              <span className="text-sm font-bold text-purple-700">
+                {leaderboardData?.gathaStats?.gathaLeader?.count || 0} gathas
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Navigation */}
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={() => setActiveTab('students')}
+          className="flex items-center gap-3 bg-white rounded-xl p-4 border-2 border-blue-200 shadow-sm active:scale-[0.98]"
+        >
+          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+            <Users className="w-6 h-6 text-blue-600" />
+          </div>
+          <div className="text-left">
+            <p className="font-bold text-gray-800">Students</p>
+            <p className="text-xs text-gray-500">View all students</p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('analytics')}
+          className="flex items-center gap-3 bg-white rounded-xl p-4 border-2 border-green-200 shadow-sm active:scale-[0.98]"
+        >
+          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+            <BarChart3 className="w-6 h-6 text-green-600" />
+          </div>
+          <div className="text-left">
+            <p className="font-bold text-gray-800">Analytics</p>
+            <p className="text-xs text-gray-500">View reports</p>
+          </div>
+        </button>
       </div>
     </div>
   );
 
   const renderApprovals = () => (
     <div className="space-y-4">
-      {/* Action Buttons */}
-      <div className="flex gap-2">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold text-gray-800">Pending Approvals</h3>
         <button
           onClick={fetchPendingData}
           disabled={isLoading}
-          className="flex items-center gap-2 bg-indigo-500 text-white px-4 py-2 rounded-xl active:scale-[0.98] text-sm font-bold"
+          className="flex items-center gap-2 bg-indigo-100 text-indigo-700 px-3 py-2 rounded-xl active:scale-[0.98] text-sm font-bold"
         >
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
         </button>
-
-        {totalPending > 0 && (
-          <button
-            onClick={handleApproveAll}
-            disabled={actionLoading === 'approve-all'}
-            className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-xl active:scale-[0.98] text-sm font-bold"
-          >
-            <Check className="w-4 h-4" />
-            {actionLoading === 'approve-all' ? 'Approving...' : 'Approve All'}
-          </button>
-        )}
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2">
+      {/* Approve All Button */}
+      {totalPending > 0 && (
         <button
-          onClick={() => setActiveTab('approvals-attendance')}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-sm ${
-            activeTab === 'approvals-attendance'
-              ? 'bg-indigo-500 text-white shadow-lg'
-              : 'bg-white text-gray-600 border-2 border-indigo-200'
+          onClick={handleApproveAll}
+          disabled={actionLoading === 'approve-all'}
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-3 rounded-xl active:scale-[0.98] font-bold shadow-lg"
+        >
+          <Check className="w-5 h-5" />
+          {actionLoading === 'approve-all' ? 'Approving...' : `Approve All (${totalPending})`}
+        </button>
+      )}
+
+      {/* Filter Tabs */}
+      <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
+        <button
+          onClick={() => setApprovalFilter('all')}
+          className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-all ${
+            approvalFilter === 'all'
+              ? 'bg-white text-gray-800 shadow'
+              : 'text-gray-600'
           }`}
         >
-          <Calendar className="w-4 h-4" />
-          Attendance ({pendingData.attendance.length})
+          All ({totalPending})
         </button>
         <button
-          onClick={() => setActiveTab('approvals-gatha')}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-sm ${
-            activeTab === 'approvals-gatha'
-              ? 'bg-indigo-500 text-white shadow-lg'
-              : 'bg-white text-gray-600 border-2 border-indigo-200'
+          onClick={() => setApprovalFilter('attendance')}
+          className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-all ${
+            approvalFilter === 'attendance'
+              ? 'bg-white text-gray-800 shadow'
+              : 'text-gray-600'
           }`}
         >
-          <BookOpen className="w-4 h-4" />
-          Gatha ({pendingData.gatha.length})
+          <Calendar className="w-4 h-4 inline mr-1" />
+          ({pendingData.attendance.length})
+        </button>
+        <button
+          onClick={() => setApprovalFilter('gatha')}
+          className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-all ${
+            approvalFilter === 'gatha'
+              ? 'bg-white text-gray-800 shadow'
+              : 'text-gray-600'
+          }`}
+        >
+          <BookOpen className="w-4 h-4 inline mr-1" />
+          ({pendingData.gatha.length})
         </button>
       </div>
 
       {/* Content */}
-      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200">
-        {isLoading ? (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-indigo-200 border-t-indigo-500"></div>
-            <p className="mt-4 text-gray-600 text-sm">Loading...</p>
-          </div>
-        ) : activeTab === 'approvals-attendance' || activeTab === 'approvals' ? (
-          pendingData.attendance.length === 0 ? (
-            <div className="text-center py-12">
-              <Calendar className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500">No pending attendance</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {pendingData.attendance.map((item) => (
-                <div key={item.id} className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <User className="w-4 h-4 text-indigo-500" />
-                        <span className="font-bold text-gray-800">{item.student_name}</span>
-                      </div>
-                      <p className="text-xs text-gray-500">@{item.student_username}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-700">{formatDate(item.date)}</span>
-                      </div>
+      {isLoading ? (
+        <div className="bg-white rounded-xl p-8 border-2 border-indigo-200 text-center">
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-indigo-200 border-t-indigo-500"></div>
+          <p className="mt-4 text-gray-600 text-sm">Loading...</p>
+        </div>
+      ) : totalPending === 0 ? (
+        <div className="bg-white rounded-xl p-8 border-2 border-green-200 text-center">
+          <CheckCircle className="w-16 h-16 mx-auto text-green-400 mb-4" />
+          <p className="text-lg font-bold text-gray-800">All Caught Up!</p>
+          <p className="text-sm text-gray-500">No pending approvals</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {/* Attendance Items */}
+          {filteredPendingAttendance.map((item) => (
+            <div key={`att-${item.id}`} className="bg-white border-2 border-yellow-200 rounded-xl p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                      <Calendar className="w-4 h-4 text-yellow-600" />
                     </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleApprove('attendance', item.id)}
-                        disabled={actionLoading === `approve-attendance-${item.id}`}
-                        className="p-2 bg-green-500 text-white rounded-lg active:scale-95"
-                      >
-                        {actionLoading === `approve-attendance-${item.id}` ? (
-                          <RefreshCw className="w-5 h-5 animate-spin" />
-                        ) : (
-                          <Check className="w-5 h-5" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => handleReject('attendance', item.id)}
-                        disabled={actionLoading === `reject-attendance-${item.id}`}
-                        className="p-2 bg-red-500 text-white rounded-lg active:scale-95"
-                      >
-                        {actionLoading === `reject-attendance-${item.id}` ? (
-                          <RefreshCw className="w-5 h-5 animate-spin" />
-                        ) : (
-                          <XCircle className="w-5 h-5" />
-                        )}
-                      </button>
+                    <div>
+                      <span className="font-bold text-gray-800">{item.student_name}</span>
+                      <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full ml-2">
+                        Attendance
+                      </span>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )
-        ) : (
-          pendingData.gatha.length === 0 ? (
-            <div className="text-center py-12">
-              <BookOpen className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500">No pending gatha entries</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {pendingData.gatha.map((item) => (
-                <div key={item.id} className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <User className="w-4 h-4 text-indigo-500" />
-                        <span className="font-bold text-gray-800">{item.student_name}</span>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                          item.type === 'new' ? 'bg-purple-500 text-white' : 'bg-blue-500 text-white'
-                        }`}>
-                          {item.type === 'new' ? 'New' : 'Revision'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mb-2">@{item.student_username}</p>
-                      
-                      <div className="bg-white rounded-lg p-2 text-sm space-y-1">
-                        <p><span className="font-semibold">Sutra:</span> {item.sutra_name}</p>
-                        <p><span className="font-semibold">Gatha:</span> {item.which_gatha}</p>
-                        <p><span className="font-semibold">Total:</span> {item.total_gatha}</p>
-                        <p className="text-xs text-gray-500">{formatDate(item.date)}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      <button
-                        onClick={() => handleApprove('gatha', item.id)}
-                        disabled={actionLoading === `approve-gatha-${item.id}`}
-                        className="p-2 bg-green-500 text-white rounded-lg active:scale-95"
-                      >
-                        {actionLoading === `approve-gatha-${item.id}` ? (
-                          <RefreshCw className="w-5 h-5 animate-spin" />
-                        ) : (
-                          <Check className="w-5 h-5" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => handleReject('gatha', item.id)}
-                        disabled={actionLoading === `reject-gatha-${item.id}`}
-                        className="p-2 bg-red-500 text-white rounded-lg active:scale-95"
-                      >
-                        {actionLoading === `reject-gatha-${item.id}` ? (
-                          <RefreshCw className="w-5 h-5 animate-spin" />
-                        ) : (
-                          <XCircle className="w-5 h-5" />
-                        )}
-                      </button>
-                    </div>
+                  <div className="ml-10 text-sm text-gray-600">
+                    <p>📅 {formatDate(item.date)}</p>
                   </div>
                 </div>
-              ))}
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleApprove('attendance', item.id)}
+                    disabled={actionLoading === `approve-attendance-${item.id}`}
+                    className="p-3 bg-green-500 text-white rounded-xl active:scale-95 shadow-md"
+                  >
+                    {actionLoading === `approve-attendance-${item.id}` ? (
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Check className="w-5 h-5" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleReject('attendance', item.id)}
+                    disabled={actionLoading === `reject-attendance-${item.id}`}
+                    className="p-3 bg-red-500 text-white rounded-xl active:scale-95 shadow-md"
+                  >
+                    {actionLoading === `reject-attendance-${item.id}` ? (
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <XCircle className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
-          )
-        )}
-      </div>
+          ))}
+
+          {/* Gatha Items */}
+          {filteredPendingGatha.map((item) => (
+            <div key={`gatha-${item.id}`} className="bg-white border-2 border-purple-200 rounded-xl p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                      <BookOpen className="w-4 h-4 text-purple-600" />
+                    </div>
+                    <div>
+                      <span className="font-bold text-gray-800">{item.student_name}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ml-2 ${
+                        item.type === 'new' 
+                          ? 'bg-purple-500 text-white' 
+                          : 'bg-blue-500 text-white'
+                      }`}>
+                        {item.type === 'new' ? '✨ New' : '🔄 Revision'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="ml-10 bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+                    <p><span className="font-semibold">📖 Sutra:</span> {item.sutra_name}</p>
+                    <p><span className="font-semibold">📝 Gatha:</span> {item.which_gatha}</p>
+                    <p><span className="font-semibold">#️⃣ Total:</span> {item.total_gatha}</p>
+                    <p className="text-xs text-gray-500">📅 {formatDate(item.date)}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => handleApprove('gatha', item.id)}
+                    disabled={actionLoading === `approve-gatha-${item.id}`}
+                    className="p-3 bg-green-500 text-white rounded-xl active:scale-95 shadow-md"
+                  >
+                    {actionLoading === `approve-gatha-${item.id}` ? (
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Check className="w-5 h-5" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleReject('gatha', item.id)}
+                    disabled={actionLoading === `reject-gatha-${item.id}`}
+                    className="p-3 bg-red-500 text-white rounded-xl active:scale-95 shadow-md"
+                  >
+                    {actionLoading === `reject-gatha-${item.id}` ? (
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <XCircle className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
   const renderStudentsList = () => (
     <div className="space-y-4">
-      {/* Search and Filters */}
-      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200">
-        <div className="flex items-center gap-2 mb-3">
-          <Search className="w-5 h-5 text-gray-400" />
+      {/* Search */}
+      <div className="bg-white rounded-xl p-3 border-2 border-indigo-200 shadow-sm">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search students..."
-            className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm"
+            placeholder="Search by name or username..."
+            className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400 text-sm"
           />
         </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={() => setSortBy('attendance')}
-            className={`flex-1 px-3 py-2 rounded-lg text-xs font-bold ${
-              sortBy === 'attendance'
-                ? 'bg-indigo-500 text-white'
-                : 'bg-gray-100 text-gray-600'
-            }`}
-          >
-            Sort by Attendance
-          </button>
-          <button
-            onClick={() => setSortBy('gatha')}
-            className={`flex-1 px-3 py-2 rounded-lg text-xs font-bold ${
-              sortBy === 'gatha'
-                ? 'bg-indigo-500 text-white'
-                : 'bg-gray-100 text-gray-600'
-            }`}
-          >
-            Sort by Gatha
-          </button>
-        </div>
       </div>
+
+      {/* Filters */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {['all', 'active', 'inactive'].map((filter) => (
+          <button
+            key={filter}
+            onClick={() => setStudentFilter(filter)}
+            className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap ${
+              studentFilter === filter
+                ? 'bg-indigo-500 text-white'
+                : 'bg-white text-gray-600 border-2 border-gray-200'
+            }`}
+          >
+            {filter === 'all' ? `All (${students.length})` : 
+             filter === 'active' ? `Active (${activeStudentsCount})` :
+             `Inactive (${students.length - activeStudentsCount})`}
+          </button>
+        ))}
+      </div>
+
+      {/* Sort Options */}
+      <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
+        {[
+          { key: 'name', label: 'A-Z', icon: '🔤' },
+          { key: 'attendance', label: 'Attendance', icon: '📅' },
+          { key: 'gatha', label: 'Gatha', icon: '📖' },
+          { key: 'total', label: 'Total', icon: '⭐' },
+        ].map((option) => (
+          <button
+            key={option.key}
+            onClick={() => setSortBy(option.key)}
+            className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold transition-all ${
+              sortBy === option.key
+                ? 'bg-white text-gray-800 shadow'
+                : 'text-gray-600'
+            }`}
+          >
+            {option.icon} {option.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Students Count */}
+      <p className="text-sm text-gray-600 font-semibold">
+        Showing {filteredStudents.length} students
+      </p>
 
       {/* Students List */}
       <div className="space-y-3">
-        {filteredStudents.map((student) => (
-          <div key={student.id} className="bg-white rounded-xl border-2 border-indigo-200 overflow-hidden">
-            <button
-              onClick={() => {
-                if (expandedStudent === student.id) {
-                  setExpandedStudent(null);
-                  setSelectedStudent(null);
-                } else {
-                  setExpandedStudent(student.id);
-                  setSelectedStudent(student.id);
-                }
-              }}
-              className="w-full p-4 text-left active:bg-gray-50"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center">
-                    <User className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-gray-800">{student.name}</p>
-                    <p className="text-xs text-gray-500">@{student.username}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-xs text-gray-500">Attendance</p>
-                    <p className="text-lg font-bold text-green-600">{student.attendance_count || 0}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-500">Gathas</p>
-                    <p className="text-lg font-bold text-purple-600">{student.total_gathas || 0}</p>
-                  </div>
-                  {expandedStudent === student.id ? (
-                    <ChevronUp className="w-5 h-5 text-gray-400" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-gray-400" />
-                  )}
-                </div>
-              </div>
-            </button>
-
-            {expandedStudent === student.id && studentDetail && (
-              <div className="border-t-2 border-indigo-100 p-4 bg-indigo-50">
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div className="bg-white rounded-lg p-3 border border-green-200">
-                    <p className="text-xs text-gray-600 mb-1">Total Attendance</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {studentDetail.attendance?.length || 0}
-                    </p>
-                  </div>
-                  <div className="bg-white rounded-lg p-3 border border-purple-200">
-                    <p className="text-xs text-gray-600 mb-1">New Gathas</p>
-                    <p className="text-2xl font-bold text-purple-600">
-                      {studentDetail.gathaStats?.new || 0}
-                    </p>
-                  </div>
-                  <div className="bg-white rounded-lg p-3 border border-blue-200">
-                    <p className="text-xs text-gray-600 mb-1">Revisions</p>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {studentDetail.gathaStats?.revision || 0}
-                    </p>
-                  </div>
-                  <div className="bg-white rounded-lg p-3 border border-orange-200">
-                    <p className="text-xs text-gray-600 mb-1">Total Gathas</p>
-                    <p className="text-2xl font-bold text-orange-600">
-                      {(studentDetail.gathaStats?.new || 0) + (studentDetail.gathaStats?.revision || 0)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Recent Activity */}
-                {studentDetail.recentActivity && studentDetail.recentActivity.length > 0 && (
-                  <div className="mt-3">
-                    <h4 className="text-sm font-bold text-gray-800 mb-2">Recent Activity</h4>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {studentDetail.recentActivity.map((activity, idx) => (
-                        <div key={idx} className="bg-white rounded-lg p-2 border border-gray-200 text-xs">
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold text-gray-700">
-                              {activity.type === 'attendance' ? '✓ Attended' : '📖 Gatha'}
-                            </span>
-                            <span className="text-gray-500">{formatDate(activity.date)}</span>
-                          </div>
-                          {activity.type === 'gatha' && (
-                            <p className="text-gray-600 mt-1">
-                              {activity.sutra_name} - {activity.which_gatha}
-                            </p>
-                          )}
-                        </div>
-                      ))}
+        {filteredStudents.map((student, index) => {
+          const badge = getPerformanceBadge(student.attendance_count, student.total_gathas);
+          
+          return (
+            <div key={student.id} className="bg-white rounded-xl border-2 border-indigo-200 overflow-hidden shadow-sm">
+              <button
+                onClick={() => {
+                  if (expandedStudent === student.id) {
+                    setExpandedStudent(null);
+                    setSelectedStudent(null);
+                  } else {
+                    setExpandedStudent(student.id);
+                    setSelectedStudent(student.id);
+                  }
+                }}
+                className="w-full p-4 text-left active:bg-gray-50"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <div className={`w-12 h-12 bg-gradient-to-br ${badge.color} rounded-full flex items-center justify-center text-xl shadow-md`}>
+                        {badge.icon}
+                      </div>
+                      <span className="absolute -bottom-1 -right-1 text-sm">{index + 1}</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-800">{student.name}</p>
+                      <p className="text-xs text-gray-500">@{student.username}</p>
+                      <span className={`inline-block text-xs mt-1 px-2 py-0.5 rounded-full bg-gradient-to-r ${badge.color} text-white font-bold`}>
+                        {badge.label}
+                      </span>
                     </div>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
+                  
+                  <div className="flex items-center gap-4">
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-green-600">{student.attendance_count || 0}</p>
+                      <p className="text-xs text-gray-400">Days</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-purple-600">{student.total_gathas || 0}</p>
+                      <p className="text-xs text-gray-400">Gathas</p>
+                    </div>
+                    {expandedStudent === student.id ? (
+                      <ChevronUp className="w-5 h-5 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-gray-400" />
+                    )}
+                  </div>
+                </div>
+              </button>
+
+              {expandedStudent === student.id && (
+                <div className="border-t-2 border-indigo-100 p-4 bg-gradient-to-br from-indigo-50 to-purple-50">
+                  {isLoading ? (
+                    <div className="text-center py-4">
+                      <RefreshCw className="w-6 h-6 animate-spin text-indigo-500 mx-auto" />
+                    </div>
+                  ) : studentDetail ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        <div className="bg-white rounded-xl p-3 border-2 border-green-200 text-center">
+                          <Calendar className="w-6 h-6 text-green-500 mx-auto mb-1" />
+                          <p className="text-2xl font-bold text-green-600">
+                            {studentDetail.attendance?.length || 0}
+                          </p>
+                          <p className="text-xs text-gray-500">Attendance</p>
+                        </div>
+                        <div className="bg-white rounded-xl p-3 border-2 border-purple-200 text-center">
+                          <Star className="w-6 h-6 text-purple-500 mx-auto mb-1" />
+                          <p className="text-2xl font-bold text-purple-600">
+                            {studentDetail.gathaStats?.new || 0}
+                          </p>
+                          <p className="text-xs text-gray-500">New Gathas</p>
+                        </div>
+                        <div className="bg-white rounded-xl p-3 border-2 border-blue-200 text-center">
+                          <RefreshCw className="w-6 h-6 text-blue-500 mx-auto mb-1" />
+                          <p className="text-2xl font-bold text-blue-600">
+                            {studentDetail.gathaStats?.revision || 0}
+                          </p>
+                          <p className="text-xs text-gray-500">Revisions</p>
+                        </div>
+                        <div className="bg-white rounded-xl p-3 border-2 border-orange-200 text-center">
+                          <Flame className="w-6 h-6 text-orange-500 mx-auto mb-1" />
+                          <p className="text-2xl font-bold text-orange-600">
+                            {(studentDetail.gathaStats?.new || 0) + (studentDetail.gathaStats?.revision || 0)}
+                          </p>
+                          <p className="text-xs text-gray-500">Total</p>
+                        </div>
+                      </div>
+
+                      {studentDetail.recentActivity && studentDetail.recentActivity.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
+                            <Activity className="w-4 h-4" />
+                            Recent Activity
+                          </h4>
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {studentDetail.recentActivity.slice(0, 5).map((activity, idx) => (
+                              <div key={idx} className="bg-white rounded-lg p-3 border border-gray-200">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-semibold text-gray-700 text-sm flex items-center gap-2">
+                                    {activity.type === 'attendance' ? (
+                                      <><Calendar className="w-4 h-4 text-green-500" /> Attended</>
+                                    ) : (
+                                      <><BookOpen className="w-4 h-4 text-purple-500" /> Gatha</>
+                                    )}
+                                  </span>
+                                  <span className="text-xs text-gray-500">{formatDate(activity.date)}</span>
+                                </div>
+                                {activity.type === 'gatha' && (
+                                  <p className="text-xs text-gray-600 mt-1 ml-6">
+                                    {activity.sutra_name} • {activity.which_gatha}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-center text-gray-500 py-4">No data available</p>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
+
+      {filteredStudents.length === 0 && (
+        <div className="bg-white rounded-xl p-8 border-2 border-gray-200 text-center">
+          <Users className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+          <p className="text-gray-500">No students found</p>
+        </div>
+      )}
     </div>
   );
 
   const renderAnalytics = () => (
     <div className="space-y-4">
-      {/* Date Range Selector */}
-      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200">
-        <h3 className="text-sm font-bold text-gray-800 mb-3">Select Date Range</h3>
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-semibold text-gray-600 block mb-1">Start Date</label>
-            <input
-              type="date"
-              value={dateRange.start}
-              onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-              className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-600 block mb-1">End Date</label>
-            <input
-              type="date"
-              value={dateRange.end}
-              onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-              className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm"
-            />
-          </div>
-          <button
-            onClick={() => setDateRange(getMonthDateRange())}
-            className="w-full bg-indigo-500 text-white py-2 rounded-lg active:scale-[0.98] text-sm font-bold"
-          >
-            This Month
-          </button>
+      {/* Date Range Presets */}
+      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-sm">
+        <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <CalendarDays className="w-4 h-4" />
+          Date Range
+        </h3>
+        
+        <div className="flex flex-wrap gap-2 mb-3">
+          {[
+            { key: 'today', label: 'Today' },
+            { key: 'week', label: 'This Week' },
+            { key: 'month', label: 'This Month' },
+            { key: 'lastMonth', label: 'Last Month' },
+            { key: 'year', label: 'This Year' },
+            { key: 'custom', label: 'Custom' },
+          ].map((preset) => (
+            <button
+              key={preset.key}
+              onClick={() => setDatePreset(preset.key)}
+              className={`px-3 py-2 rounded-lg text-xs font-bold ${
+                datePreset === preset.key
+                  ? 'bg-indigo-500 text-white'
+                  : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
         </div>
+
+        {datePreset === 'custom' && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-600 block mb-1">Start</label>
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 block mb-1">End</label>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm"
+              />
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={fetchLeaderboard}
+          className="w-full mt-3 bg-indigo-500 text-white py-2 rounded-lg active:scale-[0.98] text-sm font-bold flex items-center justify-center gap-2"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Refresh Data
+        </button>
       </div>
 
-      {/* Analytics Cards */}
+      {/* Summary Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border-2 border-green-300">
-          <Calendar className="w-8 h-8 text-green-600 mb-2" />
-          <p className="text-xs font-bold text-green-800 mb-1">Total Attendance</p>
-          <p className="text-3xl font-bold text-green-700">
+        <div className="bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl p-4 text-white shadow-lg">
+          <Calendar className="w-8 h-8 mb-2 opacity-80" />
+          <p className="text-3xl font-bold">
             {leaderboardData?.gathaStats?.totalAttendance || 0}
           </p>
+          <p className="text-xs opacity-80">Total Attendance</p>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border-2 border-purple-300">
-          <BookOpen className="w-8 h-8 text-purple-600 mb-2" />
-          <p className="text-xs font-bold text-purple-800 mb-1">Total Gathas</p>
-          <p className="text-3xl font-bold text-purple-700">
+        <div className="bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl p-4 text-white shadow-lg">
+          <BookOpen className="w-8 h-8 mb-2 opacity-80" />
+          <p className="text-3xl font-bold">
             {leaderboardData?.gathaStats?.totalPathshalaGathas || 0}
           </p>
+          <p className="text-xs opacity-80">Total Gathas</p>
         </div>
 
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border-2 border-blue-300">
-          <TrendingUp className="w-8 h-8 text-blue-600 mb-2" />
-          <p className="text-xs font-bold text-blue-800 mb-1">Avg per Student</p>
-          <p className="text-3xl font-bold text-blue-700">
+        <div className="bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl p-4 text-white shadow-lg">
+          <TrendingUp className="w-8 h-8 mb-2 opacity-80" />
+          <p className="text-3xl font-bold">
             {students.length > 0 
               ? Math.round((leaderboardData?.gathaStats?.totalPathshalaGathas || 0) / students.length)
               : 0}
           </p>
+          <p className="text-xs opacity-80">Avg Gathas/Student</p>
         </div>
 
-        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border-2 border-orange-300">
-          <Users className="w-8 h-8 text-orange-600 mb-2" />
-          <p className="text-xs font-bold text-orange-800 mb-1">Active Students</p>
-          <p className="text-3xl font-bold text-orange-700">{students.length}</p>
+        <div className="bg-gradient-to-br from-orange-400 to-red-500 rounded-xl p-4 text-white shadow-lg">
+          <Users className="w-8 h-8 mb-2 opacity-80" />
+          <p className="text-3xl font-bold">{activeStudentsCount}</p>
+          <p className="text-xs opacity-80">Active Students</p>
         </div>
       </div>
 
-      {/* Top Performers */}
-      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200">
-        <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+      {/* Leaderboard */}
+      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-sm">
+        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
           <Award className="w-5 h-5 text-yellow-500" />
-          Leaderboard
+          Champions
         </h3>
 
-        <div className="space-y-3">
-          {/* Attendance Leader */}
-          <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 border-2 border-yellow-300 rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center">
-                <Award className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs font-bold text-yellow-800 mb-1">🏆 Attendance Champion</p>
-                <p className="text-lg font-bold text-gray-800">
-                  {leaderboardData?.attendanceLeader?.username || 'N/A'}
-                </p>
-                <p className="text-sm text-gray-600">
-                  {leaderboardData?.attendanceLeader?.attendance_count || 0} days present
-                </p>
+        <div className="space-y-4">
+          {/* Attendance Champion */}
+          <div className="bg-gradient-to-r from-yellow-50 via-yellow-100 to-orange-100 border-2 border-yellow-300 rounded-xl p-4 relative overflow-hidden">
+            <div className="absolute top-0 right-0 text-6xl opacity-20">🏆</div>
+            <div className="relative">
+              <span className="text-xs font-bold text-yellow-800 bg-yellow-200 px-2 py-1 rounded-full">
+                #1 Attendance
+              </span>
+              <div className="flex items-center gap-4 mt-3">
+                <div className="w-14 h-14 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-2xl shadow-lg">
+                  🥇
+                </div>
+                <div className="flex-1">
+                  <p className="text-xl font-bold text-gray-800">
+                    {leaderboardData?.attendanceLeader?.name || leaderboardData?.attendanceLeader?.username || 'N/A'}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {leaderboardData?.attendanceLeader?.attendance_count || 0} days present
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Gatha Leader */}
-          <div className="bg-gradient-to-r from-purple-50 to-purple-100 border-2 border-purple-300 rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-purple-400 rounded-full flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs font-bold text-purple-800 mb-1">📚 Gatha Master</p>
-                <p className="text-lg font-bold text-gray-800">
-                  {leaderboardData?.gathaStats?.gathaLeader?.username || 'N/A'}
-                </p>
-                <p className="text-sm text-gray-600">
-                  {leaderboardData?.gathaStats?.gathaLeader?.count || 0} gathas learned
-                </p>
+          {/* Gatha Champion */}
+          <div className="bg-gradient-to-r from-purple-50 via-purple-100 to-pink-100 border-2 border-purple-300 rounded-xl p-4 relative overflow-hidden">
+            <div className="absolute top-0 right-0 text-6xl opacity-20">📚</div>
+            <div className="relative">
+              <span className="text-xs font-bold text-purple-800 bg-purple-200 px-2 py-1 rounded-full">
+                #1 Gatha Master
+              </span>
+              <div className="flex items-center gap-4 mt-3">
+                <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center text-2xl shadow-lg">
+                  📖
+                </div>
+                <div className="flex-1">
+                  <p className="text-xl font-bold text-gray-800">
+                    {leaderboardData?.gathaStats?.gathaLeader?.name || leaderboardData?.gathaStats?.gathaLeader?.username || 'N/A'}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {leaderboardData?.gathaStats?.gathaLeader?.count || 0} gathas learned
+                  </p>
+                </div>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Top 5 Students */}
+      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-sm">
+        <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <Star className="w-5 h-5 text-yellow-500" />
+          Top 5 Students
+        </h3>
+
+        <div className="space-y-2">
+          {students
+            .sort((a, b) => {
+              const totalA = (a.attendance_count || 0) + (a.total_gathas || 0);
+              const totalB = (b.attendance_count || 0) + (b.total_gathas || 0);
+              return totalB - totalA;
+            })
+            .slice(0, 5)
+            .map((student, index) => {
+              const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+              const total = (student.attendance_count || 0) + (student.total_gathas || 0);
+              
+              return (
+                <div
+                  key={student.id}
+                  className={`flex items-center justify-between p-3 rounded-xl ${
+                    index === 0 ? 'bg-yellow-50 border-2 border-yellow-200' :
+                    index === 1 ? 'bg-gray-50 border-2 border-gray-200' :
+                    index === 2 ? 'bg-orange-50 border-2 border-orange-200' :
+                    'bg-gray-50 border border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{medals[index]}</span>
+                    <div>
+                      <p className="font-bold text-gray-800">{student.name}</p>
+                      <p className="text-xs text-gray-500">@{student.username}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <span className="text-green-600 font-bold">{student.attendance_count || 0}📅</span>
+                    <span className="text-purple-600 font-bold">{student.total_gathas || 0}📖</span>
+                    <span className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-bold text-xs">
+                      {total}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
         </div>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-3">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-3 pb-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-xl p-4 mb-4 border-4 border-indigo-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-inner">
+              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
                 <Shield className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-gray-800">Admin: {user.name}</h2>
-                <p className="text-xs text-gray-600">Management Dashboard</p>
+                <h2 className="text-base font-bold text-gray-800">👋 {user.name}</h2>
+                <p className="text-xs text-indigo-600 font-semibold">Admin Dashboard</p>
               </div>
             </div>
             <button
               onClick={onLogout}
-              className="flex items-center gap-1 bg-red-500 text-white px-3 py-2 rounded-xl active:scale-[0.98] text-sm"
+              className="flex items-center gap-1 bg-red-100 text-red-600 px-3 py-2 rounded-xl active:scale-[0.98] text-sm font-bold"
             >
               <LogOut className="w-4 h-4" />
+              Exit
             </button>
           </div>
         </div>
 
         {/* Messages */}
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-xl mb-4 flex items-center gap-2">
+          <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-xl mb-4 flex items-center gap-2 shadow-sm">
             <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
             <p className="text-sm text-red-700 flex-1">{error}</p>
-            <button onClick={() => setError('')} className="ml-auto">
+            <button onClick={() => setError('')}>
               <CloseIcon className="w-4 h-4 text-red-500" />
             </button>
           </div>
         )}
 
         {successMessage && (
-          <div className="bg-green-50 border-l-4 border-green-500 p-3 rounded-xl mb-4 flex items-center gap-2">
+          <div className="bg-green-50 border-l-4 border-green-500 p-3 rounded-xl mb-4 flex items-center gap-2 shadow-sm animate-pulse">
             <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-            <p className="text-sm text-green-700">{successMessage}</p>
+            <p className="text-sm text-green-700 font-semibold">{successMessage}</p>
           </div>
         )}
 
         {/* Navigation Tabs */}
         <div className="grid grid-cols-4 gap-2 mb-4">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`flex flex-col items-center gap-1 p-3 rounded-xl font-bold text-xs transition-colors ${
-              activeTab === 'overview'
-                ? 'bg-indigo-500 text-white shadow-lg'
-                : 'bg-white text-gray-600 border-2 border-indigo-200'
-            }`}
-          >
-            <BarChart3 className="w-5 h-5" />
-            Overview
-          </button>
-
-          <button
-            onClick={() => setActiveTab('approvals')}
-            className={`flex flex-col items-center gap-1 p-3 rounded-xl font-bold text-xs transition-colors relative ${
-              activeTab.startsWith('approvals')
-                ? 'bg-indigo-500 text-white shadow-lg'
-                : 'bg-white text-gray-600 border-2 border-indigo-200'
-            }`}
-          >
-            <Clock className="w-5 h-5" />
-            Approvals
-            {totalPending > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                {totalPending}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('students')}
-            className={`flex flex-col items-center gap-1 p-3 rounded-xl font-bold text-xs transition-colors ${
-              activeTab === 'students'
-                ? 'bg-indigo-500 text-white shadow-lg'
-                : 'bg-white text-gray-600 border-2 border-indigo-200'
-            }`}
-          >
-            <Users className="w-5 h-5" />
-            Students
-          </button>
-
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`flex flex-col items-center gap-1 p-3 rounded-xl font-bold text-xs transition-colors ${
-              activeTab === 'analytics'
-                ? 'bg-indigo-500 text-white shadow-lg'
-                : 'bg-white text-gray-600 border-2 border-indigo-200'
-            }`}
-          >
-            <TrendingUp className="w-5 h-5" />
-            Analytics
-          </button>
+          {[
+            { key: 'overview', icon: BarChart3, label: 'Home' },
+            { key: 'approvals', icon: Clock, label: 'Pending', badge: totalPending },
+            { key: 'students', icon: Users, label: 'Students' },
+            { key: 'analytics', icon: TrendingUp, label: 'Stats' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`relative flex flex-col items-center gap-1 p-3 rounded-xl font-bold text-xs transition-all ${
+                activeTab === tab.key || (tab.key === 'approvals' && activeTab.startsWith('approvals'))
+                  ? 'bg-indigo-500 text-white shadow-lg scale-105'
+                  : 'bg-white text-gray-600 border-2 border-indigo-200'
+              }`}
+            >
+              <tab.icon className="w-5 h-5" />
+              {tab.label}
+              {tab.badge > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center animate-bounce">
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
 
         {/* Content */}
@@ -933,13 +1199,6 @@ export default function AdminDashboard({ user, onLogout }) {
         {(activeTab === 'approvals' || activeTab.startsWith('approvals-')) && renderApprovals()}
         {activeTab === 'students' && renderStudentsList()}
         {activeTab === 'analytics' && renderAnalytics()}
-
-        {/* Footer */}
-        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl shadow-xl p-6 text-center text-white mt-4">
-          <Shield className="w-10 h-10 mx-auto mb-3" />
-          <h3 className="text-xl font-bold mb-1">Admin Portal</h3>
-          <p className="text-indigo-100 text-sm">શ્રી સોમચીન્તામણી વસુપૂજ્યસ્વામી જૈન પાઠશાળા</p>
-        </div>
       </div>
     </div>
   );
