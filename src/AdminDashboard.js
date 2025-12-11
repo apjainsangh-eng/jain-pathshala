@@ -676,4 +676,271 @@ export default function AdminDashboard({ user, onLogout }) {
                     </p>
                   </div>
                   <div className="bg-white rounded-lg p-3 border border-orange-200">
-                    <p className="text-
+                    <p className="text-xs text-gray-600 mb-1">Total Gathas</p>
+                    <p className="text-2xl font-bold text-orange-600">
+                      {(studentDetail.gathaStats?.new || 0) + (studentDetail.gathaStats?.revision || 0)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Recent Activity */}
+                {studentDetail.recentActivity && studentDetail.recentActivity.length > 0 && (
+                  <div className="mt-3">
+                    <h4 className="text-sm font-bold text-gray-800 mb-2">Recent Activity</h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {studentDetail.recentActivity.map((activity, idx) => (
+                        <div key={idx} className="bg-white rounded-lg p-2 border border-gray-200 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-gray-700">
+                              {activity.type === 'attendance' ? '✓ Attended' : '📖 Gatha'}
+                            </span>
+                            <span className="text-gray-500">{formatDate(activity.date)}</span>
+                          </div>
+                          {activity.type === 'gatha' && (
+                            <p className="text-gray-600 mt-1">
+                              {activity.sutra_name} - {activity.which_gatha}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderAnalytics = () => (
+    <div className="space-y-4">
+      {/* Date Range Selector */}
+      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200">
+        <h3 className="text-sm font-bold text-gray-800 mb-3">Select Date Range</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">Start Date</label>
+            <input
+              type="date"
+              value={dateRange.start}
+              onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+              className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">End Date</label>
+            <input
+              type="date"
+              value={dateRange.end}
+              onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+              className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-indigo-400 text-sm"
+            />
+          </div>
+          <button
+            onClick={() => setDateRange(getMonthDateRange())}
+            className="w-full bg-indigo-500 text-white py-2 rounded-lg active:scale-[0.98] text-sm font-bold"
+          >
+            This Month
+          </button>
+        </div>
+      </div>
+
+      {/* Analytics Cards */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border-2 border-green-300">
+          <Calendar className="w-8 h-8 text-green-600 mb-2" />
+          <p className="text-xs font-bold text-green-800 mb-1">Total Attendance</p>
+          <p className="text-3xl font-bold text-green-700">
+            {leaderboardData?.gathaStats?.totalAttendance || 0}
+          </p>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border-2 border-purple-300">
+          <BookOpen className="w-8 h-8 text-purple-600 mb-2" />
+          <p className="text-xs font-bold text-purple-800 mb-1">Total Gathas</p>
+          <p className="text-3xl font-bold text-purple-700">
+            {leaderboardData?.gathaStats?.totalPathshalaGathas || 0}
+          </p>
+        </div>
+
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border-2 border-blue-300">
+          <TrendingUp className="w-8 h-8 text-blue-600 mb-2" />
+          <p className="text-xs font-bold text-blue-800 mb-1">Avg per Student</p>
+          <p className="text-3xl font-bold text-blue-700">
+            {students.length > 0 
+              ? Math.round((leaderboardData?.gathaStats?.totalPathshalaGathas || 0) / students.length)
+              : 0}
+          </p>
+        </div>
+
+        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border-2 border-orange-300">
+          <Users className="w-8 h-8 text-orange-600 mb-2" />
+          <p className="text-xs font-bold text-orange-800 mb-1">Active Students</p>
+          <p className="text-3xl font-bold text-orange-700">{students.length}</p>
+        </div>
+      </div>
+
+      {/* Top Performers */}
+      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200">
+        <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <Award className="w-5 h-5 text-yellow-500" />
+          Leaderboard
+        </h3>
+
+        <div className="space-y-3">
+          {/* Attendance Leader */}
+          <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 border-2 border-yellow-300 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center">
+                <Award className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-bold text-yellow-800 mb-1">🏆 Attendance Champion</p>
+                <p className="text-lg font-bold text-gray-800">
+                  {leaderboardData?.attendanceLeader?.username || 'N/A'}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {leaderboardData?.attendanceLeader?.attendance_count || 0} days present
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Gatha Leader */}
+          <div className="bg-gradient-to-r from-purple-50 to-purple-100 border-2 border-purple-300 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-purple-400 rounded-full flex items-center justify-center">
+                <BookOpen className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-bold text-purple-800 mb-1">📚 Gatha Master</p>
+                <p className="text-lg font-bold text-gray-800">
+                  {leaderboardData?.gathaStats?.gathaLeader?.username || 'N/A'}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {leaderboardData?.gathaStats?.gathaLeader?.count || 0} gathas learned
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-3">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="bg-white rounded-2xl shadow-xl p-4 mb-4 border-4 border-indigo-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-inner">
+                <Shield className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-800">Admin: {user.name}</h2>
+                <p className="text-xs text-gray-600">Management Dashboard</p>
+              </div>
+            </div>
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-1 bg-red-500 text-white px-3 py-2 rounded-xl active:scale-[0.98] text-sm"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Messages */}
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-xl mb-4 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+            <p className="text-sm text-red-700 flex-1">{error}</p>
+            <button onClick={() => setError('')} className="ml-auto">
+              <CloseIcon className="w-4 h-4 text-red-500" />
+            </button>
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="bg-green-50 border-l-4 border-green-500 p-3 rounded-xl mb-4 flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+            <p className="text-sm text-green-700">{successMessage}</p>
+          </div>
+        )}
+
+        {/* Navigation Tabs */}
+        <div className="grid grid-cols-4 gap-2 mb-4">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`flex flex-col items-center gap-1 p-3 rounded-xl font-bold text-xs transition-colors ${
+              activeTab === 'overview'
+                ? 'bg-indigo-500 text-white shadow-lg'
+                : 'bg-white text-gray-600 border-2 border-indigo-200'
+            }`}
+          >
+            <BarChart3 className="w-5 h-5" />
+            Overview
+          </button>
+
+          <button
+            onClick={() => setActiveTab('approvals')}
+            className={`flex flex-col items-center gap-1 p-3 rounded-xl font-bold text-xs transition-colors relative ${
+              activeTab.startsWith('approvals')
+                ? 'bg-indigo-500 text-white shadow-lg'
+                : 'bg-white text-gray-600 border-2 border-indigo-200'
+            }`}
+          >
+            <Clock className="w-5 h-5" />
+            Approvals
+            {totalPending > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                {totalPending}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('students')}
+            className={`flex flex-col items-center gap-1 p-3 rounded-xl font-bold text-xs transition-colors ${
+              activeTab === 'students'
+                ? 'bg-indigo-500 text-white shadow-lg'
+                : 'bg-white text-gray-600 border-2 border-indigo-200'
+            }`}
+          >
+            <Users className="w-5 h-5" />
+            Students
+          </button>
+
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`flex flex-col items-center gap-1 p-3 rounded-xl font-bold text-xs transition-colors ${
+              activeTab === 'analytics'
+                ? 'bg-indigo-500 text-white shadow-lg'
+                : 'bg-white text-gray-600 border-2 border-indigo-200'
+            }`}
+          >
+            <TrendingUp className="w-5 h-5" />
+            Analytics
+          </button>
+        </div>
+
+        {/* Content */}
+        {activeTab === 'overview' && renderOverview()}
+        {(activeTab === 'approvals' || activeTab.startsWith('approvals-')) && renderApprovals()}
+        {activeTab === 'students' && renderStudentsList()}
+        {activeTab === 'analytics' && renderAnalytics()}
+
+        {/* Footer */}
+        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl shadow-xl p-6 text-center text-white mt-4">
+          <Shield className="w-10 h-10 mx-auto mb-3" />
+          <h3 className="text-xl font-bold mb-1">Admin Portal</h3>
+          <p className="text-indigo-100 text-sm">શ્રી સોમચીન્તામણી વસુપૂજ્યસ્વામી જૈન પાઠશાળા</p>
+        </div>
+      </div>
+    </div>
+  );
+}
