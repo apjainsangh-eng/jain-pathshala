@@ -1,1961 +1,1888 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-AlertCircle,
-AlertTriangle,
-Award,
-BookMarked,
-BookOpen,
-Calendar,
-CalendarDays,
-Check,
-CheckCircle,
-ChevronLeft,
-ChevronRight,
-Clock,
-Crown,
-Edit2,
-Flame,
-Gift,
-Heart,
-Home,
-Loader,
-LogOut,
-Medal,
-Plus,
-RefreshCw,
-Rocket,
-Shield,
-Sparkles,
-Star,
-Target,
-Trash2,
-TrendingUp,
-Trophy,
-User,
-Users,
-X as CloseIcon,
-Zap,
-Info,
-HelpCircle,
-Bell,
-Settings,
-ChevronDown,
-ChevronUp,
-Sun,
-Moon,
-Coffee,
-PartyPopper,
-MessageCircle,
-Volume2,
-VolumeX,
+  BarChart3,
+  BookOpen,
+  Calendar,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Crown,
+  Edit2,
+  Heart,
+  LogOut,
+  Plus,
+  Trash2,
+  Trophy,
+  User,
+  X as CloseIcon,
+  AlertTriangle,
+  TrendingUp,
+  Loader,
+  AlertCircle,
 } from 'lucide-react';
 
-// Import Achievement Components
-import StudentAchievementPage, {
-  calculateAchievementProgress,
-  calculateTotalXP,
-  getUserLevel,
-  MONTHLY_ACHIEVEMENTS,
-  XP_VALUES,
-  DEFAULT_WORKING_DAYS,
-  AchievementDetailModal,
-  ACHIEVEMENT_COLORS,
-} from './Student_achievement';
-
-// ============================================
-// CONFIGURATION & CONSTANTS
-// ============================================
-
+// -------------------------------------
+// Helper utilities
+// -------------------------------------
 const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.vercel.app/api';
 const DEFAULT_DATE_OPTIONS = { day: 'numeric', month: 'long', year: 'numeric' };
 
-// Page Navigation - Reordered: Home, Stats, History, Pending
-const PAGES = {
-HOME: 'home',
-STATS: 'stats',
-HISTORY: 'history',
-PENDING: 'pending',
-};
-
-// Motivational Quotes in Gujarati & Hindi
-const QUOTES = [
-{ text: "अहिंसा परमो धर्मः", meaning: "Non-violence is the supreme religion", emoji: "🙏", lang: "Sanskrit" },
-{ text: "क्षमा वीरस्य भूषणम्", meaning: "Forgiveness is the ornament of the brave", emoji: "💪", lang: "Sanskrit" },
-{ text: "जीवो जीवस्य जीवनम्", meaning: "Live and let live", emoji: "🌱", lang: "Sanskrit" },
-{ text: "परस्परोपग्रहो जीवानाम्", meaning: "Souls render service to one another", emoji: "🤝", lang: "Sanskrit" },
-{ text: "ધર્મ એ જ શ્રેષ્ઠ મિત્ર છે", meaning: "Dharma is the best friend", emoji: "🙏", lang: "Gujarati" },
-{ text: "સત્ય બોલો, પ્રિય બોલો", meaning: "Speak truth, speak pleasantly", emoji: "💬", lang: "Gujarati" },
-{ text: "જ્ઞાન જ શક્તિ છે", meaning: "Knowledge is power", emoji: "📚", lang: "Gujarati" },
-{ text: "મહેનત નો કોઈ વિકલ્પ નથી", meaning: "There is no substitute for hard work", emoji: "⭐", lang: "Gujarati" },
-];
-
-// Tips for new users
-const HELPFUL_TIPS = [
-{ icon: Calendar, text: "Tap the blue button to mark your attendance daily", color: "blue" },
-{ icon: BookOpen, text: "Record your gatha learning with the purple button", color: "purple" },
-{ icon: Trophy, text: "Check Stats to see your achievements and progress", color: "yellow" },
-{ icon: Clock, text: "Pending tab shows items waiting for teacher approval", color: "orange" },
-];
-
-// ============================================
-// HELPER UTILITIES
-// ============================================
-
 const coerceToDate = (input) => {
-if (input instanceof Date) return new Date(input.getTime());
-if (typeof input === 'number') return new Date(input);
-if (typeof input === 'string') {
-const trimmed = input.trim();
-if (!trimmed) return null;
-const isoLike = trimmed.length <= 10 ? `${trimmed}T00:00:00` : trimmed;
-const parsed = new Date(isoLike);
-return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-return null;
+  if (input instanceof Date) return new Date(input.getTime());
+  if (typeof input === 'number') return new Date(input);
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    const isoLike = trimmed.length <= 10 ? `${trimmed}T00:00:00` : trimmed;
+    const parsed = new Date(isoLike);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
 };
 
 export const formatLocalDateString = (input = new Date()) => {
-const parsed = coerceToDate(input);
-if (!parsed) return '';
-const y = parsed.getFullYear();
-const m = String(parsed.getMonth() + 1).padStart(2, '0');
-const d = String(parsed.getDate()).padStart(2, '0');
-return `${y}-${m}-${d}`;
+  const parsed = coerceToDate(input);
+  if (!parsed) return '';
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, '0');
+  const d = String(parsed.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 };
 
 export const formatDateIn = (input, options = DEFAULT_DATE_OPTIONS) => {
-const parsed = coerceToDate(input);
-if (!parsed) return '';
-return parsed.toLocaleDateString('en-IN', { ...DEFAULT_DATE_OPTIONS, ...options });
+  const parsed = coerceToDate(input);
+  if (!parsed) return '';
+  return parsed.toLocaleDateString('en-IN', { ...DEFAULT_DATE_OPTIONS, ...options });
 };
 
-const getDateRangePreset = (preset) => {
-const today = new Date();
-
-switch (preset) {
-case 'today':
-return { start: formatLocalDateString(today), end: formatLocalDateString(today) };
-case 'week':
-const startOfWeek = new Date(today);
-startOfWeek.setDate(today.getDate() - today.getDay());
-return { start: formatLocalDateString(startOfWeek), end: formatLocalDateString(today) };
-case 'month':
-const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-return { start: formatLocalDateString(startOfMonth), end: formatLocalDateString(endOfMonth) };
-case 'year':
-const startOfYear = new Date(today.getFullYear(), 0, 1);
-return { start: formatLocalDateString(startOfYear), end: formatLocalDateString(today) };
-case 'all':
-return { start: '2020-01-01', end: '2099-12-31' };
-default:
-return getDateRangePreset('month');
-}
+const getMonthDateRange = () => {
+  const today = new Date();
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  return {
+    start: formatLocalDateString(startOfMonth),
+    end: formatLocalDateString(endOfMonth),
+  };
 };
 
-// Get greeting based on time of day
-const getGreeting = () => {
-const hour = new Date().getHours();
-if (hour < 5) return { text: 'Good Night', emoji: '🌙', period: 'night' };
-if (hour < 12) return { text: 'Good Morning', emoji: '🌅', period: 'morning' };
-if (hour < 17) return { text: 'Good Afternoon', emoji: '☀️', period: 'afternoon' };
-if (hour < 21) return { text: 'Good Evening', emoji: '🌆', period: 'evening' };
-return { text: 'Good Night', emoji: '🌙', period: 'night' };
+const PAGES = {
+  DASHBOARD: 'Dashboard',
+  HISTORY: 'History',
+  PENDING: 'Pending',
 };
 
-// Get motivational message based on stats
-const getMotivationalMessage = (streak, attendance, gathas) => {
-if (streak >= 7) return { text: "You're on fire! Keep the streak going! 🔥", type: "streak" };
-if (attendance >= 50) return { text: "Amazing dedication! You're a star! ⭐", type: "attendance" };
-if (gathas >= 25) return { text: "Great gatha progress! Keep learning! 📚", type: "gatha" };
-if (streak >= 3) return { text: "Nice streak! Don't break the chain! 💪", type: "streak" };
-if (attendance >= 10) return { text: "You're doing great! Stay consistent! 🎯", type: "attendance" };
-return { text: "Every journey begins with a single step! 🚀", type: "motivation" };
-};
+// -------------------------------------
+// Confirmation Modal Component
+// -------------------------------------
+const ConfirmationModal = ({ title, message, onConfirm, onCancel, confirmText = 'Confirm', confirmColor = 'red' }) => {
+  if (!title) return null;
 
-// ============================================
-// REUSABLE COMPONENTS
-// ============================================
+  const colorClasses = {
+    red: 'bg-red-500 hover:bg-red-600',
+    blue: 'bg-blue-500 hover:bg-blue-600',
+    green: 'bg-green-500 hover:bg-green-600',
+  };
 
-// Confirmation Modal
-const ConfirmationModal = ({ title, message, onConfirm, onCancel, confirmText = "Delete", confirmColor = "red" }) => {
-if (!title) return null;
-
-return (
-<div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-<div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in duration-200">
-<div className="flex items-center mb-4">
-<div className="w-14 h-14 rounded-2xl bg-yellow-100 flex items-center justify-center mr-4">
-<AlertTriangle className="w-7 h-7 text-yellow-500" />
-</div>
-<div>
-<h4 className="text-lg font-bold text-gray-800">{title}</h4>
-<p className="text-sm text-gray-500">This action cannot be undone</p>
-</div>
-</div>
-<p className="text-gray-600 mb-6 text-sm bg-gray-50 p-3 rounded-xl">{message}</p>
-<div className="flex gap-3">
-<button onClick={onCancel} className="flex-1 px-4 py-3.5 bg-gray-100 text-gray-700 font-bold rounded-2xl active:scale-[0.98] transition-transform" >
-Cancel
-</button>
-<button
-onClick={onConfirm}
-className={`flex-1 px-4 py-3.5 ${confirmColor === 'red' ? 'bg-red-500' : 'bg-orange-500'} text-white font-bold rounded-2xl active:scale-[0.98] transition-transform shadow-lg`}
->
-{confirmText}
-</button>
-</div>
-</div>
-</div>
-);
-};
-
-// Pending Status Badge
-const PendingBadge = ({ status, size = 'normal' }) => {
-const badges = {
-pending: { className: 'text-yellow-700 bg-yellow-100 border-yellow-200', icon: Clock, label: 'Pending' },
-approved: { className: 'text-green-700 bg-green-100 border-green-200', icon: Check, label: 'Approved' },
-rejected: { className: 'text-red-700 bg-red-100 border-red-200', icon: CloseIcon, label: 'Rejected' },
-};
-
-const badge = badges[status];
-if (!badge) return null;
-const Icon = badge.icon;
-
-const sizeClasses = size === 'small' ? 'text-xs px-2 py-0.5' : 'text-xs px-2.5 py-1';
-
-return (
-<span className={`inline-flex items-center gap-1 font-bold rounded-full border ${sizeClasses} ${badge.className}`}>
-<Icon className={`${size === 'small' ? 'w-3 h-3' : 'w-3.5 h-3.5'} ${status === 'pending' ? 'animate-pulse' : ''}`} />
-{badge.label}
-</span>
-);
-};
-
-// Success Toast
-const SuccessToast = ({ message, onClose }) => {
-if (!message) return null;
-
-return (
-<div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top duration-300">
-<div className="bg-green-500 text-white px-6 py-3 rounded-2xl shadow-lg flex items-center gap-3">
-<CheckCircle className="w-5 h-5" />
-<span className="font-medium">{message}</span>
-<button onClick={onClose} className="ml-2 p-1 hover:bg-white/20 rounded-full">
-<CloseIcon className="w-4 h-4" />
-</button>
-</div>
-</div>
-);
-};
-
-// Error Banner
-const ErrorBanner = ({ message, onClose }) => {
-if (!message) return null;
-
-return (
-<div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl mb-4 flex items-start gap-3 shadow-sm animate-in slide-in-from-top duration-200">
-<AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-<div className="flex-1">
-<p className="text-red-700 text-sm font-medium">{message}</p>
-</div>
-<button onClick={onClose} className="text-red-400 p-1 hover:bg-red-100 rounded-lg">
-<CloseIcon size={18} />
-</button>
-</div>
-);
-};
-
-// Streak Display Component
-const StreakDisplay = ({ streak, maxStreak }) => {
-const getStreakInfo = (s) => {
-if (s >= 30) return { label: 'Legendary!', color: 'from-yellow-400 to-orange-500', emoji: '🔥', tier: 'diamond' };
-if (s >= 14) return { label: 'Amazing!', color: 'from-purple-400 to-pink-500', emoji: '⚡', tier: 'gold' };
-if (s >= 7) return { label: 'Great!', color: 'from-blue-400 to-indigo-500', emoji: '✨', tier: 'silver' };
-if (s >= 3) return { label: 'Good!', color: 'from-green-400 to-emerald-500', emoji: '🌟', tier: 'bronze' };
-if (s >= 1) return { label: 'Started!', color: 'from-cyan-400 to-blue-500', emoji: '🚀', tier: 'starter' };
-return { label: 'Start today!', color: 'from-gray-400 to-gray-500', emoji: '💪', tier: 'none' };
-};
-
-const info = getStreakInfo(streak);
-
-return (
-<div className={`bg-gradient-to-r ${info.color} rounded-2xl p-4 text-white shadow-lg relative overflow-hidden`}>
-{/* Background decoration */}
-<div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
-<div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12" />
-
-text
-
-  <div className="relative z-10">
-    <div className="flex items-center justify-between mb-2">
-      <div className="flex items-center gap-2">
-        <Flame className="w-6 h-6" />
-        <span className="font-bold">Current Streak</span>
-      </div>
-      <span className="text-3xl">{info.emoji}</span>
-    </div>
-    <div className="flex items-end gap-3">
-      <div>
-        <p className="text-5xl font-bold">{streak}</p>
-        <p className="text-sm opacity-80">{streak === 1 ? 'day' : 'days'}</p>
-      </div>
-      <div className="flex-1 text-right">
-        <p className="text-lg font-bold">{info.label}</p>
-        <p className="text-xs opacity-80 flex items-center justify-end gap-1">
-          <Trophy className="w-3 h-3" /> Best: {maxStreak} days
-        </p>
-      </div>
-    </div>
-  </div>
-</div>
-);
-};
-
-// Quick Stats Card
-const QuickStatCard = ({ icon: Icon, value, label, color, sublabel }) => {
-const colorClasses = {
-green: 'bg-green-50 border-green-200 text-green-600',
-purple: 'bg-purple-50 border-purple-200 text-purple-600',
-blue: 'bg-blue-50 border-blue-200 text-blue-600',
-orange: 'bg-orange-50 border-orange-200 text-orange-600',
-yellow: 'bg-yellow-50 border-yellow-200 text-yellow-600',
-};
-
-return (
-<div className={`rounded-2xl p-4 border-2 ${colorClasses[color]} shadow-sm`}>
-<div className="flex items-center justify-between mb-2">
-<Icon className="w-7 h-7" />
-{sublabel && (
-<span className={`text-xs px-2 py-0.5 rounded-full bg-white/80 font-bold`}>
-{sublabel}
-</span>
-)}
-</div>
-<p className="text-3xl font-bold text-gray-800">{value}</p>
-<p className="text-xs text-gray-500 mt-1">{label}</p>
-</div>
-);
-};
-
-// Help Tooltip
-const HelpTooltip = ({ text }) => {
-const [isOpen, setIsOpen] = useState(false);
-
-return (
-<div className="relative inline-block">
-<button
-onClick={() => setIsOpen(!isOpen)}
-className="p-1 text-gray-400 hover:text-gray-600"
->
-<HelpCircle className="w-4 h-4" />
-</button>
-{isOpen && (
-<>
-<div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-<div className="absolute z-50 bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg">
-{text}
-<div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
-</div>
-</>
-)}
-</div>
-);
-};
-
-// ============================================
-// GATHA ENTRY MODAL
-// ============================================
-
-const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData }) => {
-const [activeTab, setActiveTab] = useState(editData?.type || 'new');
-const [form, setForm] = useState({
-sutraName: editData?.sutra_name || '',
-whichGatha: editData?.which_gatha || '',
-totalGatha: editData?.total_gatha?.toString() || '',
-});
-
-useEffect(() => {
-if (editData) {
-setActiveTab(editData.type || 'new');
-setForm({
-sutraName: editData.sutra_name || '',
-whichGatha: editData.which_gatha || '',
-totalGatha: editData.total_gatha?.toString() || '',
-});
-} else {
-setForm({ sutraName: '', whichGatha: '', totalGatha: '' });
-}
-}, [editData]);
-
-if (!isOpen) return null;
-
-const handleSubmit = () => {
-onSubmit({
-type: activeTab,
-sutra_name: form.sutraName,
-which_gatha: form.whichGatha,
-total_gatha: Number(form.totalGatha),
-});
-};
-
-const isValid = form.sutraName && form.whichGatha && form.totalGatha;
-
-// Quick preset buttons for common sutra names
-const commonSutras = ['નવકાર', 'પંચ પરમેષ્ઠી', 'લોગસ્સ', 'ઉવસગ્ગહરં'];
-
-return (
-<div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-<div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
-{/* Header */}
-<div className={`p-5 text-white ${activeTab === 'new' ? 'bg-gradient-to-r from-purple-500 to-indigo-600' : 'bg-gradient-to-r from-blue-500 to-cyan-600'}`}>
-<div className="flex items-center justify-between">
-<div className="flex items-center gap-3">
-<div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
-<BookOpen className="w-6 h-6" />
-</div>
-<div>
-<h3 className="text-xl font-bold">{editData ? 'Edit Entry' : 'Add Gatha'}</h3>
-<p className="text-sm opacity-80">Record your learning progress</p>
-</div>
-</div>
-<button onClick={onClose} className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors">
-<CloseIcon size={24} />
-</button>
-</div>
-</div>
-
-text
-
-    {/* Tab Switcher */}
-    {!editData && (
-      <div className="flex p-2 bg-gray-100 gap-2">
-        <button
-          onClick={() => setActiveTab('new')}
-          className={`flex-1 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
-            activeTab === 'new' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-600 bg-white'
-          }`}
-        >
-          <Plus className="w-5 h-5" /> New Learning
-        </button>
-        <button
-          onClick={() => setActiveTab('revision')}
-          className={`flex-1 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
-            activeTab === 'revision' ? 'bg-blue-500 text-white shadow-lg' : 'text-gray-600 bg-white'
-          }`}
-        >
-          <RefreshCw className="w-5 h-5" /> Revision
-        </button>
-      </div>
-    )}
-
-    {/* Form */}
-    <div className="p-5 space-y-4">
-      {/* Quick Sutra Selection */}
-      <div>
-        <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
-          📖 Sutra Name
-          <HelpTooltip text="Enter the name of the sutra you learned or revised" />
-        </label>
-        <div className="flex flex-wrap gap-2 mb-2">
-          {commonSutras.map((sutra) => (
-            <button
-              key={sutra}
-              type="button"
-              onClick={() => setForm({ ...form, sutraName: sutra })}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                form.sutraName === sutra
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {sutra}
-            </button>
-          ))}
+  return (
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 transform transition-all">
+        <div className="flex items-center mb-4">
+          <AlertTriangle className="w-6 h-6 text-yellow-500 mr-3 flex-shrink-0" />
+          <h4 className="text-lg font-bold text-gray-800">{title}</h4>
         </div>
-        <input
-          type="text"
-          value={form.sutraName}
-          onChange={(e) => setForm({ ...form, sutraName: e.target.value })}
-          className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
-          placeholder="Enter sutra name or select above"
-        />
-      </div>
-
-      <div>
-        <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
-          📝 Which Gatha
-          <HelpTooltip text="Enter the gatha numbers you completed (e.g., 1-5 or 3,4,5)" />
-        </label>
-        <input
-          type="text"
-          value={form.whichGatha}
-          onChange={(e) => setForm({ ...form, whichGatha: e.target.value })}
-          className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
-          placeholder="e.g., Gatha 1-5 or 3,4,5"
-        />
-      </div>
-
-      <div>
-        <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
-          #️⃣ Total Count
-          <HelpTooltip text="How many gathas did you complete in total?" />
-        </label>
-        <div className="flex gap-2">
-          {[1, 3, 5, 10].map((num) => (
-            <button
-              key={num}
-              type="button"
-              onClick={() => setForm({ ...form, totalGatha: num.toString() })}
-              className={`flex-1 py-3 rounded-xl font-bold transition-all ${
-                form.totalGatha === num.toString()
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              {num}
-            </button>
-          ))}
-        </div>
-        <input
-          type="number"
-          value={form.totalGatha}
-          onChange={(e) => setForm({ ...form, totalGatha: e.target.value })}
-          className="w-full mt-2 px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
-          placeholder="Or enter custom count"
-          min="1"
-        />
-      </div>
-
-      <div className="flex gap-3 pt-2">
-        <button
-          onClick={onClose}
-          className="flex-1 py-3.5 bg-gray-100 text-gray-700 font-bold rounded-xl active:scale-[0.98] transition-transform"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleSubmit}
-          disabled={isSubmitting || !isValid}
-          className={`flex-1 py-3.5 font-bold rounded-xl text-white shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform ${
-            activeTab === 'new'
-              ? 'bg-gradient-to-r from-purple-500 to-purple-600'
-              : 'bg-gradient-to-r from-blue-500 to-blue-600'
-          }`}
-        >
-          {isSubmitting ? (
-            <Loader className="w-5 h-5 animate-spin" />
-          ) : (
-            <Check className="w-5 h-5" />
-          )}
-          {editData ? 'Save Changes' : 'Submit'}
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-);
-};
-
-// ============================================
-// HISTORY PAGE COMPONENT
-// ============================================
-
-const HistoryPage = () => {
-const today = new Date();
-const [selectedYear, setSelectedYear] = useState(today.getFullYear());
-const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
-const [historyData, setHistoryData] = useState(null);
-const [isLoading, setIsLoading] = useState(false);
-const [error, setError] = useState(null);
-const [selectedDay, setSelectedDay] = useState(null);
-
-const monthNames = [
-'January', 'February', 'March', 'April', 'May', 'June',
-'July', 'August', 'September', 'October', 'November', 'December',
-];
-
-const monthNamesGujarati = [
-'જાન્યુઆરી', 'ફેબ્રુઆરી', 'માર્ચ', 'એપ્રિલ', 'મે', 'જૂન',
-'જુલાઈ', 'ઓગસ્ટ', 'સપ્ટેમ્બર', 'ઓક્ટોબર', 'નવેમ્બર', 'ડિસેમ્બર',
-];
-
-const fetchHistory = async (year, month) => {
-setIsLoading(true);
-setError(null);
-const token = localStorage.getItem('jainPathshalaToken');
-
-text
-
-try {
-  const url = `${API_BASE}/history/${year}/${month}`;
-  const res = await fetch(`${API_BASE}/gatha`, { headers: { Authorization: `Bearer ${token}` } });
-
-  if (!res.ok) throw new Error('Failed to load history.');
-  const data = await res.json();
-  setHistoryData(data);
-} catch (err) {
-  setError(err.message || 'Failed to load history.');
-  setHistoryData(null);
-} finally {
-  setIsLoading(false);
-}
-};
-
-useEffect(() => {
-fetchHistory(selectedYear, selectedMonth);
-}, [selectedYear, selectedMonth]);
-
-const handleMonthChange = (direction) => {
-let newMonth = selectedMonth + direction;
-let newYear = selectedYear;
-
-text
-
-if (newMonth > 12) { newMonth = 1; newYear += 1; }
-else if (newMonth < 1) { newMonth = 12; newYear -= 1; }
-
-const currentMonth = today.getMonth() + 1;
-const currentYear = today.getFullYear();
-
-if (newYear > currentYear || (newYear === currentYear && newMonth > currentMonth)) return;
-
-setSelectedYear(newYear);
-setSelectedMonth(newMonth);
-};
-
-const activityData = historyData?.dailyActivity ?? {};
-const todayIso = formatLocalDateString(today);
-
-const monthlySummary = useMemo(() => {
-let presentCount = 0, newGathas = 0, revisionGathas = 0;
-
-text
-
-Object.entries(activityData).forEach(([_, activity]) => {
-  const normalized = activity || {};
-  const gathas = normalized.gathas || { new: 0, revision: 0 };
-  if (normalized.present) presentCount += 1;
-  newGathas += Number(gathas.new || 0);
-  revisionGathas += Number(gathas.revision || 0);
-});
-
-return { presentDays: presentCount, newGathas, revisionGathas };
-}, [activityData]);
-
-// Calendar rendering
-const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
-const firstDayOfMonth = new Date(selectedYear, selectedMonth - 1, 1).getDay();
-
-const renderCalendar = () => {
-const days = [];
-
-text
-
-for (let i = 0; i < firstDayOfMonth; i++) {
-  days.push(<div key={`empty-${i}`} className="h-11" />);
-}
-
-for (let day = 1; day <= daysInMonth; day++) {
-  const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-  const activity = activityData[dateStr];
-  const isPresent = activity?.present === true;
-  const isToday = dateStr === todayIso;
-  const hasGathas = (activity?.gathas?.new || 0) + (activity?.gathas?.revision || 0) > 0;
-  const isFuture = new Date(dateStr) > today;
-
-  days.push(
-    <button
-      key={day}
-      onClick={() => isPresent && setSelectedDay({ dateStr, activity })}
-      disabled={!isPresent || isFuture}
-      className={`h-11 w-11 rounded-xl flex items-center justify-center text-sm font-bold transition-all ${
-        isPresent
-          ? 'bg-gradient-to-br from-green-400 to-green-600 text-white shadow-md active:scale-95'
-          : isToday
-          ? 'bg-orange-100 text-orange-600 border-2 border-orange-400 ring-2 ring-orange-200'
-          : isFuture
-          ? 'text-gray-200'
-          : 'text-gray-400 hover:bg-gray-100'
-      }`}
-    >
-      <div className="relative">
-        {day}
-        {hasGathas && isPresent && (
-          <span className="absolute -top-1 -right-2 w-2 h-2 bg-purple-500 rounded-full" />
-        )}
-      </div>
-    </button>
-  );
-}
-
-return days;
-};
-
-return (
-<div className="space-y-4">
-{/* Help Banner */}
-<div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
-<Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-<div>
-<p className="text-sm font-bold text-blue-800">How to use History</p>
-<p className="text-xs text-blue-600 mt-1">
-Green days = You were present. Tap on green days to see gatha details.
-</p>
-</div>
-</div>
-
-text
-
-  {/* Month Navigation */}
-  <div className="bg-white rounded-2xl p-4 border-2 border-orange-200 shadow-sm">
-    <div className="flex items-center justify-between mb-4">
-      <button
-        onClick={() => handleMonthChange(-1)}
-        className="p-3 rounded-xl bg-orange-50 active:scale-95 transition-transform"
-      >
-        <ChevronLeft size={24} className="text-orange-600" />
-      </button>
-      <div className="text-center">
-        <h3 className="text-xl font-bold text-gray-800">
-          {monthNames[selectedMonth - 1]} {selectedYear}
-        </h3>
-        <p className="text-xs text-gray-500">{monthNamesGujarati[selectedMonth - 1]}</p>
-      </div>
-      <button
-        onClick={() => handleMonthChange(1)}
-        disabled={selectedMonth === today.getMonth() + 1 && selectedYear === today.getFullYear()}
-        className="p-3 rounded-xl bg-orange-50 active:scale-95 transition-transform disabled:opacity-40"
-      >
-        <ChevronRight size={24} className="text-orange-600" />
-      </button>
-    </div>
-
-    {isLoading ? (
-      <div className="text-center py-12">
-        <RefreshCw className="w-12 h-12 animate-spin text-orange-500 mx-auto" />
-        <p className="mt-4 text-gray-600 font-medium">Loading history...</p>
-      </div>
-    ) : error ? (
-      <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-6 text-center">
-        <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
-        <p className="text-red-700 font-medium">{error}</p>
-        <button
-          onClick={() => fetchHistory(selectedYear, selectedMonth)}
-          className="mt-3 px-4 py-2 bg-red-100 text-red-700 rounded-xl font-medium"
-        >
-          Try Again
-        </button>
-      </div>
-    ) : (
-      <>
-        {/* Calendar */}
-        <div className="bg-gray-50 rounded-xl p-3 mb-4">
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-              <div key={i} className="h-8 flex items-center justify-center text-xs font-bold text-gray-400">
-                {d}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {renderCalendar()}
-          </div>
-        </div>
-
-        {/* Legend */}
-        <div className="flex items-center justify-center gap-4 text-xs mb-4 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-green-400 to-green-600" />
-            <span className="text-gray-600">Present ({monthlySummary.presentDays})</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-purple-500" />
-            <span className="text-gray-600">Has Gathas</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-md border-2 border-orange-400 bg-orange-100" />
-            <span className="text-gray-600">Today</span>
-          </div>
-        </div>
-
-        {/* Monthly Stats */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-green-50 border-2 border-green-200 rounded-xl p-3 text-center">
-            <Calendar className="w-6 h-6 text-green-500 mx-auto mb-1" />
-            <p className="text-2xl font-bold text-green-600">{monthlySummary.presentDays}</p>
-            <p className="text-xs text-gray-500">Days Present</p>
-          </div>
-          <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-3 text-center">
-            <Plus className="w-6 h-6 text-purple-500 mx-auto mb-1" />
-            <p className="text-2xl font-bold text-purple-600">{monthlySummary.newGathas}</p>
-            <p className="text-xs text-gray-500">New Gathas</p>
-          </div>
-          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-3 text-center">
-            <RefreshCw className="w-6 h-6 text-blue-500 mx-auto mb-1" />
-            <p className="text-2xl font-bold text-blue-600">{monthlySummary.revisionGathas}</p>
-            <p className="text-xs text-gray-500">Revisions</p>
-          </div>
-        </div>
-      </>
-    )}
-  </div>
-
-  {/* Day Detail Modal */}
-  {selectedDay && (
-    <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setSelectedDay(null)}>
-      <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl max-h-[80vh] overflow-y-auto animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center">
-              <Check className="w-7 h-7 text-green-600" />
-            </div>
-            <div>
-              <h3 className="font-bold text-gray-800 text-lg">
-                {formatDateIn(selectedDay.dateStr, { weekday: 'short', day: 'numeric', month: 'short' })}
-              </h3>
-              <PendingBadge status="approved" />
-            </div>
-          </div>
-          <button onClick={() => setSelectedDay(null)} className="p-2 bg-gray-100 rounded-xl">
-            <CloseIcon size={20} />
+        <p className="text-gray-600 mb-6 text-sm">{message}</p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-300 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className={`flex-1 px-4 py-3 text-white font-semibold rounded-xl transition-colors ${colorClasses[confirmColor]}`}
+          >
+            {confirmText}
           </button>
         </div>
-
-        <div className="space-y-4">
-          {/* New Gathas */}
-          <div className="bg-purple-50 rounded-xl p-4 border-2 border-purple-200">
-            <h4 className="font-bold text-purple-800 mb-3 flex items-center gap-2">
-              <Plus size={18} className="text-purple-600" /> 
-              New Gathas: {selectedDay.activity.gathas?.new || 0}
-            </h4>
-            {(selectedDay.activity.details || []).filter((d) => d.type === 'new').length === 0 ? (
-              <p className="text-sm text-purple-600 bg-white/50 px-3 py-2 rounded-lg">No new gathas recorded</p>
-            ) : (
-              <div className="space-y-2">
-                {(selectedDay.activity.details || []).filter((d) => d.type === 'new').map((entry, idx) => (
-                  <div key={idx} className="bg-white rounded-lg p-3 border border-purple-200">
-                    <p className="text-sm"><strong>Sutra:</strong> {entry.sutra_name}</p>
-                    <p className="text-sm"><strong>Gatha:</strong> {entry.which_gatha}</p>
-                    <p className="text-sm font-bold text-purple-700">Count: {entry.total_gatha}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Revisions */}
-          <div className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
-            <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2">
-              <RefreshCw size={18} className="text-blue-600" /> 
-              Revisions: {selectedDay.activity.gathas?.revision || 0}
-            </h4>
-            {(selectedDay.activity.details || []).filter((d) => d.type === 'revision').length === 0 ? (
-              <p className="text-sm text-blue-600 bg-white/50 px-3 py-2 rounded-lg">No revisions recorded</p>
-            ) : (
-              <div className="space-y-2">
-                {(selectedDay.activity.details || []).filter((d) => d.type === 'revision').map((entry, idx) => (
-                  <div key={idx} className="bg-white rounded-lg p-3 border border-blue-200">
-                    <p className="text-sm"><strong>Sutra:</strong> {entry.sutra_name}</p>
-                    <p className="text-sm"><strong>Gatha:</strong> {entry.which_gatha}</p>
-                    <p className="text-sm font-bold text-blue-700">Count: {entry.total_gatha}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <button
-          onClick={() => setSelectedDay(null)}
-          className="w-full mt-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold py-3.5 rounded-xl active:scale-[0.98] transition-transform"
-        >
-          Close
-        </button>
       </div>
     </div>
-  )}
-</div>
-);
+  );
 };
 
-// ============================================
-// PENDING PAGE COMPONENT
-// ============================================
-
-const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting }) => {
-const allPending = [
-...(pendingStatus.attendance?.filter((p) => p.status === 'pending').map((p) => ({ ...p, itemType: 'attendance' })) || []),
-...(pendingStatus.gatha?.filter((p) => p.status === 'pending').map((p) => ({ ...p, itemType: 'gatha' })) || []),
-];
-
-const allRejected = [
-...(pendingStatus.attendance?.filter((p) => p.status === 'rejected').map((p) => ({ ...p, itemType: 'attendance' })) || []),
-...(pendingStatus.gatha?.filter((p) => p.status === 'rejected').map((p) => ({ ...p, itemType: 'gatha' })) || []),
-];
-
-const totalPendingCount = allPending.length;
-
-return (
-<div className="space-y-4">
-{/* Help Banner */}
-<div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 flex items-start gap-3">
-<Clock className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-<div>
-<p className="text-sm font-bold text-yellow-800">What is Pending?</p>
-<p className="text-xs text-yellow-700 mt-1">
-After you mark attendance or add gathas, your teacher needs to approve them.
-Items waiting for approval appear here.
-</p>
-</div>
-</div>
-
-text
-
-  {/* Pending Summary */}
-  <div className="bg-gradient-to-r from-yellow-400 to-orange-400 rounded-2xl p-5 text-white shadow-lg relative overflow-hidden">
-    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
-    
-    <div className="relative z-10">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Clock className="w-6 h-6" />
-          <span className="font-bold text-lg">Pending Approvals</span>
-        </div>
-        <button
-          onClick={onRefresh}
-          disabled={isSubmitting}
-          className="p-2.5 bg-white/20 rounded-xl hover:bg-white/30 transition-colors"
-        >
-          <RefreshCw className={`w-5 h-5 ${isSubmitting ? 'animate-spin' : ''}`} />
-        </button>
-      </div>
-      <p className="text-5xl font-bold">{totalPendingCount}</p>
-      <p className="text-sm opacity-80 mt-1">
-        {totalPendingCount === 0 ? 'All caught up!' : 'items awaiting teacher approval'}
-      </p>
-    </div>
-  </div>
-
-  {/* Pending Items */}
-  {totalPendingCount === 0 ? (
-    <div className="bg-white rounded-2xl p-8 border-2 border-green-200 text-center shadow-sm">
-      <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-        <CheckCircle className="w-10 h-10 text-green-500" />
-      </div>
-      <p className="text-xl font-bold text-gray-800">All Caught Up! 🎉</p>
-      <p className="text-sm text-gray-500 mt-2">No pending approvals</p>
-      <p className="text-xs text-gray-400 mt-1">All your submissions have been reviewed</p>
-    </div>
-  ) : (
-    <div className="bg-white rounded-2xl p-4 border-2 border-yellow-200 shadow-sm">
-      <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-        <Clock className="w-5 h-5 text-yellow-500" />
-        Awaiting Approval
-      </h3>
-      <div className="space-y-3">
-        {allPending.map((item, index) => (
-          <div
-            key={index}
-            className={`p-4 rounded-xl border-2 ${
-              item.itemType === 'attendance' ? 'bg-blue-50 border-blue-200' : 'bg-purple-50 border-purple-200'
-            }`}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-3">
-                <div
-                  className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                    item.itemType === 'attendance' ? 'bg-blue-200' : 'bg-purple-200'
-                  }`}
-                >
-                  {item.itemType === 'attendance' ? (
-                    <Calendar className="w-6 h-6 text-blue-700" />
-                  ) : (
-                    <BookOpen className="w-6 h-6 text-purple-700" />
-                  )}
-                </div>
-                <div>
-                  <p className="font-bold text-gray-800">
-                    {item.itemType === 'attendance' ? 'Attendance' : `Gatha - ${item.type === 'new' ? 'New' : 'Revision'}`}
-                  </p>
-                  <p className="text-sm text-gray-600">{formatDateIn(item.date)}</p>
-                  {item.itemType === 'gatha' && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      {item.sutra_name} • {item.total_gatha} gathas
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                <PendingBadge status="pending" />
-                {item.itemType === 'gatha' && (
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => onEdit(item)}
-                      className="p-2 bg-blue-100 rounded-lg text-blue-600 active:scale-95 transition-transform"
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                    <button
-                      onClick={() => onDelete(item)}
-                      className="p-2 bg-red-100 rounded-lg text-red-600 active:scale-95 transition-transform"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )}
-
-  {/* Rejected Items */}
-  {allRejected.length > 0 && (
-    <div className="bg-white rounded-2xl p-4 border-2 border-red-200 shadow-sm">
-      <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-        <AlertCircle className="w-5 h-5 text-red-500" />
-        Rejected ({allRejected.length})
-      </h3>
-      <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-3 text-sm text-red-700">
-        <p className="font-medium">These submissions were rejected by your teacher.</p>
-        <p className="text-xs mt-1">Please check the reason and try again if needed.</p>
-      </div>
-      <div className="space-y-3">
-        {allRejected.map((item, index) => (
-          <div key={index} className="p-4 rounded-xl bg-red-50 border-2 border-red-200">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-200 rounded-lg flex items-center justify-center">
-                {item.itemType === 'attendance' ? (
-                  <Calendar className="w-5 h-5 text-red-700" />
-                ) : (
-                  <BookOpen className="w-5 h-5 text-red-700" />
-                )}
-              </div>
-              <div className="flex-1">
-                <p className="font-bold text-gray-800">
-                  {item.itemType === 'attendance' ? 'Attendance' : `Gatha - ${item.type}`}
-                </p>
-                <p className="text-sm text-gray-600">{formatDateIn(item.date)}</p>
-                {item.rejection_reason && (
-                  <p className="text-xs text-red-600 mt-1 bg-red-100 px-2 py-1 rounded">
-                    Reason: {item.rejection_reason}
-                  </p>
-                )}
-              </div>
-              <PendingBadge status="rejected" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )}
-</div>
-);
-};
-
-// Recent Badges Component (Simplified)
-const RecentBadges = ({ stats, onBadgeClick }) => {
-  const recentlyUnlocked = useMemo(() => {
-    return MONTHLY_ACHIEVEMENTS
-      .filter((a) => calculateAchievementProgress(a, stats).unlocked)
-      .slice(0, 4);
-  }, [stats]);
-
-  if (recentlyUnlocked.length === 0) {
+// -------------------------------------
+// Pending Status Badge Component
+// -------------------------------------
+const PendingBadge = ({ status }) => {
+  if (status === 'pending') {
     return (
-      <div className="bg-gray-50 rounded-xl p-6 text-center border-2 border-gray-200">
-        <Award className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-        <p className="text-gray-500 text-sm">No badges yet this month</p>
-        <p className="text-gray-400 text-xs mt-1">Keep learning to unlock!</p>
-      </div>
+      <span className="inline-flex items-center gap-1 text-xs font-bold text-yellow-700 bg-yellow-100 px-2 py-1 rounded-full border border-yellow-300">
+        <Clock className="w-3 h-3 animate-pulse" />
+        Pending
+      </span>
     );
   }
-
-  return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
-      {recentlyUnlocked.map((achievement) => {
-        const Icon = achievement.icon;
-        const colors = ACHIEVEMENT_COLORS[achievement.color];
-
-        return (
-          <button
-            key={achievement.id}
-            onClick={() => onBadgeClick?.(achievement)}
-            className="flex-shrink-0 w-20 p-2 bg-white rounded-xl border-2 border-gray-200 shadow-sm active:scale-95 transition-transform"
-          >
-            <div className={`w-10 h-10 rounded-full mx-auto mb-1 flex items-center justify-center bg-gradient-to-br ${colors.bg}`}>
-              <Icon className="w-5 h-5 text-white" />
-            </div>
-            <p className="text-xs font-bold text-gray-800 text-center truncate">{achievement.title}</p>
-            <p className="text-xs text-center">{colors.icon}</p>
-          </button>
-        );
-      })}
-    </div>
-  );
+  if (status === 'approved') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-bold text-green-700 bg-green-100 px-2 py-1 rounded-full border border-green-300">
+        <Check className="w-3 h-3" />
+        Approved
+      </span>
+    );
+  }
+  if (status === 'rejected') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-bold text-red-700 bg-red-100 px-2 py-1 rounded-full border border-red-300">
+        <CloseIcon className="w-3 h-3" />
+        Rejected
+      </span>
+    );
+  }
+  return null;
 };
 
-// Next Badges to Unlock (Simplified)
-const NextBadges = ({ stats, onBadgeClick }) => {
-  const nextAchievements = useMemo(() => {
-    return MONTHLY_ACHIEVEMENTS
-      .map((a) => ({ ...a, ...calculateAchievementProgress(a, stats) }))
-      .filter((a) => !a.unlocked && a.progress > 0)
-      .sort((a, b) => b.progress - a.progress)
-      .slice(0, 2);
-  }, [stats]);
+// -------------------------------------
+// History Page Component
+// -------------------------------------
+const HistoryPage = ({ formatDateIn, formatLocalDateString }) => {
+  const today = new Date();
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
+  const [historyData, setHistoryData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedDayDetails, setSelectedDayDetails] = useState(null);
 
-  if (nextAchievements.length === 0) {
-    return null;
-  }
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
 
-  return (
-    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border-2 border-green-200">
-      <h4 className="font-bold text-green-800 mb-3 flex items-center gap-2">
-        <Target className="w-5 h-5" />
-        Almost There! Keep Going!
-      </h4>
+  const fetchHistory = async (year, month) => {
+    setIsLoading(true);
+    setError(null);
+    const token = localStorage.getItem('jainPathshalaToken');
+
+    try {
+      const url = `${API_BASE}/history/${year}/${month}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+
+      if (!res.ok) {
+        throw new Error('Failed to load history.');
+      }
+
+      const data = await res.json();
+      setHistoryData(data);
+    } catch (err) {
+      console.error('Fetch History Error:', err);
+      setError(err.message || 'Failed to load history.');
+      setHistoryData(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHistory(selectedYear, selectedMonth);
+  }, [selectedYear, selectedMonth]);
+
+  const handleMonthChange = (direction) => {
+    let newMonth = selectedMonth + direction;
+    let newYear = selectedYear;
+
+    if (newMonth > 12) {
+      newMonth = 1;
+      newYear += 1;
+    } else if (newMonth < 1) {
+      newMonth = 12;
+      newYear -= 1;
+    }
+
+    const currentMonth = today.getMonth() + 1;
+    const currentYear = today.getFullYear();
+
+    if (newYear > currentYear || (newYear === currentYear && newMonth > currentMonth)) {
+      return;
+    }
+
+    setSelectedYear(newYear);
+    setSelectedMonth(newMonth);
+  };
+
+  const handleDayClick = (dateStr, activity) => {
+    setSelectedDayDetails({ dateStr, activity });
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setSelectedDayDetails(null);
+  };
+
+  const activityData = historyData?.dailyActivity ?? {};
+
+  const presentDays = useMemo(() => {
+    return Object.entries(activityData)
+      .filter(([_, activity]) => activity?.present === true)
+      .sort((a, b) => new Date(b[0]) - new Date(a[0]));
+  }, [activityData]);
+
+  const monthlySummary = useMemo(() => {
+    let presentCount = 0;
+    let newGathas = 0;
+    let revisionGathas = 0;
+
+    Object.entries(activityData).forEach(([dateStr, activity]) => {
+      const normalized = activity || {};
+      const gathas = normalized.gathas || { new: 0, revision: 0 };
+      
+      if (normalized.present) {
+        presentCount += 1;
+      }
+      
+      newGathas += Number(gathas.new || 0);
+      revisionGathas += Number(gathas.revision || 0);
+    });
+
+    return {
+      presentDays: presentCount,
+      newGathas,
+      revisionGathas,
+    };
+  }, [activityData]);
+
+  const renderSummaryCards = () => (
+    <div className="grid grid-cols-2 gap-3 mb-6">
+      <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-300 rounded-xl p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs uppercase tracking-wide text-green-700 font-bold">Present</p>
+          <Calendar className="text-green-500" size={16} />
+        </div>
+        <p className="text-2xl font-bold text-green-700">
+          {monthlySummary.presentDays || 0}
+        </p>
+        <p className="text-xs text-green-600">Days attended</p>
+      </div>
+
+      <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-xl p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs uppercase tracking-wide text-purple-700 font-bold">New</p>
+          <Plus className="text-purple-500" size={16} />
+        </div>
+        <p className="text-2xl font-bold text-purple-700">
+          {monthlySummary.newGathas || 0}
+        </p>
+        <p className="text-xs text-purple-600">Gathas learned</p>
+      </div>
+
+      <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-xl p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs uppercase tracking-wide text-blue-700 font-bold">Revisions</p>
+          <Heart className="text-blue-500" size={16} />
+        </div>
+        <p className="text-2xl font-bold text-blue-700">
+          {monthlySummary.revisionGathas || 0}
+        </p>
+        <p className="text-xs text-blue-600">Gathas revised</p>
+      </div>
+
+      <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-300 rounded-xl p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs uppercase tracking-wide text-orange-700 font-bold">Total</p>
+          <TrendingUp className="text-orange-500" size={16} />
+        </div>
+        <p className="text-2xl font-bold text-orange-700">
+          {(monthlySummary.newGathas || 0) + (monthlySummary.revisionGathas || 0)}
+        </p>
+        <p className="text-xs text-orange-600">Combined count</p>
+      </div>
+    </div>
+  );
+
+  const renderDailyHistory = () => {
+    if (isLoading) {
+      return (
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-orange-200 border-t-orange-500"></div>
+          <p className="mt-4 text-gray-600 font-medium text-sm">Loading history...</p>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6 text-center">
+          <CloseIcon size={40} className="mx-auto text-red-400 mb-3" />
+          <p className="text-red-700 font-semibold text-sm">{error}</p>
+        </div>
+      );
+    }
+
+    if (presentDays.length === 0) {
+      return (
+        <div className="bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center">
+          <Calendar size={48} className="mx-auto text-gray-300 mb-4" />
+          <p className="text-lg font-semibold text-gray-600 mb-2">No Activity This Month</p>
+          <p className="text-gray-500 text-sm">
+            Approved attendance will appear here!
+          </p>
+        </div>
+      );
+    }
+
+    const todayIso = formatLocalDateString(new Date());
+
+    return (
       <div className="space-y-3">
-        {nextAchievements.map((achievement) => {
-          const Icon = achievement.icon;
-          const colors = ACHIEVEMENT_COLORS[achievement.color];
+        {presentDays.map(([dateStr, activity]) => {
+          const { gathas = { new: 0, revision: 0 } } = activity;
+          const newCount = Number(gathas.new || 0);
+          const revisionCount = Number(gathas.revision || 0);
+          const totalCount = newCount + revisionCount;
+          const isToday = dateStr === todayIso;
+
+          const weekdayLabel = formatDateIn(dateStr, { weekday: 'short' });
+          const friendlyDate = formatDateIn(dateStr, { day: 'numeric', month: 'short' });
 
           return (
             <button
-              key={achievement.id}
-              onClick={() => onBadgeClick?.(achievement)}
-              className="w-full flex items-center gap-3 bg-white rounded-xl p-3 border border-green-200 text-left active:scale-[0.98] transition-transform"
+              key={dateStr}
+              type="button"
+              onClick={() => handleDayClick(dateStr, activity)}
+              className={`w-full text-left bg-white border-2 rounded-xl p-4 shadow-sm transition-all active:scale-[0.98] ${
+                isToday ? 'border-orange-400 ring-2 ring-orange-200' : 'border-green-200'
+              }`}
             >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br ${colors.bg}`}>
-                <Icon className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1">
-                <p className="font-bold text-gray-800 text-sm">{achievement.title}</p>
-                <p className="text-xs text-gray-500">({achievement.subtitle})</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full bg-gradient-to-r ${colors.bg} rounded-full`}
-                      style={{ width: `${achievement.progress * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-xs font-bold text-gray-500">
-                    {achievement.current}/{achievement.target}
-                  </span>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-green-100 to-green-200 text-green-700 flex-shrink-0">
+                  <Check size={22} strokeWidth={3} />
                 </div>
+                
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-bold text-gray-800">
+                      {weekdayLabel}, {friendlyDate}
+                    </p>
+                    {isToday && (
+                      <span className="text-xs font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">
+                        TODAY
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-1.5">
+                    {newCount > 0 && (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-1 rounded-full">
+                        <Plus size={12} strokeWidth={3} /> {newCount} New
+                      </span>
+                    )}
+                    {revisionCount > 0 && (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-1 rounded-full">
+                        <Heart size={12} strokeWidth={3} /> {revisionCount} Rev
+                      </span>
+                    )}
+                    {totalCount === 0 && (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                        No gathas
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <ChevronRight size={20} className="text-gray-400 flex-shrink-0" />
               </div>
             </button>
           );
         })}
       </div>
+    );
+  };
+
+  const renderModal = () => {
+    if (!showModal || !selectedDayDetails) return null;
+    const { dateStr, activity } = selectedDayDetails;
+    const newGathas = (activity.details || []).filter((d) => d.type === 'new');
+    const revisionGathas = (activity.details || []).filter((d) => d.type === 'revision');
+    const newCount = Number(activity.gathas?.new || 0);
+    const revisionCount = Number(activity.gathas?.revision || 0);
+
+    return (
+      <div
+        className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-3"
+        onClick={closeModal}
+      >
+        <div
+          className="bg-white rounded-2xl p-4 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex justify-between items-start border-b-2 border-gray-100 pb-3 mb-4">
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-gray-800 mb-1 flex items-center gap-2">
+                <Calendar size={20} className="text-orange-500" />
+                {formatDateIn(dateStr, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+              </h3>
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2 py-1 rounded-full">
+                <Check size={12} /> Approved
+              </span>
+            </div>
+            <button 
+              onClick={closeModal} 
+              className="text-gray-400 hover:text-gray-600 p-2 rounded-lg" 
+              aria-label="Close"
+            >
+              <CloseIcon size={22} />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border-2 border-purple-200">
+              <h4 className="font-bold text-purple-800 mb-3 flex items-center gap-2">
+                <Plus size={18} strokeWidth={3} /> New Gathas: {newCount}
+              </h4>
+              {newGathas.length === 0 ? (
+                <p className="text-sm text-purple-600 bg-white bg-opacity-50 px-3 py-2 rounded-lg">
+                  No new gathas recorded.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {newGathas.map((entry, index) => (
+                    <div key={entry.id} className="bg-white bg-opacity-70 border border-purple-200 rounded-lg p-3">
+                      <span className="text-xs font-bold text-purple-600 bg-purple-200 px-2 py-0.5 rounded mb-2 inline-block">
+                        #{index + 1}
+                      </span>
+                      <div className="space-y-1 text-sm">
+                        <p><span className="font-semibold">Sutra:</span> {entry.sutra_name}</p>
+                        <p><span className="font-semibold">Gatha:</span> {entry.which_gatha}</p>
+                        <p><span className="font-semibold">Count:</span> <span className="font-bold text-purple-700">{entry.total_gatha}</span></p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border-2 border-blue-200">
+              <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2">
+                <Heart size={18} strokeWidth={3} /> Revisions: {revisionCount}
+              </h4>
+              {revisionGathas.length === 0 ? (
+                <p className="text-sm text-blue-600 bg-white bg-opacity-50 px-3 py-2 rounded-lg">
+                  No revisions recorded.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {revisionGathas.map((entry, index) => (
+                    <div key={entry.id} className="bg-white bg-opacity-70 border border-blue-200 rounded-lg p-3">
+                      <span className="text-xs font-bold text-blue-600 bg-blue-200 px-2 py-0.5 rounded mb-2 inline-block">
+                        #{index + 1}
+                      </span>
+                      <div className="space-y-1 text-sm">
+                        <p><span className="font-semibold">Sutra:</span> {entry.sutra_name}</p>
+                        <p><span className="font-semibold">Gatha:</span> {entry.which_gatha}</p>
+                        <p><span className="font-semibold">Count:</span> <span className="font-bold text-blue-700">{entry.total_gatha}</span></p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <button
+              onClick={closeModal}
+              className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold py-3 px-6 rounded-xl shadow-md active:scale-[0.98]"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-xl p-4 border-4 border-orange-200 mb-4">
+      <h2 className="text-xl font-bold text-gray-800 mb-4 border-b-2 border-gray-100 pb-3 flex items-center gap-2">
+        <Clock size={24} className="text-orange-500" /> Approved History
+      </h2>
+
+      <div className="flex items-center justify-between gap-2 mb-6 bg-orange-50 p-3 rounded-xl">
+        <button
+          onClick={() => handleMonthChange(-1)}
+          className="p-2 rounded-lg bg-white shadow-sm active:scale-95"
+          aria-label="Previous Month"
+        >
+          <ChevronLeft size={22} />
+        </button>
+        <div className="text-center">
+          <h3 className="text-lg font-bold text-orange-600">
+            {monthNames[selectedMonth - 1]} {selectedYear}
+          </h3>
+          <p className="text-xs text-gray-600">Tap day for details</p>
+        </div>
+        <button
+          onClick={() => handleMonthChange(1)}
+          className="p-2 rounded-lg bg-white shadow-sm active:scale-95 disabled:opacity-40"
+          aria-label="Next Month"
+          disabled={
+            selectedMonth === today.getMonth() + 1 && selectedYear === today.getFullYear()
+          }
+        >
+          <ChevronRight size={22} />
+        </button>
+      </div>
+
+      {renderSummaryCards()}
+      
+      <div className="mb-3">
+        <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+          <Calendar size={18} className="text-green-500" />
+          Days Attended ({presentDays.length})
+        </h3>
+      </div>
+      
+      {renderDailyHistory()}
+      {renderModal()}
     </div>
   );
 };
 
-// ============================================
-// MAIN STUDENT DASHBOARD COMPONENT
-// ============================================
+// -------------------------------------
+// Pending Page Component
+// -------------------------------------
+const PendingPage = ({ pendingStatus, onRefresh, onEditGatha, onDeletePendingGatha }) => {
+  const pendingAttendance = pendingStatus.attendance?.filter(p => p.status === 'pending') || [];
+  const pendingGatha = pendingStatus.gatha?.filter(p => p.status === 'pending') || [];
+  const rejectedAttendance = pendingStatus.attendance?.filter(p => p.status === 'rejected') || [];
+  const rejectedGatha = pendingStatus.gatha?.filter(p => p.status === 'rejected') || [];
 
+  const totalPending = pendingAttendance.length + pendingGatha.length;
+  const totalRejected = rejectedAttendance.length + rejectedGatha.length;
+
+  return (
+    <div className="space-y-4">
+      {/* Pending Summary */}
+      <div className="bg-white rounded-2xl shadow-xl p-4 border-4 border-yellow-200">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <Clock size={24} className="text-yellow-500" /> Pending Approvals
+          </h2>
+          <button
+            onClick={onRefresh}
+            className="p-2 bg-yellow-100 rounded-lg active:scale-95"
+          >
+            <Loader size={18} className="text-yellow-600" />
+          </button>
+        </div>
+
+        {totalPending === 0 ? (
+          <div className="text-center py-8 bg-green-50 rounded-xl">
+            <Check size={48} className="mx-auto text-green-400 mb-3" />
+            <p className="text-green-700 font-semibold">All caught up!</p>
+            <p className="text-green-600 text-sm">No pending approvals</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {/* Pending Attendance */}
+            {pendingAttendance.map((item) => (
+              <div key={`att-${item.id}`} className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-yellow-200 rounded-lg flex items-center justify-center">
+                      <Calendar size={20} className="text-yellow-700" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-800">Attendance</p>
+                      <p className="text-sm text-gray-600">{formatDateIn(item.date)}</p>
+                    </div>
+                  </div>
+                  <PendingBadge status="pending" />
+                </div>
+              </div>
+            ))}
+
+            {/* Pending Gatha with Edit & Delete Buttons */}
+            {pendingGatha.map((item) => (
+              <div key={`gatha-${item.id}`} className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 flex-1">
+                    <div className="w-10 h-10 bg-purple-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <BookOpen size={20} className="text-purple-700" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <p className="font-bold text-gray-800">Gatha</p>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          item.type === 'new' 
+                            ? 'bg-purple-500 text-white' 
+                            : 'bg-blue-500 text-white'
+                        }`}>
+                          {item.type === 'new' ? 'New' : 'Revision'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 truncate">{item.sutra_name}</p>
+                      <p className="text-xs text-gray-500">{item.which_gatha} • {item.total_gatha} gathas</p>
+                      <p className="text-xs text-gray-400 mt-1">{formatDateIn(item.date)}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <PendingBadge status="pending" />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => onEditGatha(item)}
+                        className="flex items-center gap-1 text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-1.5 rounded-lg hover:bg-blue-200 transition-colors"
+                      >
+                        <Edit2 size={12} />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => onDeletePendingGatha(item.id)}
+                        className="flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-100 px-2 py-1.5 rounded-lg hover:bg-red-200 transition-colors"
+                      >
+                        <Trash2 size={12} />
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Rejected Items */}
+      {totalRejected > 0 && (
+        <div className="bg-white rounded-2xl shadow-xl p-4 border-4 border-red-200">
+          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <AlertCircle size={24} className="text-red-500" /> Rejected ({totalRejected})
+          </h2>
+          
+          <div className="space-y-3">
+            {rejectedAttendance.map((item) => (
+              <div key={`rej-att-${item.id}`} className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-red-200 rounded-lg flex items-center justify-center">
+                      <Calendar size={20} className="text-red-700" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-800">Attendance</p>
+                      <p className="text-sm text-gray-600">{formatDateIn(item.date)}</p>
+                    </div>
+                  </div>
+                  <PendingBadge status="rejected" />
+                </div>
+              </div>
+            ))}
+
+            {rejectedGatha.map((item) => (
+              <div key={`rej-gatha-${item.id}`} className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-red-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <BookOpen size={20} className="text-red-700" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-800">Gatha - {item.type}</p>
+                      <p className="text-sm text-gray-600">{item.sutra_name}</p>
+                      {item.rejection_reason && (
+                        <p className="text-xs text-red-600 mt-1">Reason: {item.rejection_reason}</p>
+                      )}
+                    </div>
+                  </div>
+                  <PendingBadge status="rejected" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// -------------------------------------
+// Main Student Dashboard Component
+// -------------------------------------
 export default function StudentDashboard({ user, onLogout }) {
-const [currentPage, setCurrentPage] = useState(PAGES.HOME);
+  // Navigation
+  const [currentPage, setCurrentPage] = useState(PAGES.DASHBOARD);
 
-// Data states
-const [attendanceHistory, setAttendanceHistory] = useState([]);
-const [gathaEntries, setGathaEntries] = useState([]);
-const [pendingStatus, setPendingStatus] = useState({ attendance: [], gatha: [] });
-const [analyticsData, setAnalyticsData] = useState({ attendanceLeader: null, gathaStats: null });
+  // Attendance & stats
+  const [attendanceHistory, setAttendanceHistory] = useState([]);
+  const [todayAttendanceMarked, setTodayAttendanceMarked] = useState(false);
+  const [userYearlyAttendance, setUserYearlyAttendance] = useState(0);
 
-// Stats
-// Stats (Monthly focused)
-const [monthlyAttendance, setMonthlyAttendance] = useState(0);
-const [monthlyNewGathas, setMonthlyNewGathas] = useState(0);
-const [monthlyRevisionGathas, setMonthlyRevisionGathas] = useState(0);
-const [currentStreak, setCurrentStreak] = useState(0);
-const [maxStreak, setMaxStreak] = useState(0);
-const [workingDays, setWorkingDays] = useState(DEFAULT_WORKING_DAYS);
+  // Pending Status
+  const [pendingStatus, setPendingStatus] = useState({ attendance: [], gatha: [] });
+  const [todayPendingAttendance, setTodayPendingAttendance] = useState(null);
 
-// Selected month for stats page
-const [statsMonth, setStatsMonth] = useState(() => {
-  const now = new Date();
-  return {
-    year: now.getFullYear(),
-    month: now.getMonth() + 1,
+  // Gatha entries
+  const [gathaEntries, setGathaEntries] = useState([]);
+  const [showGathaForm, setShowGathaForm] = useState(false);
+  const [gathaForm, setGathaForm] = useState({
+    newGatha: { sutraName: '', whichGatha: '', totalGatha: '' },
+    revision: { sutraName: '', whichGatha: '', totalGatha: '' },
+  });
+  
+  // Edit mode state
+  const [editingGatha, setEditingGatha] = useState(null);
+  const [editForm, setEditForm] = useState({
+    sutraName: '',
+    whichGatha: '',
+    totalGatha: '',
+  });
+
+  // Analytics
+  const [dateRange, setDateRange] = useState(getMonthDateRange());
+  const [analyticsData, setAnalyticsData] = useState({ attendanceLeader: null, gathaStats: null });
+  const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(false);
+  const [userNewGathasCount, setUserNewGathasCount] = useState(0);
+  const [currentMonthAnalytics, setCurrentMonthAnalytics] = useState({ attendanceLeader: null, gathaStats: null });
+  const [isCurrentMonthLoading, setIsCurrentMonthLoading] = useState(false);
+
+  // UI feedback
+  const [globalError, setGlobalError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Convenience
+  const todayIso = formatLocalDateString(new Date());
+
+  const clearGlobalError = () => setGlobalError('');
+
+  const showSuccess = (message) => {
+    setSuccessMessage(message);
+    setTimeout(() => setSuccessMessage(''), 3000);
   };
-});
 
-// UI states
-const [isLoading, setIsLoading] = useState(true);
-const [isSubmitting, setIsSubmitting] = useState(false);
-const [globalError, setGlobalError] = useState('');
-const [successMessage, setSuccessMessage] = useState('');
-const [confirmAction, setConfirmAction] = useState(null);
-const [showTips, setShowTips] = useState(true);
-const [datePreset, setDatePreset] = useState('month');
-const [dateRange, setDateRange] = useState(getDateRangePreset('month'));
+  // Normalizer for gatha entries
+  const normalizeEntry = (entry) => ({
+    id: entry.id ?? entry._id ?? null,
+    type: entry.type,
+    sutra_name: entry.sutra_name ?? entry.sutraName ?? entry.sutra ?? '',
+    which_gatha: entry.which_gatha ?? entry.whichGatha ?? entry.gatha ?? '',
+    total_gatha: Number(entry.total_gatha ?? entry.totalGatha ?? entry.total ?? 0),
+    created_at: entry.created_at ?? entry.date ?? entry.createdAt ?? null,
+  });
 
-// Modals
-const [showGathaModal, setShowGathaModal] = useState(false);
-const [editingGatha, setEditingGatha] = useState(null);
-const [selectedAchievement, setSelectedAchievement] = useState(null);
+  // Memoized derived data
+  const todaysEntries = useMemo(
+    () =>
+      gathaEntries.filter(
+        (e) => e.created_at && formatLocalDateString(e.created_at) === todayIso,
+      ),
+    [gathaEntries, todayIso],
+  );
 
-const todayIso = formatLocalDateString(new Date());
-const greeting = getGreeting();
-const [dailyQuote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)]);
+  // Get pending gatha for today
+  const todaysPendingGatha = useMemo(() => {
+    return pendingStatus.gatha?.filter(
+      (p) => formatLocalDateString(p.date) === todayIso && p.status === 'pending'
+    ) || [];
+  }, [pendingStatus.gatha, todayIso]);
 
-// Derived data
-const todayAttendanceMarked = useMemo(
-() => attendanceHistory.some((r) => formatLocalDateString(r.date) === todayIso),
-[attendanceHistory, todayIso]
-);
+  // Count total pending
+  const totalPendingCount = useMemo(() => {
+    const pendingAtt = pendingStatus.attendance?.filter(p => p.status === 'pending').length || 0;
+    const pendingGatha = pendingStatus.gatha?.filter(p => p.status === 'pending').length || 0;
+    return pendingAtt + pendingGatha;
+  }, [pendingStatus]);
 
-const todayPendingAttendance = useMemo(
-() => pendingStatus.attendance?.find((p) => formatLocalDateString(p.date) === todayIso && p.status === 'pending'),
-[pendingStatus.attendance, todayIso]
-);
-
-const todayAttendanceStatus = useMemo(() => {
-if (todayAttendanceMarked) return 'approved';
-if (todayPendingAttendance) return 'pending';
-return 'not_marked';
-}, [todayAttendanceMarked, todayPendingAttendance]);
-
-const todaysApprovedGathas = useMemo(
-() => gathaEntries.filter((e) => e.created_at && formatLocalDateString(e.created_at) === todayIso),
-[gathaEntries, todayIso]
-);
-
-const todaysPendingGathas = useMemo(
-() => pendingStatus.gatha?.filter((p) => formatLocalDateString(p.date) === todayIso && p.status === 'pending') || [],
-[pendingStatus.gatha, todayIso]
-);
-
-const totalPendingCount = useMemo(() => {
-const att = pendingStatus.attendance?.filter((p) => p.status === 'pending').length || 0;
-const gatha = pendingStatus.gatha?.filter((p) => p.status === 'pending').length || 0;
-return att + gatha;
-}, [pendingStatus]);
-
-// User stats for achievements
-const userStats = useMemo(() => ({
-  monthlyAttendance,
-  monthlyNewGathas,
-  currentStreak,
-  maxStreak,
-  workingDays,
-}), [monthlyAttendance, monthlyNewGathas, currentStreak, maxStreak, workingDays]);
-
-// Calculate XP and level
-const xpBreakdown = useMemo(
-  () => calculateTotalXP(userStats, MONTHLY_ACHIEVEMENTS),
-  [userStats]
-);
-
-const userLevel = useMemo(() => getUserLevel(xpBreakdown.total), [xpBreakdown.total]);
-
-const unlockedBadgesCount = useMemo(
-  () => MONTHLY_ACHIEVEMENTS.filter((a) => calculateAchievementProgress(a, userStats).unlocked).length,
-  [userStats]
-);
-
-const motivationalMessage = useMemo(
-  () => getMotivationalMessage(currentStreak, monthlyAttendance, monthlyNewGathas),
-  [currentStreak, monthlyAttendance, monthlyNewGathas]
-);
-
-// Helpers
-const showSuccess = (msg) => {
-setSuccessMessage(msg);
-setTimeout(() => setSuccessMessage(''), 3000);
-};
-
-const normalizeEntry = (entry) => ({
-id: entry.id ?? entry._id ?? null,
-type: entry.type,
-sutra_name: entry.sutra_name ?? entry.sutraName ?? '',
-which_gatha: entry.which_gatha ?? entry.whichGatha ?? '',
-total_gatha: Number(entry.total_gatha ?? entry.totalGatha ?? 0),
-created_at: entry.created_at ?? entry.date ?? null,
-});
-
-const calculateStreak = (history) => {
-const sortedDates = history
-.map((r) => formatLocalDateString(r.date))
-.filter((v, i, a) => a.indexOf(v) === i)
-.sort((a, b) => new Date(b) - new Date(a));
-
-text
-
-if (sortedDates.length === 0) return { current: 0, max: 0 };
-
-let current = 0;
-let max = 0;
-let tempStreak = 1;
-
-for (let i = 0; i < sortedDates.length; i++) {
-  if (i === 0) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const date = new Date(sortedDates[i]);
-    const diffDays = Math.floor((today - date) / (1000 * 60 * 60 * 24));
-    if (diffDays > 1) {
-      current = 0;
-    } else {
-      current = 1;
+  // -------------------------------------
+  // API calls
+  // -------------------------------------
+  const fetchPendingStatus = async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    try {
+      const res = await fetch(`${API_BASE}/student/pending`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPendingStatus(data);
+        
+        const todayPending = data.attendance?.find(
+          (p) => formatLocalDateString(p.date) === todayIso && p.status === 'pending'
+        );
+        setTodayPendingAttendance(todayPending || null);
+      }
+    } catch (error) {
+      console.error('Error fetching pending status:', error);
     }
-  }
+  };
 
-  if (i < sortedDates.length - 1) {
-    const currentDate = new Date(sortedDates[i]);
-    const nextDate = new Date(sortedDates[i + 1]);
-    const diffDays = Math.floor((currentDate - nextDate) / (1000 * 60 * 60 * 24));
+  const fetchAnalytics = async () => {
+    if (!dateRange.start || !dateRange.end) return;
+    setIsAnalyticsLoading(true);
+    const token = localStorage.getItem('jainPathshalaToken');
 
-    if (diffDays === 1) {
-      tempStreak++;
-      if (i === 0 || current > 0) current = tempStreak;
-    } else {
-      max = Math.max(max, tempStreak);
-      tempStreak = 1;
-    }
-  }
-}
-
-max = Math.max(max, tempStreak, current);
-return { current, max };
-};
-
-// API calls
-const fetchPendingStatus = useCallback(async () => {
-const token = localStorage.getItem('jainPathshalaToken');
-try {
-const res = await fetch(`${API_BASE}/student/pending`, {
-headers: { Authorization: `Bearer ${token}` },
-});
-if (res.ok) setPendingStatus(await res.json());
-} catch (error) {
-console.error('Error fetching pending:', error);
-}
-}, []);
-
-const fetchAttendance = useCallback(async () => {
-const token = localStorage.getItem('jainPathshalaToken');
-try {
-const res = await fetch(`${API_BASE}/attendance`, { headers: { Authorization: `Bearer ${token}` } });
-if (res.ok) {
-const data = await res.json();
-setAttendanceHistory(Array.isArray(data) ? data : []);
-const streakData = calculateStreak(data);
-setCurrentStreak(streakData.current);
-setMaxStreak(streakData.max);
-
-text
-
-    // Calculate monthly attendance
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-    const monthlyCount = data.filter((r) => {
-      const date = new Date(r.date);
-      return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
-    }).length;
-    setMonthlyAttendance(monthlyCount);
-  }
-} catch (error) {
-  console.error('Error fetching attendance:', error);
-}
-}, []);
-
-const fetchGathas = useCallback(async () => {
-  const token = localStorage.getItem('jainPathshalaToken');
-  try {
-    const res = await fetch(`${API_BASE}/gatha`, { headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) {
+    try {
+      const res = await fetch(
+        `${API_BASE}/analytics/leaderboard?startDate=${dateRange.start}&endDate=${dateRange.end}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!res.ok) throw new Error('Could not fetch analytics.');
       const data = await res.json();
-      const entries = Array.isArray(data) ? data.map(normalizeEntry) : [];
-      setGathaEntries(entries);
-
-      // Calculate monthly gathas
-      const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
-      const monthlyCount = entries
-        .filter((e) => {
-          const date = new Date(e.created_at);
-          return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
-        })
-        .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
-      setMonthlyNewGathas(monthlyCount);
+      setAnalyticsData(data);
+      clearGlobalError();
+    } catch (error) {
+      setAnalyticsData({ attendanceLeader: null, gathaStats: null });
+    } finally {
+      setIsAnalyticsLoading(false);
     }
-  } catch (error) {
-    console.error('Error fetching gathas:', error);
-  }
-}, []);
+  };
 
-// Fetch comprehensive stats for a specific month
-const fetchMonthlyStats = useCallback(async (year, month) => {
+  const fetchCurrentMonthAnalytics = async () => {
+    setIsCurrentMonthLoading(true);
+    const token = localStorage.getItem('jainPathshalaToken');
+    const monthRange = getMonthDateRange();
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/analytics/leaderboard?startDate=${monthRange.start}&endDate=${monthRange.end}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!res.ok) throw new Error('Could not fetch current month analytics.');
+      const data = await res.json();
+      setCurrentMonthAnalytics(data);
+    } catch (error) {
+      setCurrentMonthAnalytics({ attendanceLeader: null, gathaStats: null });
+    } finally {
+      setIsCurrentMonthLoading(false);
+    }
+  };
+
+  const fetchUserYearlyStats = async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+
+    try {
+      const res = await fetch(`${API_BASE}/stats/yearly`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error('Could not fetch yearly stats.');
+      const data = await res.json();
+      setUserYearlyAttendance(data.totalDaysPresent ?? 0);
+    } catch (error) {
+      setUserYearlyAttendance(0);
+    }
+  };
+
+  const fetchGathaEntries = async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/gatha`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error('Could not fetch gatha entries.');
+      const data = await res.json();
+      setGathaEntries(Array.isArray(data) ? data.map(normalizeEntry) : []);
+    } catch (error) {
+      setGathaEntries([]);
+    }
+  };
+
+  const fetchAttendance = async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/attendance`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error('Could not fetch attendance history.');
+      const data = await res.json();
+      setAttendanceHistory(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setAttendanceHistory([]);
+    }
+  };
+
+  // -------------------------------------
+  // Effects
+  // -------------------------------------
+  useEffect(() => {
+    fetchAnalytics();
+  }, [dateRange.start, dateRange.end]);
+
+  useEffect(() => {
+    fetchCurrentMonthAnalytics();
+    fetchUserYearlyStats();
+    fetchAttendance();
+    fetchGathaEntries();
+    fetchPendingStatus();
+  }, []);
+
+  useEffect(() => {
+    const isMarked = attendanceHistory.some(
+      (record) => formatLocalDateString(record.date) === todayIso,
+    );
+    setTodayAttendanceMarked(isMarked);
+  }, [attendanceHistory, todayIso]);
+
+  useEffect(() => {
+    const startRange = coerceToDate(dateRange.start);
+    const endRange = coerceToDate(dateRange.end);
+
+    if (!startRange || !endRange) {
+      setUserNewGathasCount(0);
+      return;
+    }
+
+    const count = gathaEntries
+      .filter((e) => {
+        if (e.type !== 'new' || !e.created_at) return false;
+        const entryDate = coerceToDate(e.created_at);
+        if (!entryDate) return false;
+        return entryDate >= startRange && entryDate <= endRange;
+      })
+      .reduce((sum, e) => sum + Number(e.total_gatha || 0), 0);
+
+    setUserNewGathasCount(count);
+  }, [gathaEntries, dateRange.start, dateRange.end]);
+
+  // -------------------------------------
+  // Attendance + Gatha handlers
+  // -------------------------------------
+  const markAttendance = async () => {
+    setGlobalError('');
+    setIsSubmitting(true);
+    const token = localStorage.getItem('jainPathshalaToken');
+
+    try {
+      const response = await fetch(`${API_BASE}/attendance/mark`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setGlobalError(data.error || 'Failed to mark attendance');
+        return;
+      }
+
+      showSuccess('Attendance submitted for approval!');
+      await fetchPendingStatus();
+    } catch (error) {
+      console.error('markAttendance error:', error);
+      setGlobalError('Network error occurred');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const submitGatha = async (e) => {
+    if (e) e.preventDefault();
+    const token = localStorage.getItem('jainPathshalaToken');
+    setIsSubmitting(true);
+    setGlobalError('');
+
+    const { newGatha, revision } = gathaForm;
+
+    try {
+      let submitted = false;
+
+      if (newGatha.sutraName && newGatha.whichGatha && String(newGatha.totalGatha).trim() !== '') {
+        const payload = {
+          type: 'new',
+          sutra_name: newGatha.sutraName,
+          which_gatha: newGatha.whichGatha,
+          total_gatha: Number(newGatha.totalGatha),
+        };
+
+        const res = await fetch(`${API_BASE}/gatha`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || 'Failed to submit new gatha');
+        }
+        submitted = true;
+      }
+
+      if (revision.sutraName && revision.whichGatha && String(revision.totalGatha).trim() !== '') {
+        const payload = {
+          type: 'revision',
+          sutra_name: revision.sutraName,
+          which_gatha: revision.whichGatha,
+          total_gatha: Number(revision.totalGatha),
+        };
+
+        const res = await fetch(`${API_BASE}/gatha`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || 'Failed to submit revision gatha');
+        }
+        submitted = true;
+      }
+
+      if (submitted) {
+        showSuccess('Gatha submitted for approval!');
+        await fetchPendingStatus();
+        setGathaForm({
+          newGatha: { sutraName: '', whichGatha: '', totalGatha: '' },
+          revision: { sutraName: '', whichGatha: '', totalGatha: '' },
+        });
+        setShowGathaForm(false);
+      }
+    } catch (error) {
+      console.error('submitGatha error:', error);
+      setGlobalError(error.message || 'Failed to submit gatha');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle edit gatha - open edit modal
+  const handleEditGatha = (entry) => {
+    setEditingGatha(entry);
+    setEditForm({
+      sutraName: entry.sutra_name || '',
+      whichGatha: entry.which_gatha || '',
+      totalGatha: String(entry.total_gatha || ''),
+    });
+  };
+
+  // Close edit modal
+  const closeEditModal = () => {
+    setEditingGatha(null);
+    setEditForm({
+      sutraName: '',
+      whichGatha: '',
+      totalGatha: '',
+    });
+  };
+
+  // Submit edited gatha
+  // Submit edited gatha - use pending endpoint
+const submitEditedGatha = async () => {
+  if (!editingGatha) return;
+  
   const token = localStorage.getItem('jainPathshalaToken');
+  setIsSubmitting(true);
+  setGlobalError('');
+
   try {
-    const res = await fetch(`${API_BASE}/stats/comprehensive?year=${year}&month=${month}`, {
+    const payload = {
+      sutra_name: editForm.sutraName,
+      which_gatha: editForm.whichGatha,
+      total_gatha: Number(editForm.totalGatha),
+    };
+
+    // Use /api/gatha/pending/:id for pending entries
+    const res = await fetch(`${API_BASE}/gatha/pending/${editingGatha.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || 'Failed to update gatha');
+    }
+
+    showSuccess('Gatha updated successfully!');
+    closeEditModal();
+    await fetchPendingStatus();
+    await fetchGathaEntries();
+  } catch (error) {
+    console.error('updateGatha error:', error);
+    setGlobalError(error.message || 'Failed to update gatha');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
+// Delete pending gatha - use pending endpoint
+const deletePendingGatha = async (id) => {
+  setConfirmAction(null);
+  const token = localStorage.getItem('jainPathshalaToken');
+  setIsSubmitting(true);
+
+  try {
+    // Use /api/gatha/pending/:id for pending entries
+    const res = await fetch(`${API_BASE}/gatha/pending/${id}`, {
+      method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (res.ok) {
-      const data = await res.json();
-      setMonthlyAttendance(data.monthlyAttendance ?? 0);
-      setMonthlyNewGathas(data.monthlyNewGathas ?? 0);
-      setMonthlyRevisionGathas(data.monthlyRevisionGathas ?? 0);
-      setCurrentStreak(data.currentStreak ?? 0);
-      setMaxStreak(data.maxStreak ?? 0);
-      setWorkingDays(data.workingDays ?? DEFAULT_WORKING_DAYS);
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Delete failed' }));
+      throw new Error(err.error || 'Failed to delete entry');
     }
+
+    showSuccess('Gatha entry deleted successfully');
+    await fetchPendingStatus();
+    await fetchGathaEntries();
   } catch (error) {
-    console.error('Error fetching stats:', error);
+    console.error('deletePendingGatha error:', error);
+    setGlobalError(error.message || 'Failed to delete gatha entry');
+  } finally {
+    setIsSubmitting(false);
   }
-}, []);
+};
 
-// Initial load
-useEffect(() => {
-  const loadData = async () => {
-    setIsLoading(true);
-    const now = new Date();
-    await Promise.all([
-      fetchAttendance(),
-      fetchGathas(),
-      fetchPendingStatus(),
-      fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1),
-    ]);
-    setIsLoading(false);
+  // Delete pending gatha - show confirmation
+  const handleDeletePendingGathaRequest = (id) => {
+    setConfirmAction({
+      title: "Delete Pending Gatha",
+      message: "Are you sure you want to delete this pending gatha entry? This action cannot be undone.",
+      handler: () => deletePendingGatha(id),
+      id: id
+    });
   };
-  loadData();
-}, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
 
-  // Handle month change in stats page
-const handleStatsMonthChange = (year, month) => {
-  setStatsMonth({ year, month });
-  fetchMonthlyStats(year, month);
-};
 
-const fetchAnalytics = useCallback(async () => {
-const token = localStorage.getItem('jainPathshalaToken');
-try {
-const res = await fetch(
-`${API_BASE}/analytics/leaderboard?startDate=${dateRange.start}&endDate=${dateRange.end}`,
-{ headers: { Authorization: `Bearer ${token}` } }
-);
-if (res.ok) setAnalyticsData(await res.json());
-} catch (error) {
-console.error('Error fetching analytics:', error);
-}
-}, [dateRange]);
+  // Delete approved gatha
+  const handleRemoveGathaRequest = (id) => {
+    setConfirmAction({
+      title: "Delete Approved Gatha",
+      message: "Are you sure you want to delete this approved gatha entry?",
+      handler: () => removeGathaEntry(id),
+      id: id
+    });
+  };
 
-useEffect(() => {
-fetchAnalytics();
-}, [dateRange]);
+  const removeGathaEntry = async (id) => {
+    setConfirmAction(null);
+    const token = localStorage.getItem('jainPathshalaToken');
 
-useEffect(() => {
-if (datePreset !== 'custom') {
-setDateRange(getDateRangePreset(datePreset));
-}
-}, [datePreset]);
+    try {
+      const res = await fetch(`${API_BASE}/gatha/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Delete failed' }));
+        throw new Error(err.error || 'Failed to delete entry');
+      }
+      await fetchGathaEntries();
+      showSuccess('Gatha entry deleted');
+    } catch (error) {
+      console.error('removeGathaEntry error:', error);
+      setGlobalError(error.message || 'Failed to delete gatha entry');
+    }
+  };
 
-// Handlers
-const markAttendance = async () => {
-if (todayAttendanceStatus !== 'not_marked') return;
+  // Edit Modal Component
+  const renderEditModal = () => {
+    if (!editingGatha) return null;
 
-text
+    const typeLabel = editingGatha.type === 'new' ? 'New Gatha' : 'Revision';
+    const isNew = editingGatha.type === 'new';
 
-setGlobalError('');
-setIsSubmitting(true);
-const token = localStorage.getItem('jainPathshalaToken');
-
-try {
-  const res = await fetch(`${API_BASE}/attendance/mark`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to mark attendance');
-  showSuccess('✅ Attendance submitted! Waiting for teacher approval.');
-  await fetchPendingStatus();
-} catch (error) {
-  setGlobalError(error.message);
-} finally {
-  setIsSubmitting(false);
-}
-};
-
-const submitGatha = async (formData) => {
-const token = localStorage.getItem('jainPathshalaToken');
-setIsSubmitting(true);
-setGlobalError('');
-
-text
-
-try {
-  const url = editingGatha ? `${API_BASE}/gatha/pending/${editingGatha.id}` : `${API_BASE}/gatha`;
-
-  const res = await fetch(url, {
-    method: editingGatha ? 'PUT' : 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(formData),
-  });
-
-  if (!res.ok) {
-    const errData = await res.json();
-    throw new Error(errData.error || 'Failed to submit gatha');
-  }
-
-  showSuccess(editingGatha ? '✅ Gatha updated successfully!' : '✅ Gatha submitted! Waiting for approval.');
-  setShowGathaModal(false);
-  setEditingGatha(null);
-  await Promise.all([fetchPendingStatus(), fetchGathas()]);
-} catch (error) {
-  setGlobalError(error.message);
-} finally {
-  setIsSubmitting(false);
-}
-};
-
-const deletePendingGatha = async (id) => {
-setConfirmAction(null);
-const token = localStorage.getItem('jainPathshalaToken');
-setIsSubmitting(true);
-
-text
-
-try {
-  const res = await fetch(`${API_BASE}/gatha/pending/${id}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error('Failed to delete');
-  showSuccess('🗑️ Entry deleted successfully');
-  await Promise.all([fetchPendingStatus(), fetchGathas()]);
-} catch (error) {
-  setGlobalError(error.message);
-} finally {
-  setIsSubmitting(false);
-}
-};
-
-// ==================== RENDER HOME PAGE ====================
-const renderHome = () => (
-<div className="space-y-4">
-{/* Welcome Card /}
-<div className="bg-gradient-to-br from-orange-400 via-amber-400 to-yellow-400 rounded-3xl p-5 text-white shadow-lg relative overflow-hidden">
-{/ Background decorations */}
-<div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -mr-20 -mt-20" />
-<div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full -ml-16 -mb-16" />
-
-text
-
-    <div className="relative z-10">
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-3xl">{greeting.emoji}</span>
-            <span className="text-orange-100 text-sm font-medium">{greeting.text}</span>
-          </div>
-          <h1 className="text-2xl font-bold">{user?.name || user?.username}</h1>
-          <p className="text-orange-100 text-sm mt-1">{motivationalMessage.text}</p>
-        </div>
-        <div className="flex flex-col items-center">
-          <div className="w-16 h-16 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center text-3xl shadow-lg">
-            {userLevel.icon}
-          </div>
-          <span className="text-xs mt-1 bg-white/20 px-2 py-0.5 rounded-full font-bold">
-            Lv.{userLevel.level}
-          </span>
-        </div>
-      </div>
-
-      {/* XP Progress */}
-      <div className="bg-white/20 backdrop-blur rounded-xl p-3">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-sm font-bold">{userLevel.name}</span>
-          <span className="text-xs">{xpBreakdown.total} XP</span>
-        </div>
-        {userLevel.nextLevel && (
-          <div className="h-2 bg-white/30 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-white rounded-full transition-all duration-500"
-              style={{ width: `${userLevel.progressToNext * 100}%` }}
-            />
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-
-  {/* Tips for new users */}
-  {showTips && (
-    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <HelpCircle className="w-5 h-5 text-blue-500" />
-          <span className="font-bold text-blue-800">Quick Tips</span>
-        </div>
-        <button
-          onClick={() => setShowTips(false)}
-          className="text-blue-400 p-1"
+    return (
+      <div
+        className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4"
+        onClick={closeEditModal}
+      >
+        <div
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 transform transition-all"
+          onClick={(e) => e.stopPropagation()}
         >
-          <CloseIcon size={18} />
-        </button>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        {HELPFUL_TIPS.map((tip, i) => (
-          <div key={i} className="flex items-start gap-2 bg-white p-2 rounded-lg">
-            <tip.icon className={`w-4 h-4 text-${tip.color}-500 flex-shrink-0 mt-0.5`} />
-            <span className="text-xs text-gray-600">{tip.text}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )}
-
-  {/* Streak Card */}
-  <StreakDisplay streak={currentStreak} maxStreak={maxStreak} />
-
-  {/* Today's Quick Actions */}
-  <div className="bg-white rounded-2xl p-4 border-2 border-orange-200 shadow-sm">
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="font-bold text-gray-800 flex items-center gap-2">
-        <Target className="w-5 h-5 text-orange-500" />
-        Today's Goals
-      </h3>
-      <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full font-bold">
-        {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
-      </span>
-    </div>
-
-    <div className="grid grid-cols-2 gap-3">
-      {/* Attendance Button */}
-      <button
-        onClick={markAttendance}
-        disabled={todayAttendanceStatus !== 'not_marked' || isSubmitting}
-        className={`p-4 rounded-2xl transition-all active:scale-[0.97] ${
-          todayAttendanceStatus === 'approved'
-            ? 'bg-green-100 border-2 border-green-300'
-            : todayAttendanceStatus === 'pending'
-            ? 'bg-yellow-100 border-2 border-yellow-300'
-            : 'bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-lg'
-        }`}
-      >
-        {todayAttendanceStatus === 'approved' ? (
-          <>
-            <CheckCircle className="w-10 h-10 mx-auto mb-2 text-green-600" />
-            <p className="font-bold text-green-700">Present ✓</p>
-            <p className="text-xs text-green-600">+{XP_VALUES.attendance} XP earned!</p>
-          </>
-        ) : todayAttendanceStatus === 'pending' ? (
-          <>
-            <Clock className="w-10 h-10 mx-auto mb-2 text-yellow-600 animate-pulse" />
-            <p className="font-bold text-yellow-700">Pending...</p>
-            <p className="text-xs text-yellow-600">Waiting for approval</p>
-          </>
-        ) : (
-          <>
-            <Calendar className="w-10 h-10 mx-auto mb-2" />
-            <p className="font-bold">Mark Present</p>
-            <p className="text-xs opacity-80">+{XP_VALUES.attendance} XP</p>
-          </>
-        )}
-      </button>
-
-      {/* Gatha Button */}
-      <button
-        onClick={() => {
-          setEditingGatha(null);
-          setShowGathaModal(true);
-        }}
-        className="relative p-4 rounded-2xl bg-gradient-to-br from-purple-400 to-purple-600 text-white shadow-lg active:scale-[0.97] transition-transform"
-      >
-        <BookOpen className="w-10 h-10 mx-auto mb-2" />
-        <p className="font-bold">Add Gatha</p>
-        <p className="text-xs opacity-80">Record your learning</p>
-        {todaysApprovedGathas.length + todaysPendingGathas.length > 0 && (
-          <span className="absolute -top-2 -right-2 w-7 h-7 bg-green-500 rounded-full flex items-center justify-center text-sm font-bold shadow-lg">
-            {todaysApprovedGathas.length + todaysPendingGathas.length}
-          </span>
-        )}
-      </button>
-    </div>
-
-    {/* Today's Entries */}
-    {(todaysApprovedGathas.length > 0 || todaysPendingGathas.length > 0) && (
-      <div className="mt-4 pt-4 border-t-2 border-gray-100">
-        <p className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-          <BookMarked className="w-4 h-4" />
-          Today's Gathas ({todaysApprovedGathas.length + todaysPendingGathas.length})
-        </p>
-        <div className="space-y-2 max-h-48 overflow-y-auto">
-          {[
-            ...todaysApprovedGathas.map((e) => ({ ...e, status: 'approved' })),
-            ...todaysPendingGathas.map((e) => ({ ...e, status: 'pending' })),
-          ].map((entry) => (
-            <div
-              key={entry.id}
-              className={`flex items-center justify-between p-3 rounded-xl ${
-                entry.status === 'approved' ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'
-              }`}
+          <div className="flex items-center justify-between mb-4 border-b-2 border-gray-100 pb-3">
+            <div className="flex items-center gap-2">
+              <Edit2 className={`w-5 h-5 ${isNew ? 'text-purple-500' : 'text-blue-500'}`} />
+              <h3 className="text-lg font-bold text-gray-800">Edit {typeLabel}</h3>
+            </div>
+            <button
+              onClick={closeEditModal}
+              className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+              aria-label="Close"
             >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    entry.type === 'new' ? 'bg-purple-200' : 'bg-blue-200'
-                  }`}
-                >
-                  {entry.type === 'new' ? <Plus className="w-5 h-5 text-purple-700" /> : <RefreshCw className="w-5 h-5 text-blue-700" />}
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-gray-800">{entry.sutra_name}</p>
-                  <p className="text-xs text-gray-500">{entry.total_gatha} gathas • {entry.which_gatha}</p>
-                </div>
+              <CloseIcon size={22} />
+            </button>
+          </div>
+
+          <div className={`${isNew ? 'bg-purple-50 border-purple-200' : 'bg-blue-50 border-blue-200'} rounded-xl p-4 border-2 mb-4`}>
+            <div className="flex items-center gap-2 mb-3">
+              <span className={`inline-block px-2 py-0.5 ${isNew ? 'bg-purple-500' : 'bg-blue-500'} text-white text-xs font-bold rounded-full`}>
+                {typeLabel}
+              </span>
+              <PendingBadge status="pending" />
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">
+                  Sutra Name
+                </label>
+                <input
+                  type="text"
+                  value={editForm.sutraName}
+                  onChange={(e) => setEditForm({ ...editForm, sutraName: e.target.value })}
+                  className={`w-full px-3 py-2.5 border-2 ${isNew ? 'border-purple-200 focus:border-purple-400' : 'border-blue-200 focus:border-blue-400'} rounded-lg focus:outline-none text-sm`}
+                  placeholder="Enter sutra name"
+                />
               </div>
-              <div className="flex items-center gap-2">
-                <PendingBadge status={entry.status} size="small" />
-                {entry.status === 'pending' && (
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => {
-                        setEditingGatha(entry);
-                        setShowGathaModal(true);
-                      }}
-                      className="p-1.5 bg-blue-100 rounded-lg text-blue-600"
-                    >
-                      <Edit2 size={12} />
-                    </button>
-                    <button
-                      onClick={() =>
-                        setConfirmAction({
-                          title: 'Delete Gatha',
-                          message: 'Are you sure you want to delete this entry?',
-                          handler: () => deletePendingGatha(entry.id),
-                        })
-                      }
-                      className="p-1.5 bg-red-100 rounded-lg text-red-600"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                )}
+
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">
+                  Which Gatha
+                </label>
+                <input
+                  type="text"
+                  value={editForm.whichGatha}
+                  onChange={(e) => setEditForm({ ...editForm, whichGatha: e.target.value })}
+                  className={`w-full px-3 py-2.5 border-2 ${isNew ? 'border-purple-200 focus:border-purple-400' : 'border-blue-200 focus:border-blue-400'} rounded-lg focus:outline-none text-sm`}
+                  placeholder="e.g., Gatha 1, 2, 3"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1">
+                  Total Gatha Count
+                </label>
+                <input
+                  type="number"
+                  value={editForm.totalGatha}
+                  onChange={(e) => setEditForm({ ...editForm, totalGatha: e.target.value })}
+                  className={`w-full px-3 py-2.5 border-2 ${isNew ? 'border-purple-200 focus:border-purple-400' : 'border-blue-200 focus:border-blue-400'} rounded-lg focus:outline-none text-sm`}
+                  placeholder="Enter total count"
+                  min="1"
+                />
               </div>
             </div>
-          ))}
-        </div>
-      </div>
-    )}
-  </div>
+          </div>
 
-  {/* Quick Stats - Monthly */}
-<div className="grid grid-cols-2 gap-3">
-  <QuickStatCard
-    icon={CalendarDays}
-    value={monthlyAttendance}
-    label="Days Present"
-    color="green"
-    sublabel="This Month"
-  />
-  <QuickStatCard
-    icon={BookMarked}
-    value={monthlyNewGathas}
-    label="New Gathas"
-    color="purple"
-    sublabel="This Month"
-  />
-</div>
-
-  {/* Recent Badges */}
-<div className="bg-white rounded-2xl p-4 border-2 border-yellow-200 shadow-sm">
-  <div className="flex items-center justify-between mb-3">
-    <h3 className="font-bold text-gray-800 flex items-center gap-2">
-      <Trophy className="w-5 h-5 text-yellow-500" />
-      Your Badges
-    </h3>
-    <button
-      onClick={() => setCurrentPage(PAGES.STATS)}
-      className="text-xs bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full font-bold flex items-center gap-1"
-    >
-      View All <ChevronRight className="w-3 h-3" />
-    </button>
-  </div>
-  <RecentBadges stats={userStats} onBadgeClick={setSelectedAchievement} />
-</div>
-
-{/* Next Badges to Unlock */}
-<NextBadges stats={userStats} onBadgeClick={setSelectedAchievement} />
-
-  {/* Daily Quote */}
-  <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-4 text-white shadow-lg relative overflow-hidden">
-    <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12" />
-    <div className="relative z-10 flex items-start gap-3">
-      <span className="text-4xl">{dailyQuote.emoji}</span>
-      <div>
-        <p className="text-lg font-bold">{dailyQuote.text}</p>
-        <p className="text-sm text-indigo-100 mt-1">{dailyQuote.meaning}</p>
-        <p className="text-xs text-indigo-200 mt-2">— {dailyQuote.lang} Proverb</p>
-      </div>
-    </div>
-  </div>
-</div>
-);
-
-// ==================== RENDER STATS PAGE ====================
-const renderStats = () => (
-  <StudentAchievementPage 
-    stats={userStats} 
-    onMonthChange={handleStatsMonthChange}
-    workingDays={workingDays}
-  />
-);
-
-// ==================== RENDER CONTENT ====================
-const renderContent = () => {
-if (isLoading) {
-return (
-<div className="bg-white rounded-2xl p-16 text-center border-2 border-orange-200 shadow-sm">
-<div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-<RefreshCw className="w-10 h-10 animate-spin text-orange-500" />
-</div>
-<p className="text-gray-600 font-medium text-lg">Loading your dashboard...</p>
-<p className="text-gray-400 text-sm mt-2">Please wait a moment</p>
-</div>
-);
-}
-
-text
-
-switch (currentPage) {
-  case PAGES.HOME:
-    return renderHome();
-  case PAGES.STATS:
-    return renderStats();
-  case PAGES.HISTORY:
-    return <HistoryPage />;
-  case PAGES.PENDING:
-    return (
-      <PendingPage
-        pendingStatus={pendingStatus}
-        onRefresh={fetchPendingStatus}
-        onEdit={(item) => {
-          setEditingGatha(item);
-          setShowGathaModal(true);
-        }}
-        onDelete={(item) =>
-          setConfirmAction({
-            title: 'Delete Gatha',
-            message: 'Are you sure you want to delete this entry?',
-            handler: () => deletePendingGatha(item.id),
-          })
-        }
-        isSubmitting={isSubmitting}
-      />
-    );
-  default:
-    return renderHome();
-}
-};
-
-// ==================== MAIN RETURN ====================
-return (
-<div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 pb-24">
-{/* Success Toast */}
-<SuccessToast message={successMessage} onClose={() => setSuccessMessage('')} />
-
-text
-
-  {/* Header */}
-  <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm shadow-md px-4 py-3">
-    <div className="max-w-lg mx-auto flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div className="w-11 h-11 bg-gradient-to-br from-orange-400 to-amber-500 rounded-xl flex items-center justify-center shadow-lg">
-          <BookOpen className="w-6 h-6 text-white" />
-        </div>
-        <div>
-          <h1 className="font-bold text-gray-800">જૈન પાઠશાળા</h1>
-          <p className="text-xs text-gray-500">Jain Pathshala</p>
-        </div>
-      </div>
-      <button
-        onClick={onLogout}
-        className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-transform border border-red-200"
-      >
-        <LogOut className="w-4 h-4" />
-        Logout
-      </button>
-    </div>
-  </div>
-
-  <div className="max-w-lg mx-auto px-4 py-4">
-    {/* Error Banner */}
-    <ErrorBanner message={globalError} onClose={() => setGlobalError('')} />
-
-    {/* Navigation Tabs - Reordered: Home, Stats, History, Pending */}
-    <div className="grid grid-cols-4 gap-2 mb-4">
-      {[
-        { key: PAGES.HOME, icon: Home, label: 'Home' },
-        { key: PAGES.STATS, icon: Award, label: 'Stats', badge: unlockedBadgesCount },
-        { key: PAGES.HISTORY, icon: Calendar, label: 'History' },
-        { key: PAGES.PENDING, icon: Clock, label: 'Pending', badge: totalPendingCount, badgeColor: 'red' },
-      ].map((tab) => (
-        <button
-          key={tab.key}
-          onClick={() => setCurrentPage(tab.key)}
-          className={`relative flex flex-col items-center gap-1 p-3 rounded-2xl font-bold text-xs transition-all active:scale-[0.97] ${
-            currentPage === tab.key
-              ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg'
-              : 'bg-white text-gray-600 border-2 border-orange-200 shadow-sm'
-          }`}
-        >
-          <tab.icon className="w-5 h-5" />
-          {tab.label}
-          {tab.badge > 0 && (
-            <span
-              className={`absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shadow ${
-                tab.badgeColor === 'red'
-                  ? 'bg-red-500 text-white animate-pulse'
-                  : 'bg-yellow-500 text-white'
-              }`}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={closeEditModal}
+              className="bg-gray-200 text-gray-700 font-bold py-3 rounded-xl active:scale-[0.98]"
             >
-              {tab.badge}
-            </span>
-          )}
-        </button>
-      ))}
+              Cancel
+            </button>
+            <button
+              onClick={submitEditedGatha}
+              disabled={
+                isSubmitting ||
+                !editForm.sutraName.trim() ||
+                !editForm.whichGatha.trim() ||
+                !editForm.totalGatha.trim()
+              }
+              className={`${isNew ? 'bg-gradient-to-r from-purple-500 to-purple-600' : 'bg-gradient-to-r from-blue-500 to-blue-600'} text-white font-bold py-3 rounded-xl active:scale-[0.98] shadow-lg disabled:opacity-50 flex items-center justify-center gap-2`}
+            >
+              {isSubmitting ? (
+                <Loader className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  <Check size={18} />
+                  Save
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // -------------------------------------
+  // Render Dashboard
+  // -------------------------------------
+  const renderDashboard = () => (
+    <>
+      {/* Attendance & Gatha Cards */}
+      <div className="grid grid-cols-1 gap-4 mb-4">
+        {/* Attendance Card */}
+        <div className="bg-white rounded-2xl shadow-xl p-5 border-4 border-orange-200">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full mx-auto mb-4 flex items-center justify-center shadow-lg">
+              <Calendar className="w-8 h-8 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Mark Attendance</h3>
+            <p className="text-gray-600 text-sm mb-4">Record your presence for today</p>
+
+            {todayAttendanceMarked ? (
+              <div className="bg-green-50 border-2 border-green-300 rounded-xl p-4 flex flex-col items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <Check className="w-6 h-6 text-green-600" />
+                  <span className="text-green-700 font-bold">Attendance Approved!</span>
+                </div>
+                <p className="text-green-600 text-xs">Your attendance is recorded</p>
+              </div>
+            ) : todayPendingAttendance ? (
+              <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 flex flex-col items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-6 h-6 text-yellow-600 animate-pulse" />
+                  <span className="text-yellow-700 font-bold">Pending Approval</span>
+                </div>
+                <p className="text-yellow-600 text-xs">Waiting for admin to approve</p>
+              </div>
+            ) : (
+              <button
+                onClick={markAttendance}
+                disabled={isSubmitting}
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 rounded-xl active:scale-[0.98] shadow-lg disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader className="w-5 h-5 animate-spin" />
+                    Submitting...
+                  </div>
+                ) : (
+                  'Mark Present'
+                )}
+              </button>
+            )}
+
+            <div className="mt-3 text-xs text-gray-500">{formatDateIn(new Date())}</div>
+
+            <div className="mt-4 pt-4 border-t-2 border-gray-100">
+              <div className="text-xs text-gray-600 mb-1">Total Days Present (This Year)</div>
+              <div className="text-2xl font-bold text-blue-600">{userYearlyAttendance}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Gatha Card */}
+        <div className="bg-white rounded-2xl shadow-xl p-5 border-4 border-orange-200">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full mx-auto mb-4 flex items-center justify-center shadow-lg">
+              <Heart className="w-8 h-8 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Submit Gatha</h3>
+            <p className="text-gray-600 text-sm mb-4">Record your gatha progress</p>
+
+            {/* Show approved entries */}
+            {todaysEntries.length > 0 && (
+              <div className="mb-4 space-y-2">
+                <h4 className="font-semibold text-gray-700 text-left text-sm flex items-center gap-2">
+                  <Check size={16} className="text-green-500" />
+                  Approved Today:
+                </h4>
+                {todaysEntries.map((entry) => (
+                  <div key={entry.id} className="bg-green-50 border-2 border-green-300 rounded-xl p-3 text-left">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="inline-block px-2 py-0.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                        {entry.type === 'new' ? 'New' : 'Revision'} ✓
+                      </span>
+                      <button
+                        onClick={() => handleRemoveGathaRequest(entry.id)}
+                        className="text-red-500 p-1"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-700">
+                      <span className="font-bold">Sutra:</span> {entry.sutra_name}
+                    </p>
+                    <p className="text-xs text-gray-700">
+                      <span className="font-bold">Gatha:</span> {entry.which_gatha}
+                    </p>
+                    <p className="text-xs text-gray-700">
+                      <span className="font-bold">Total:</span> {entry.total_gatha}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Show pending entries with edit & delete buttons */}
+            {todaysPendingGatha.length > 0 && (
+              <div className="mb-4 space-y-2">
+                <h4 className="font-semibold text-gray-700 text-left text-sm flex items-center gap-2">
+                  <Clock size={16} className="text-yellow-500" />
+                  Pending Approval:
+                </h4>
+                {todaysPendingGatha.map((entry) => (
+                  <div key={entry.id} className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-3 text-left">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="inline-block px-2 py-0.5 bg-yellow-500 text-white text-xs font-bold rounded-full">
+                        {entry.type === 'new' ? 'New' : 'Revision'} ⏳
+                      </span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => handleEditGatha(entry)}
+                          className="flex items-center gap-1 text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-1 rounded-lg hover:bg-blue-200 transition-colors"
+                          title="Edit"
+                        >
+                          <Edit2 size={12} />
+                        </button>
+                        <button
+                          onClick={() => handleDeletePendingGathaRequest(entry.id)}
+                          className="flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-100 px-2 py-1 rounded-lg hover:bg-red-200 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-700">
+                      <span className="font-bold">Sutra:</span> {entry.sutra_name}
+                    </p>
+                    <p className="text-xs text-gray-700">
+                      <span className="font-bold">Gatha:</span> {entry.which_gatha}
+                    </p>
+                    <p className="text-xs text-gray-700">
+                      <span className="font-bold">Total:</span> {entry.total_gatha}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!showGathaForm && (
+              <button
+                onClick={() => setShowGathaForm(true)}
+                className="w-full bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold py-3 rounded-xl active:scale-[0.98] shadow-lg flex items-center justify-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                Add Gatha Entry
+              </button>
+            )}
+
+            {showGathaForm && (
+              <div className="space-y-4 text-left">
+                <div className="bg-purple-50 rounded-xl p-4 border-2 border-purple-200">
+                  <h4 className="font-bold text-purple-700 mb-3 text-sm">New Gatha</h4>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={gathaForm.newGatha.sutraName}
+                      onChange={(e) =>
+                        setGathaForm((prev) => ({
+                          ...prev,
+                          newGatha: { ...prev.newGatha, sutraName: e.target.value },
+                        }))
+                      }
+                      className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg focus:outline-none focus:border-purple-400 text-sm"
+                      placeholder="Sutra name"
+                    />
+                    <input
+                      type="text"
+                      value={gathaForm.newGatha.whichGatha}
+                      onChange={(e) =>
+                        setGathaForm((prev) => ({
+                          ...prev,
+                          newGatha: { ...prev.newGatha, whichGatha: e.target.value },
+                        }))
+                      }
+                      className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg focus:outline-none focus:border-purple-400 text-sm"
+                      placeholder="e.g., Gatha 1, 2, 3"
+                    />
+                    <input
+                      type="number"
+                      value={gathaForm.newGatha.totalGatha}
+                      onChange={(e) =>
+                        setGathaForm((prev) => ({
+                          ...prev,
+                          newGatha: { ...prev.newGatha, totalGatha: e.target.value },
+                        }))
+                      }
+                      className="w-full px-3 py-2.5 border-2 border-purple-200 rounded-lg focus:outline-none focus:border-purple-400 text-sm"
+                      placeholder="Total count"
+                      min="1"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
+                  <h4 className="font-bold text-blue-700 mb-3 text-sm">Revision</h4>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={gathaForm.revision.sutraName}
+                      onChange={(e) =>
+                        setGathaForm((prev) => ({
+                          ...prev,
+                          revision: { ...prev.revision, sutraName: e.target.value },
+                        }))
+                      }
+                      className="w-full px-3 py-2.5 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
+                      placeholder="Sutra name"
+                    />
+                    <input
+                      type="text"
+                      value={gathaForm.revision.whichGatha}
+                      onChange={(e) =>
+                        setGathaForm((prev) => ({
+                          ...prev,
+                          revision: { ...prev.revision, whichGatha: e.target.value },
+                        }))
+                      }
+                      className="w-full px-3 py-2.5 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
+                      placeholder="e.g., Gatha 1, 2, 3"
+                    />
+                    <input
+                      type="number"
+                      value={gathaForm.revision.totalGatha}
+                      onChange={(e) =>
+                        setGathaForm((prev) => ({
+                          ...prev,
+                          revision: { ...prev.revision, totalGatha: e.target.value },
+                        }))
+                      }
+                      className="w-full px-3 py-2.5 border-2 border-blue-200 rounded-lg focus:outline-none focus:border-blue-400 text-sm"
+                      placeholder="Total count"
+                      min="1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => {
+                      setShowGathaForm(false);
+                      setGathaForm({
+                        newGatha: { sutraName: '', whichGatha: '', totalGatha: '' },
+                        revision: { sutraName: '', whichGatha: '', totalGatha: '' },
+                      });
+                    }}
+                    className="bg-gray-300 text-gray-700 font-bold py-3 rounded-xl active:scale-[0.98]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={submitGatha}
+                    disabled={
+                      isSubmitting ||
+                      (!(gathaForm.newGatha.sutraName && gathaForm.newGatha.whichGatha && gathaForm.newGatha.totalGatha) &&
+                        !(gathaForm.revision.sutraName && gathaForm.revision.whichGatha && gathaForm.revision.totalGatha))
+                    }
+                    className="bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold py-3 rounded-xl active:scale-[0.98] shadow-lg disabled:opacity-50"
+                  >
+                    {isSubmitting ? (
+                      <Loader className="w-5 h-5 animate-spin mx-auto" />
+                    ) : (
+                      'Submit'
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Pathshala Analytics Section */}
+      <div className="bg-white rounded-2xl shadow-xl p-4 border-4 border-orange-200 mb-4">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg flex-shrink-0">
+            <BarChart3 className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">Pathshala Analytics</h3>
+            <p className="text-xs text-gray-600">Performance for selected period</p>
+          </div>
+        </div>
+
+        {/* Date Picker Section */}
+        <div className="bg-green-50 p-3 rounded-xl border-2 border-green-200 mb-4">
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="startDate" className="text-xs font-semibold text-gray-600 block mb-1">
+                Start Date
+              </label>
+              <input
+                type="date"
+                id="startDate"
+                value={dateRange.start}
+                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                className="w-full px-3 py-2.5 rounded-lg border-2 border-green-200 focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm bg-white"
+              />
+              <span className="text-xs text-green-700 mt-1 block">
+                {formatDateIn(dateRange.start) || 'Select date'}
+              </span>
+            </div>
+
+            <div>
+              <label htmlFor="endDate" className="text-xs font-semibold text-gray-600 block mb-1">
+                End Date
+              </label>
+              <input
+                type="date"
+                id="endDate"
+                value={dateRange.end}
+                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                className="w-full px-3 py-2.5 rounded-lg border-2 border-green-200 focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm bg-white"
+              />
+              <span className="text-xs text-green-700 mt-1 block">
+                {formatDateIn(dateRange.end) || 'Select date'}
+              </span>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => {
+                  const today = formatLocalDateString(new Date());
+                  setDateRange({ start: today, end: today });
+                }}
+                className="flex-1 bg-blue-500 text-white px-3 py-2.5 rounded-lg active:scale-[0.98] text-sm font-medium"
+              >
+                Today
+              </button>
+              <button
+                onClick={() => setDateRange(getMonthDateRange())}
+                className="flex-1 bg-green-500 text-white px-3 py-2.5 rounded-lg active:scale-[0.98] text-sm font-medium"
+              >
+                This Month
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Analytics Cards */}
+        {isAnalyticsLoading ? (
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-green-200 border-t-green-500"></div>
+            <p className="mt-3 text-gray-600 text-sm">Loading Analytics...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-yellow-50 border-2 border-yellow-300 p-3 rounded-xl text-center">
+              <Trophy className="w-8 h-8 mx-auto text-yellow-500 mb-2" />
+              <h4 className="font-bold text-gray-700 text-xs">Attendance Leader</h4>
+              <p className="text-lg font-bold text-yellow-600 truncate">
+                {analyticsData.attendanceLeader?.username || 'N/A'}
+              </p>
+              <p className="text-xs text-gray-500">
+                {analyticsData.attendanceLeader?.attendance_count || 0} days
+              </p>
+            </div>
+            
+            <div className="bg-blue-50 border-2 border-blue-300 p-3 rounded-xl text-center">
+              <User className="w-8 h-8 mx-auto text-blue-500 mb-2" />
+              <h4 className="font-bold text-gray-700 text-xs">Your New Gathas</h4>
+              <p className="text-lg font-bold text-blue-600">{userNewGathasCount}</p>
+              <p className="text-xs text-gray-500">in this period</p>
+            </div>
+            
+            <div className="bg-purple-50 border-2 border-purple-300 p-3 rounded-xl text-center">
+              <BookOpen className="w-8 h-8 mx-auto text-purple-500 mb-2" />
+              <h4 className="font-bold text-gray-700 text-xs">Total Gathas</h4>
+              <p className="text-lg font-bold text-purple-600">
+                {analyticsData.gathaStats?.totalPathshalaGathas || 0}
+              </p>
+              <p className="text-xs text-gray-500">learned together</p>
+            </div>
+            
+            <div className="bg-red-50 border-2 border-red-300 p-3 rounded-xl text-center">
+              <Crown className="w-8 h-8 mx-auto text-red-500 mb-2" />
+              <h4 className="font-bold text-gray-700 text-xs">Gatha Leader</h4>
+              <p className="text-lg font-bold text-red-600 truncate">
+                {analyticsData.gathaStats?.gathaLeader?.username || 'N/A'}
+              </p>
+              <p className="text-xs text-gray-500">
+                {analyticsData.gathaStats?.gathaLeader?.count || 0} gathas
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Current Month Summary */}
+      <div className="bg-white rounded-2xl shadow-xl p-4 border-4 border-orange-200 mb-4">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-full flex items-center justify-center shadow-lg flex-shrink-0">
+            <Calendar className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">Current Month</h3>
+            <p className="text-xs text-gray-600">
+              {formatDateIn(new Date(), { month: 'long', year: 'numeric' })}
+            </p>
+          </div>
+        </div>
+
+        {isCurrentMonthLoading ? (
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-cyan-200 border-t-cyan-500"></div>
+            <p className="mt-3 text-gray-600 text-sm">Loading...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-cyan-50 border-2 border-cyan-300 p-3 rounded-xl text-center">
+              <Trophy className="w-8 h-8 mx-auto text-cyan-500 mb-2" />
+              <h4 className="font-bold text-gray-700 text-xs">Attendance Leader</h4>
+              <p className="text-lg font-bold text-cyan-600 truncate">
+                {currentMonthAnalytics.attendanceLeader?.username || 'N/A'}
+              </p>
+              <p className="text-xs text-gray-500">
+                {currentMonthAnalytics.attendanceLeader?.attendance_count || 0} days
+              </p>
+            </div>
+            
+            <div className="bg-blue-50 border-2 border-blue-300 p-3 rounded-xl text-center">
+              <User className="w-8 h-8 mx-auto text-blue-500 mb-2" />
+              <h4 className="font-bold text-gray-700 text-xs">Total Attendance</h4>
+              <p className="text-lg font-bold text-blue-600">
+                {currentMonthAnalytics.gathaStats?.totalAttendance || 0}
+              </p>
+              <p className="text-xs text-gray-500">all students</p>
+            </div>
+            
+            <div className="bg-purple-50 border-2 border-purple-300 p-3 rounded-xl text-center">
+              <BookOpen className="w-8 h-8 mx-auto text-purple-500 mb-2" />
+              <h4 className="font-bold text-gray-700 text-xs">Total Gathas</h4>
+              <p className="text-lg font-bold text-purple-600">
+                {currentMonthAnalytics.gathaStats?.totalPathshalaGathas || 0}
+              </p>
+              <p className="text-xs text-gray-500">this month</p>
+            </div>
+            
+            <div className="bg-red-50 border-2 border-red-300 p-3 rounded-xl text-center">
+              <Crown className="w-8 h-8 mx-auto text-red-500 mb-2" />
+              <h4 className="font-bold text-gray-700 text-xs">Gatha Leader</h4>
+              <p className="text-lg font-bold text-red-600 truncate">
+                {currentMonthAnalytics.gathaStats?.gathaLeader?.username || 'N/A'}
+              </p>
+              <p className="text-xs text-gray-500">
+                {currentMonthAnalytics.gathaStats?.gathaLeader?.count || 0} gathas
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+
+  const renderContent = () => {
+    switch (currentPage) {
+      case PAGES.HISTORY:
+        return <HistoryPage formatDateIn={formatDateIn} formatLocalDateString={formatLocalDateString} />;
+      case PAGES.PENDING:
+        return (
+          <PendingPage 
+            pendingStatus={pendingStatus} 
+            onRefresh={fetchPendingStatus}
+            onEditGatha={handleEditGatha}
+            onDeletePendingGatha={handleDeletePendingGathaRequest}
+          />
+        );
+      default:
+        return renderDashboard();
+    }
+  };
+
+  // -------------------------------------
+  // Main Return
+  // -------------------------------------
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 p-3">
+      <div className="max-w-lg mx-auto">
+        {/* Header */}
+        <div className="bg-white rounded-2xl shadow-xl p-4 mb-4 border-4 border-orange-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center shadow-inner">
+                <User className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-800">
+                  પ્રણામ, {user?.name || user?.username}
+                </h2>
+                <p className="text-xs text-gray-600">શ્રી સોમચીન્તામણી વસુપૂજ્યસ્વામી જૈન પાઠશાળા</p>
+              </div>
+            </div>
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-1 bg-red-500 text-white px-3 py-2 rounded-xl active:scale-[0.98] shadow-md text-sm"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Global error banner */}
+        {globalError && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-xl mb-4 flex items-start gap-2 text-red-700 shadow">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-xs">{globalError}</p>
+            </div>
+            <button
+              onClick={clearGlobalError}
+              className="text-red-600 p-1"
+              aria-label="Dismiss"
+            >
+              <CloseIcon size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* Success message */}
+        {successMessage && (
+          <div className="bg-green-50 border-l-4 border-green-500 p-3 rounded-xl mb-4 flex items-center gap-2 text-green-700 shadow">
+            <Check className="w-5 h-5 flex-shrink-0" />
+            <p className="text-xs">{successMessage}</p>
+          </div>
+        )}
+
+        {/* Navigation Bar */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setCurrentPage(PAGES.DASHBOARD)}
+            className={`flex-1 flex items-center justify-center gap-1 px-3 py-3 rounded-xl font-bold transition-colors active:scale-[0.98] text-sm ${
+              currentPage === PAGES.DASHBOARD
+                ? 'bg-orange-500 text-white shadow-lg'
+                : 'bg-white text-gray-600 border-2 border-orange-200'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            Home
+          </button>
+          <button
+            onClick={() => setCurrentPage(PAGES.PENDING)}
+            className={`flex-1 flex items-center justify-center gap-1 px-3 py-3 rounded-xl font-bold transition-colors active:scale-[0.98] text-sm relative ${
+              currentPage === PAGES.PENDING
+                ? 'bg-orange-500 text-white shadow-lg'
+                : 'bg-white text-gray-600 border-2 border-orange-200'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            Pending
+            {totalPendingCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                {totalPendingCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setCurrentPage(PAGES.HISTORY)}
+            className={`flex-1 flex items-center justify-center gap-1 px-3 py-3 rounded-xl font-bold transition-colors active:scale-[0.98] text-sm ${
+              currentPage === PAGES.HISTORY
+                ? 'bg-orange-500 text-white shadow-lg'
+                : 'bg-white text-gray-600 border-2 border-orange-200'
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            History
+          </button>
+        </div>
+
+        {/* Dynamic Content */}
+        {renderContent()}
+
+        {/* Footer */}
+        <div className="bg-gradient-to-r from-orange-400 to-amber-500 rounded-2xl shadow-xl p-6 text-center text-white mt-4">
+          <BookOpen className="w-10 h-10 mx-auto mb-3" />
+          <h3 className="text-xl font-bold mb-1">अहिंसा परमो धर्मः</h3>
+          <p className="text-orange-100 text-sm">Non-violence is the supreme religion</p>
+        </div>
+      </div>
+      
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        title={confirmAction?.title}
+        message={confirmAction?.message}
+        onConfirm={confirmAction?.handler}
+        onCancel={() => setConfirmAction(null)}
+      />
+      
+      {/* Edit Gatha Modal */}
+      {renderEditModal()}
     </div>
-
-    {/* Content */}
-    {renderContent()}
-
-    {/* Footer */}
-    <div className="mt-8 text-center py-4">
-      <p className="text-gray-400 text-xs">© 2024 Jain Pathshala • Made with ❤️ for our students</p>
-    </div>
-  </div>
-
-  {/* Modals */}
-  <GathaEntryModal
-    isOpen={showGathaModal}
-    onClose={() => {
-      setShowGathaModal(false);
-      setEditingGatha(null);
-    }}
-    onSubmit={submitGatha}
-    isSubmitting={isSubmitting}
-    editData={editingGatha}
-  />
-
-  <ConfirmationModal
-    title={confirmAction?.title}
-    message={confirmAction?.message}
-    onConfirm={confirmAction?.handler}
-    onCancel={() => setConfirmAction(null)}
-  />
-
-  <AchievementDetailModal
-    achievement={selectedAchievement}
-    stats={userStats}
-    onClose={() => setSelectedAchievement(null)}
-  />
-</div>
-);
+  );
 }
