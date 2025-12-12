@@ -55,14 +55,9 @@ import StudentAchievementPage, {
   calculateAchievementProgress,
   calculateTotalXP,
   getUserLevel,
-  ALL_ACHIEVEMENTS,
-  LIFETIME_ACHIEVEMENTS,
   MONTHLY_ACHIEVEMENTS,
-  SPECIAL_ACHIEVEMENTS,
-  XPLevelDisplay,
-  AchievementSummary,
-  RecentAchievements,
-  NextToUnlock,
+  XP_VALUES,
+  DEFAULT_WORKING_DAYS,
   AchievementDetailModal,
   ACHIEVEMENT_COLORS,
 } from './Student_achievement';
@@ -112,7 +107,7 @@ if (typeof input === 'number') return new Date(input);
 if (typeof input === 'string') {
 const trimmed = input.trim();
 if (!trimmed) return null;
-const isoLike = trimmed.length <= 10 ? ${trimmed}T00:00:00 : trimmed;
+const isoLike = trimmed.length <= 10 ? `${trimmed}T00:00:00` : trimmed;
 const parsed = new Date(isoLike);
 return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
@@ -125,7 +120,7 @@ if (!parsed) return '';
 const y = parsed.getFullYear();
 const m = String(parsed.getMonth() + 1).padStart(2, '0');
 const d = String(parsed.getDate()).padStart(2, '0');
-return ${y}-${m}-${d};
+return `${y}-${m}-${d}`;
 };
 
 export const formatDateIn = (input, options = DEFAULT_DATE_OPTIONS) => {
@@ -205,7 +200,7 @@ Cancel
 </button>
 <button
 onClick={onConfirm}
-className={flex-1 px-4 py-3.5 ${ confirmColor === 'red' ? 'bg-red-500' : 'bg-orange-500' } text-white font-bold rounded-2xl active:scale-[0.98] transition-transform shadow-lg}
+className={`flex-1 px-4 py-3.5 ${confirmColor === 'red' ? 'bg-red-500' : 'bg-orange-500'} text-white font-bold rounded-2xl active:scale-[0.98] transition-transform shadow-lg`}
 >
 {confirmText}
 </button>
@@ -1352,7 +1347,7 @@ if (res.ok) {
 const data = await res.json();
 setAttendanceHistory(Array.isArray(data) ? data : []);
 const streakData = calculateStreak(data);
-setAttendanceStreak(streakData.current);
+setCurrentStreak(streakData.current);
 setMaxStreak(streakData.max);
 
 text
@@ -1379,7 +1374,6 @@ if (res.ok) {
 const data = await res.json();
 const entries = Array.isArray(data) ? data.map(normalizeEntry) : [];
 setGathaEntries(entries);
-setUserTotalGathas(entries.reduce((sum, e) => sum + (e.total_gatha || 0), 0));
 
 text
 
@@ -1392,7 +1386,7 @@ text
         return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
       })
       .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
-    setMonthlyGathas(monthlyCount);
+    setMonthlyNewGathas(monthlyCount);
   }
 } catch (error) {
   console.error('Error fetching gathas:', error);
