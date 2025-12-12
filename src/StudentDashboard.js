@@ -52,19 +52,19 @@ VolumeX,
 
 // Import Achievement Components
 import StudentAchievementPage, {
-calculateAchievementProgress,
-calculateTotalXP,
-getUserLevel,
-ALL_ACHIEVEMENTS,
-LIFETIME_ACHIEVEMENTS,
-MONTHLY_ACHIEVEMENTS,
-SPECIAL_ACHIEVEMENTS,
-XPLevelDisplay,
-AchievementSummary,
-RecentAchievements,
-NextToUnlock,
-AchievementDetailModal,
-ACHIEVEMENT_COLORS,
+  calculateAchievementProgress,
+  calculateTotalXP,
+  getUserLevel,
+  ALL_ACHIEVEMENTS,
+  LIFETIME_ACHIEVEMENTS,
+  MONTHLY_ACHIEVEMENTS,
+  SPECIAL_ACHIEVEMENTS,
+  XPLevelDisplay,
+  AchievementSummary,
+  RecentAchievements,
+  NextToUnlock,
+  AchievementDetailModal,
+  ACHIEVEMENT_COLORS,
 } from './Student_achievement';
 
 // ============================================
@@ -1061,6 +1061,105 @@ text
 );
 };
 
+// Recent Badges Component (Simplified)
+const RecentBadges = ({ stats, onBadgeClick }) => {
+  const recentlyUnlocked = useMemo(() => {
+    return MONTHLY_ACHIEVEMENTS
+      .filter((a) => calculateAchievementProgress(a, stats).unlocked)
+      .slice(0, 4);
+  }, [stats]);
+
+  if (recentlyUnlocked.length === 0) {
+    return (
+      <div className="bg-gray-50 rounded-xl p-6 text-center border-2 border-gray-200">
+        <Award className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+        <p className="text-gray-500 text-sm">No badges yet this month</p>
+        <p className="text-gray-400 text-xs mt-1">Keep learning to unlock!</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-2">
+      {recentlyUnlocked.map((achievement) => {
+        const Icon = achievement.icon;
+        const colors = ACHIEVEMENT_COLORS[achievement.color];
+
+        return (
+          <button
+            key={achievement.id}
+            onClick={() => onBadgeClick?.(achievement)}
+            className="flex-shrink-0 w-20 p-2 bg-white rounded-xl border-2 border-gray-200 shadow-sm active:scale-95 transition-transform"
+          >
+            <div className={`w-10 h-10 rounded-full mx-auto mb-1 flex items-center justify-center bg-gradient-to-br ${colors.bg}`}>
+              <Icon className="w-5 h-5 text-white" />
+            </div>
+            <p className="text-xs font-bold text-gray-800 text-center truncate">{achievement.title}</p>
+            <p className="text-xs text-center">{colors.icon}</p>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+// Next Badges to Unlock (Simplified)
+const NextBadges = ({ stats, onBadgeClick }) => {
+  const nextAchievements = useMemo(() => {
+    return MONTHLY_ACHIEVEMENTS
+      .map((a) => ({ ...a, ...calculateAchievementProgress(a, stats) }))
+      .filter((a) => !a.unlocked && a.progress > 0)
+      .sort((a, b) => b.progress - a.progress)
+      .slice(0, 2);
+  }, [stats]);
+
+  if (nextAchievements.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border-2 border-green-200">
+      <h4 className="font-bold text-green-800 mb-3 flex items-center gap-2">
+        <Target className="w-5 h-5" />
+        Almost There! Keep Going!
+      </h4>
+      <div className="space-y-3">
+        {nextAchievements.map((achievement) => {
+          const Icon = achievement.icon;
+          const colors = ACHIEVEMENT_COLORS[achievement.color];
+
+          return (
+            <button
+              key={achievement.id}
+              onClick={() => onBadgeClick?.(achievement)}
+              className="w-full flex items-center gap-3 bg-white rounded-xl p-3 border border-green-200 text-left active:scale-[0.98] transition-transform"
+            >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br ${colors.bg}`}>
+                <Icon className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-gray-800 text-sm">{achievement.title}</p>
+                <p className="text-xs text-gray-500">({achievement.subtitle})</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full bg-gradient-to-r ${colors.bg} rounded-full`}
+                      style={{ width: `${achievement.progress * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-bold text-gray-500">
+                    {achievement.current}/{achievement.target}
+                  </span>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 // ============================================
 // MAIN STUDENT DASHBOARD COMPONENT
 // ============================================
@@ -1075,13 +1174,22 @@ const [pendingStatus, setPendingStatus] = useState({ attendance: [], gatha: [] }
 const [analyticsData, setAnalyticsData] = useState({ attendanceLeader: null, gathaStats: null });
 
 // Stats
-const [userYearlyAttendance, setUserYearlyAttendance] = useState(0);
-const [userTotalGathas, setUserTotalGathas] = useState(0);
-const [attendanceStreak, setAttendanceStreak] = useState(0);
-const [maxStreak, setMaxStreak] = useState(0);
+// Stats (Monthly focused)
 const [monthlyAttendance, setMonthlyAttendance] = useState(0);
-const [monthlyGathas, setMonthlyGathas] = useState(0);
-const [specialConditions, setSpecialConditions] = useState({});
+const [monthlyNewGathas, setMonthlyNewGathas] = useState(0);
+const [monthlyRevisionGathas, setMonthlyRevisionGathas] = useState(0);
+const [currentStreak, setCurrentStreak] = useState(0);
+const [maxStreak, setMaxStreak] = useState(0);
+const [workingDays, setWorkingDays] = useState(DEFAULT_WORKING_DAYS);
+
+// Selected month for stats page
+const [statsMonth, setStatsMonth] = useState(() => {
+  const now = new Date();
+  return {
+    year: now.getFullYear(),
+    month: now.getMonth() + 1,
+  };
+});
 
 // UI states
 const [isLoading, setIsLoading] = useState(true);
@@ -1137,26 +1245,29 @@ return att + gatha;
 
 // User stats for achievements
 const userStats = useMemo(() => ({
-totalAttendance: userYearlyAttendance,
-totalGathas: userTotalGathas,
-currentStreak: attendanceStreak,
-maxStreak: maxStreak,
-monthlyAttendance: monthlyAttendance,
-monthlyGathas: monthlyGathas,
-daysInCurrentMonth: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate(),
-specialConditions: {},
-}), [userYearlyAttendance, userTotalGathas, attendanceStreak, maxStreak, monthlyAttendance, monthlyGathas]);
+  monthlyAttendance,
+  monthlyNewGathas,
+  currentStreak,
+  maxStreak,
+  workingDays,
+}), [monthlyAttendance, monthlyNewGathas, currentStreak, maxStreak, workingDays]);
 
-const totalXP = useMemo(() => calculateTotalXP(ALL_ACHIEVEMENTS, userStats), [userStats]);
-const userLevel = useMemo(() => getUserLevel(totalXP), [totalXP]);
-const unlockedAchievements = useMemo(
-() => ALL_ACHIEVEMENTS.filter((a) => calculateAchievementProgress(a, userStats).unlocked),
-[userStats]
+// Calculate XP and level
+const xpBreakdown = useMemo(
+  () => calculateTotalXP(userStats, MONTHLY_ACHIEVEMENTS),
+  [userStats]
+);
+
+const userLevel = useMemo(() => getUserLevel(xpBreakdown.total), [xpBreakdown.total]);
+
+const unlockedBadgesCount = useMemo(
+  () => MONTHLY_ACHIEVEMENTS.filter((a) => calculateAchievementProgress(a, userStats).unlocked).length,
+  [userStats]
 );
 
 const motivationalMessage = useMemo(
-() => getMotivationalMessage(attendanceStreak, userYearlyAttendance, userTotalGathas),
-[attendanceStreak, userYearlyAttendance, userTotalGathas]
+  () => getMotivationalMessage(currentStreak, monthlyAttendance, monthlyNewGathas),
+  [currentStreak, monthlyAttendance, monthlyNewGathas]
 );
 
 // Helpers
@@ -1288,45 +1399,48 @@ text
 }
 }, []);
 
-const fetchComprehensiveStats = useCallback(async () => {
-const token = localStorage.getItem('jainPathshalaToken');
-try {
-const res = await fetch(${API_BASE}/stats/comprehensive, {
-headers: { Authorization: Bearer ${token} }
-});
-if (res.ok) {
-const data = await res.json();
-setUserYearlyAttendance(data.yearlyAttendance ?? 0);
-setUserTotalGathas(data.totalGathas ?? 0);
-setAttendanceStreak(data.currentStreak ?? 0);
-setMaxStreak(data.maxStreak ?? 0);
-setMonthlyAttendance(data.monthlyAttendance ?? 0);
-setMonthlyGathas(data.monthlyGathas ?? 0);
-
-text
-
-  // Store special conditions for achievements
-  setSpecialConditions(data.specialConditions ?? {});
-}
-} catch (error) {
-console.error('Error fetching stats:', error);
-}
+// Fetch comprehensive stats for a specific month
+const fetchMonthlyStats = useCallback(async (year, month) => {
+  const token = localStorage.getItem('jainPathshalaToken');
+  try {
+    const res = await fetch(`${API_BASE}/stats/comprehensive?year=${year}&month=${month}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setMonthlyAttendance(data.monthlyAttendance ?? 0);
+      setMonthlyNewGathas(data.monthlyNewGathas ?? 0);
+      setMonthlyRevisionGathas(data.monthlyRevisionGathas ?? 0);
+      setCurrentStreak(data.currentStreak ?? 0);
+      setMaxStreak(data.maxStreak ?? 0);
+      setWorkingDays(data.workingDays ?? DEFAULT_WORKING_DAYS);
+    }
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+  }
 }, []);
 
-// Replace fetchYearlyStats with fetchComprehensiveStats in useEffect
+// Initial load
 useEffect(() => {
-const loadData = async () => {
-setIsLoading(true);
-await Promise.all([
-fetchAttendance(),
-fetchGathas(),
-fetchPendingStatus(),
-fetchComprehensiveStats(), // Changed from fetchYearlyStats
-]);
-setIsLoading(false);
+  const loadData = async () => {
+    setIsLoading(true);
+    const now = new Date();
+    await Promise.all([
+      fetchAttendance(),
+      fetchGathas(),
+      fetchPendingStatus(),
+      fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1),
+    ]);
+    setIsLoading(false);
+  };
+  loadData();
+}, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
+
+  // Handle month change in stats page
+const handleStatsMonthChange = (year, month) => {
+  setStatsMonth({ year, month });
+  fetchMonthlyStats(year, month);
 };
-loadData();
-}, []);
 
 const fetchAnalytics = useCallback(async () => {
 const token = localStorage.getItem('jainPathshalaToken');
@@ -1466,7 +1580,7 @@ text
       <div className="bg-white/20 backdrop-blur rounded-xl p-3">
         <div className="flex items-center justify-between mb-1">
           <span className="text-sm font-bold">{userLevel.name}</span>
-          <span className="text-xs">{totalXP} XP</span>
+          <span className="text-xs">{xpBreakdown.total} XP</span>
         </div>
         {userLevel.nextLevel && (
           <div className="h-2 bg-white/30 rounded-full overflow-hidden">
@@ -1507,7 +1621,7 @@ text
   )}
 
   {/* Streak Card */}
-  <StreakDisplay streak={attendanceStreak} maxStreak={maxStreak} />
+  <StreakDisplay streak={currentStreak} maxStreak={maxStreak} />
 
   {/* Today's Quick Actions */}
   <div className="bg-white rounded-2xl p-4 border-2 border-orange-200 shadow-sm">
@@ -1538,7 +1652,7 @@ text
           <>
             <CheckCircle className="w-10 h-10 mx-auto mb-2 text-green-600" />
             <p className="font-bold text-green-700">Present ✓</p>
-            <p className="text-xs text-green-600">Attendance marked</p>
+            <p className="text-xs text-green-600">+{XP_VALUES.attendance} XP earned!</p>
           </>
         ) : todayAttendanceStatus === 'pending' ? (
           <>
@@ -1550,7 +1664,7 @@ text
           <>
             <Calendar className="w-10 h-10 mx-auto mb-2" />
             <p className="font-bold">Mark Present</p>
-            <p className="text-xs opacity-80">Tap to mark attendance</p>
+            <p className="text-xs opacity-80">+{XP_VALUES.attendance} XP</p>
           </>
         )}
       </button>
@@ -1640,43 +1754,43 @@ text
     )}
   </div>
 
-  {/* Quick Stats */}
-  <div className="grid grid-cols-2 gap-3">
-    <QuickStatCard
-      icon={CalendarDays}
-      value={userYearlyAttendance}
-      label="Days Present"
-      color="green"
-      sublabel="This Year"
-    />
-    <QuickStatCard
-      icon={BookMarked}
-      value={userTotalGathas}
-      label="Total Gathas"
-      color="purple"
-      sublabel="Lifetime"
-    />
-  </div>
+  {/* Quick Stats - Monthly */}
+<div className="grid grid-cols-2 gap-3">
+  <QuickStatCard
+    icon={CalendarDays}
+    value={monthlyAttendance}
+    label="Days Present"
+    color="green"
+    sublabel="This Month"
+  />
+  <QuickStatCard
+    icon={BookMarked}
+    value={monthlyNewGathas}
+    label="New Gathas"
+    color="purple"
+    sublabel="This Month"
+  />
+</div>
 
-  {/* Recent Achievements */}
-  <div className="bg-white rounded-2xl p-4 border-2 border-yellow-200 shadow-sm">
-    <div className="flex items-center justify-between mb-3">
-      <h3 className="font-bold text-gray-800 flex items-center gap-2">
-        <Trophy className="w-5 h-5 text-yellow-500" />
-        Recent Achievements
-      </h3>
-      <button
-        onClick={() => setCurrentPage(PAGES.STATS)}
-        className="text-xs bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full font-bold flex items-center gap-1"
-      >
-        View All <ChevronRight className="w-3 h-3" />
-      </button>
-    </div>
-    <RecentAchievements stats={userStats} onAchievementClick={setSelectedAchievement} limit={4} />
+  {/* Recent Badges */}
+<div className="bg-white rounded-2xl p-4 border-2 border-yellow-200 shadow-sm">
+  <div className="flex items-center justify-between mb-3">
+    <h3 className="font-bold text-gray-800 flex items-center gap-2">
+      <Trophy className="w-5 h-5 text-yellow-500" />
+      Your Badges
+    </h3>
+    <button
+      onClick={() => setCurrentPage(PAGES.STATS)}
+      className="text-xs bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full font-bold flex items-center gap-1"
+    >
+      View All <ChevronRight className="w-3 h-3" />
+    </button>
   </div>
+  <RecentBadges stats={userStats} onBadgeClick={setSelectedAchievement} />
+</div>
 
-  {/* Next to Unlock */}
-  <NextToUnlock stats={userStats} onAchievementClick={setSelectedAchievement} limit={2} />
+{/* Next Badges to Unlock */}
+<NextBadges stats={userStats} onBadgeClick={setSelectedAchievement} />
 
   {/* Daily Quote */}
   <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-4 text-white shadow-lg relative overflow-hidden">
@@ -1695,7 +1809,11 @@ text
 
 // ==================== RENDER STATS PAGE ====================
 const renderStats = () => (
-<StudentAchievementPage stats={userStats} />
+  <StudentAchievementPage 
+    stats={userStats} 
+    onMonthChange={handleStatsMonthChange}
+    workingDays={workingDays}
+  />
 );
 
 // ==================== RENDER CONTENT ====================
@@ -1783,7 +1901,7 @@ text
     <div className="grid grid-cols-4 gap-2 mb-4">
       {[
         { key: PAGES.HOME, icon: Home, label: 'Home' },
-        { key: PAGES.STATS, icon: Award, label: 'Stats', badge: unlockedAchievements.length },
+        { key: PAGES.STATS, icon: Award, label: 'Stats', badge: unlockedBadgesCount },
         { key: PAGES.HISTORY, icon: Calendar, label: 'History' },
         { key: PAGES.PENDING, icon: Clock, label: 'Pending', badge: totalPendingCount, badgeColor: 'red' },
       ].map((tab) => (
