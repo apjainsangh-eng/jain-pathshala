@@ -225,8 +225,8 @@ const Icon = badge.icon;
 const sizeClasses = size === 'small' ? 'text-xs px-2 py-0.5' : 'text-xs px-2.5 py-1';
 
 return (
-<span className={inline-flex items-center gap-1 font-bold rounded-full border ${sizeClasses} ${badge.className}}>
-<Icon className={${size === 'small' ? 'w-3 h-3' : 'w-3.5 h-3.5'} ${status === 'pending' ? 'animate-pulse' : ''}} />
+<span className={`inline-flex items-center gap-1 font-bold rounded-full border ${sizeClasses} ${badge.className}`}>
+<Icon className={`${size === 'small' ? 'w-3 h-3' : 'w-3.5 h-3.5'} ${status === 'pending' ? 'animate-pulse' : ''}`} />
 {badge.label}
 </span>
 );
@@ -280,7 +280,7 @@ return { label: 'Start today!', color: 'from-gray-400 to-gray-500', emoji: '💪
 const info = getStreakInfo(streak);
 
 return (
-<div className={bg-gradient-to-r ${info.color} rounded-2xl p-4 text-white shadow-lg relative overflow-hidden}>
+<div className={`bg-gradient-to-r ${info.color} rounded-2xl p-4 text-white shadow-lg relative overflow-hidden`}>
 {/* Background decoration */}
 <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
 <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12" />
@@ -323,11 +323,11 @@ yellow: 'bg-yellow-50 border-yellow-200 text-yellow-600',
 };
 
 return (
-<div className={rounded-2xl p-4 border-2 ${colorClasses[color]} shadow-sm}>
+<div className={`rounded-2xl p-4 border-2 ${colorClasses[color]} shadow-sm`}>
 <div className="flex items-center justify-between mb-2">
 <Icon className="w-7 h-7" />
 {sublabel && (
-<span className={text-xs px-2 py-0.5 rounded-full bg-white/80 font-bold}>
+<span className={`text-xs px-2 py-0.5 rounded-full bg-white/80 font-bold`}>
 {sublabel}
 </span>
 )}
@@ -408,7 +408,7 @@ return (
 <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
 <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
 {/* Header */}
-<div className={p-5 text-white ${activeTab === 'new' ? 'bg-gradient-to-r from-purple-500 to-indigo-600' : 'bg-gradient-to-r from-blue-500 to-cyan-600'}}>
+<div className={`p-5 text-white ${activeTab === 'new' ? 'bg-gradient-to-r from-purple-500 to-indigo-600' : 'bg-gradient-to-r from-blue-500 to-cyan-600'}`}>
 <div className="flex items-center justify-between">
 <div className="flex items-center gap-3">
 <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
