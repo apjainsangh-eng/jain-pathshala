@@ -1064,13 +1064,14 @@ export default function StudentDashboard({ user, onLogout }) {
   const [analyticsData, setAnalyticsData] = useState({ attendanceLeader: null, gathaStats: null });
 
   // Stats
-  const [userYearlyAttendance, setUserYearlyAttendance] = useState(0);
-  const [userTotalGathas, setUserTotalGathas] = useState(0);
-  const [attendanceStreak, setAttendanceStreak] = useState(0);
-  const [maxStreak, setMaxStreak] = useState(0);
-  const [monthlyAttendance, setMonthlyAttendance] = useState(0);
-  const [monthlyGathas, setMonthlyGathas] = useState(0);
-
+const [userYearlyAttendance, setUserYearlyAttendance] = useState(0);
+const [userTotalGathas, setUserTotalGathas] = useState(0);
+const [attendanceStreak, setAttendanceStreak] = useState(0);
+const [maxStreak, setMaxStreak] = useState(0);
+const [monthlyAttendance, setMonthlyAttendance] = useState(0);
+const [monthlyGathas, setMonthlyGathas] = useState(0);
+const [specialConditions, setSpecialConditions] = useState({});
+  
   // UI states
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1320,16 +1321,6 @@ useEffect(() => {
       console.error('Error fetching analytics:', error);
     }
   }, [dateRange]);
-
-  // Initial fetch
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      await Promise.all([fetchAttendance(), fetchGathas(), fetchPendingStatus(), fetchYearlyStats()]);
-      setIsLoading(false);
-    };
-    loadData();
-  }, []);
 
   useEffect(() => {
     fetchAnalytics();
