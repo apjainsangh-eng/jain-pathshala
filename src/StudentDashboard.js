@@ -1330,8 +1330,8 @@ return { current, max };
 const fetchPendingStatus = useCallback(async () => {
 const token = localStorage.getItem('jainPathshalaToken');
 try {
-const res = await fetch(${API_BASE}/student/pending, {
-headers: { Authorization: Bearer ${token} },
+const res = await fetch(`${API_BASE}/student/pending`, {
+headers: { Authorization: `Bearer ${token}` },
 });
 if (res.ok) setPendingStatus(await res.json());
 } catch (error) {
@@ -1342,7 +1342,7 @@ console.error('Error fetching pending:', error);
 const fetchAttendance = useCallback(async () => {
 const token = localStorage.getItem('jainPathshalaToken');
 try {
-const res = await fetch(${API_BASE}/attendance, { headers: { Authorization: Bearer ${token} } });
+const res = await fetch(`${API_BASE}/attendance`, { headers: { Authorization: `Bearer ${token}` } });
 if (res.ok) {
 const data = await res.json();
 setAttendanceHistory(Array.isArray(data) ? data : []);
@@ -1440,8 +1440,8 @@ const fetchAnalytics = useCallback(async () => {
 const token = localStorage.getItem('jainPathshalaToken');
 try {
 const res = await fetch(
-${API_BASE}/analytics/leaderboard?startDate=${dateRange.start}&endDate=${dateRange.end},
-{ headers: { Authorization: Bearer ${token} } }
+`${API_BASE}/analytics/leaderboard?startDate=${dateRange.start}&endDate=${dateRange.end}`,
+{ headers: { Authorization: `Bearer ${token}` } }
 );
 if (res.ok) setAnalyticsData(await res.json());
 } catch (error) {
