@@ -589,7 +589,7 @@ text
 
 try {
   const url = `${API_BASE}/history/${year}/${month}`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(`${API_BASE}/gatha`, { headers: { Authorization: `Bearer ${token}` } });
 
   if (!res.ok) throw new Error('Failed to load history.');
   const data = await res.json();
@@ -1367,30 +1367,28 @@ text
 }, []);
 
 const fetchGathas = useCallback(async () => {
-const token = localStorage.getItem('jainPathshalaToken');
-try {
-const res = await fetch(${API_BASE}/gatha, { headers: { Authorization: Bearer ${token} } });
-if (res.ok) {
-const data = await res.json();
-const entries = Array.isArray(data) ? data.map(normalizeEntry) : [];
-setGathaEntries(entries);
+  const token = localStorage.getItem('jainPathshalaToken');
+  try {
+    const res = await fetch(`${API_BASE}/gatha`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) {
+      const data = await res.json();
+      const entries = Array.isArray(data) ? data.map(normalizeEntry) : [];
+      setGathaEntries(entries);
 
-text
-
-    // Calculate monthly gathas
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-    const monthlyCount = entries
-      .filter((e) => {
-        const date = new Date(e.created_at);
-        return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
-      })
-      .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
-    setMonthlyNewGathas(monthlyCount);
+      // Calculate monthly gathas
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      const monthlyCount = entries
+        .filter((e) => {
+          const date = new Date(e.created_at);
+          return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+        })
+        .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
+      setMonthlyNewGathas(monthlyCount);
+    }
+  } catch (error) {
+    console.error('Error fetching gathas:', error);
   }
-} catch (error) {
-  console.error('Error fetching gathas:', error);
-}
 }, []);
 
 // Fetch comprehensive stats for a specific month
