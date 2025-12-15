@@ -1835,6 +1835,7 @@ export default function StudentDashboard({ user, onLogout }) {
   }, []);
 
   // Initial load
+// Replace the existing initial data useEffect with this:
 useEffect(() => {
   const loadData = async () => {
     setIsLoading(true);
@@ -1849,15 +1850,28 @@ useEffect(() => {
   };
   loadData();
 
-  // ADD THIS: Poll for updates every 30 seconds
+  // Poll every 30 seconds
   const pollInterval = setInterval(() => {
     fetchPendingStatus();
     fetchAttendance();
     fetchGathas();
-  }, 30000); // 30 seconds
+  }, 30000);
 
-  // Cleanup on unmount
-  return () => clearInterval(pollInterval);
+  // Also refresh when tab becomes visible
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      fetchPendingStatus();
+      fetchAttendance();
+      fetchGathas();
+    }
+  };
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+
+  // Cleanup
+  return () => {
+    clearInterval(pollInterval);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+  };
 }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
 
   const handleStatsMonthChange = (year, month) => {
