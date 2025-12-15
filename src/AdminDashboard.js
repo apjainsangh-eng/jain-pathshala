@@ -99,33 +99,32 @@ red: 'text-red-500',
 // ============================================
 
 const coerceToDate = (input) => {
-if (input instanceof Date) return new Date(input.getTime());
-if (typeof input === 'number') return new Date(input);
-if (typeof input === 'string') {
-const trimmed = input.trim();
-if (!trimmed) return null;
-const isoLike = trimmed.length <= 10 ? ${trimmed}T00:00:00 : trimmed;
-const parsed = new Date(isoLike);
-return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-return null;
+  if (input instanceof Date) return new Date(input.getTime());
+  if (typeof input === 'number') return new Date(input);
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    const isoLike = trimmed.length <= 10 ? `${trimmed}T00:00:00` : trimmed;
+    const parsed = new Date(isoLike);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
 };
 
 export const formatLocalDateString = (input = new Date()) => {
-const parsed = coerceToDate(input);
-if (!parsed) return '';
-const y = parsed.getFullYear();
-const m = String(parsed.getMonth() + 1).padStart(2, '0');
-const d = String(parsed.getDate()).padStart(2, '0');
-return ${y}-${m}-${d};
+  const parsed = coerceToDate(input);
+  if (!parsed) return '';
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, '0');
+  const d = String(parsed.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 };
 
 export const formatDateIn = (input, options = DEFAULT_DATE_OPTIONS) => {
-const parsed = coerceToDate(input);
-if (!parsed) return '';
-return parsed.toLocaleDateString('en-IN', { ...DEFAULT_DATE_OPTIONS, ...options });
+  const parsed = coerceToDate(input);
+  if (!parsed) return '';
+  return parsed.toLocaleDateString('en-IN', { ...DEFAULT_DATE_OPTIONS, ...options });
 };
-
 const getDateRangePreset = (preset) => {
 const today = new Date();
 
@@ -187,56 +186,56 @@ return (
 };
 
 const ConfirmationModal = ({ title, message, onConfirm, onCancel, confirmText = "Delete", confirmColor = "red" }) => {
-if (!title) return null;
+  if (!title) return null;
 
-return (
-<div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-<div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in duration-200">
-<div className="flex items-center mb-4">
-<div className="w-14 h-14 rounded-2xl bg-yellow-100 flex items-center justify-center mr-4">
-<AlertTriangle className="w-7 h-7 text-yellow-500" />
-</div>
-<div>
-<h4 className="text-lg font-bold text-gray-800">{title}</h4>
-<p className="text-sm text-gray-500">This action cannot be undone</p>
-</div>
-</div>
-<p className="text-gray-600 mb-6 text-sm bg-gray-50 p-3 rounded-xl">{message}</p>
-<div className="flex gap-3">
-<button onClick={onCancel} className="flex-1 px-4 py-3.5 bg-gray-100 text-gray-700 font-bold rounded-2xl active:scale-[0.98] transition-transform">
-Cancel
-</button>
-<button
-onClick={onConfirm}
-className={flex-1 px-4 py-3.5 ${confirmColor === 'red' ? 'bg-red-500' : 'bg-orange-500'} text-white font-bold rounded-2xl active:scale-[0.98] transition-transform shadow-lg}
->
-{confirmText}
-</button>
-</div>
-</div>
-</div>
-);
+  return (
+    <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in duration-200">
+        <div className="flex items-center mb-4">
+          <div className="w-14 h-14 rounded-2xl bg-yellow-100 flex items-center justify-center mr-4">
+            <AlertTriangle className="w-7 h-7 text-yellow-500" />
+          </div>
+          <div>
+            <h4 className="text-lg font-bold text-gray-800">{title}</h4>
+            <p className="text-sm text-gray-500">This action cannot be undone</p>
+          </div>
+        </div>
+        <p className="text-gray-600 mb-6 text-sm bg-gray-50 p-3 rounded-xl">{message}</p>
+        <div className="flex gap-3">
+          <button onClick={onCancel} className="flex-1 px-4 py-3.5 bg-gray-100 text-gray-700 font-bold rounded-2xl active:scale-[0.98] transition-transform">
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className={`flex-1 px-4 py-3.5 ${confirmColor === 'red' ? 'bg-red-500' : 'bg-orange-500'} text-white font-bold rounded-2xl active:scale-[0.98] transition-transform shadow-lg`}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const PendingBadge = ({ status, size = 'normal' }) => {
-const badges = {
-pending: { className: 'text-yellow-700 bg-yellow-100 border-yellow-200', icon: Clock, label: 'Pending' },
-approved: { className: 'text-green-700 bg-green-100 border-green-200', icon: Check, label: 'Approved' },
-rejected: { className: 'text-red-700 bg-red-100 border-red-200', icon: CloseIcon, label: 'Rejected' },
-};
+  const badges = {
+    pending: { className: 'text-yellow-700 bg-yellow-100 border-yellow-200', icon: Clock, label: 'Pending' },
+    approved: { className: 'text-green-700 bg-green-100 border-green-200', icon: Check, label: 'Approved' },
+    rejected: { className: 'text-red-700 bg-red-100 border-red-200', icon: CloseIcon, label: 'Rejected' },
+  };
 
-const badge = badges[status];
-if (!badge) return null;
-const Icon = badge.icon;
+  const badge = badges[status];
+  if (!badge) return null;
+  const Icon = badge.icon;
 
-const sizeClasses = size === 'small' ? 'text-xs px-2 py-0.5' : 'text-xs px-2.5 py-1';
+  const sizeClasses = size === 'small' ? 'text-xs px-2 py-0.5' : 'text-xs px-2.5 py-1';
 
-return (
-<span className={inline-flex items-center gap-1 font-bold rounded-full border ${sizeClasses} ${badge.className}}>
-<Icon className={${size === 'small' ? 'w-3 h-3' : 'w-3.5 h-3.5'} ${status === 'pending' ? 'animate-pulse' : ''}} />
-{badge.label}
-</span>
-);
+  return (
+    <span className={`inline-flex items-center gap-1 font-bold rounded-full border ${sizeClasses} ${badge.className}`}>
+      <Icon className={`${size === 'small' ? 'w-3 h-3' : 'w-3.5 h-3.5'} ${status === 'pending' ? 'animate-pulse' : ''}`} />
+      {badge.label}
+    </span>
+  );
 };
 
 const SuccessToast = ({ message, onClose }) => {
@@ -272,72 +271,70 @@ return (
 };
 
 const StreakDisplay = ({ streak, maxStreak }) => {
-const getStreakInfo = (s) => {
-if (s >= 30) return { label: 'Legendary!', color: 'from-yellow-400 to-orange-500', emoji: '🔥', tier: 'diamond' };
-if (s >= 14) return { label: 'Amazing!', color: 'from-purple-400 to-pink-500', emoji: '⚡', tier: 'gold' };
-if (s >= 7) return { label: 'Great!', color: 'from-blue-400 to-indigo-500', emoji: '✨', tier: 'silver' };
-if (s >= 3) return { label: 'Good!', color: 'from-green-400 to-emerald-500', emoji: '🌟', tier: 'bronze' };
-if (s >= 1) return { label: 'Started!', color: 'from-cyan-400 to-blue-500', emoji: '🚀', tier: 'starter' };
-return { label: 'Start today!', color: 'from-gray-400 to-gray-500', emoji: '💪', tier: 'none' };
-};
+  const getStreakInfo = (s) => {
+    if (s >= 30) return { label: 'Legendary!', color: 'from-yellow-400 to-orange-500', emoji: '🔥', tier: 'diamond' };
+    if (s >= 14) return { label: 'Amazing!', color: 'from-purple-400 to-pink-500', emoji: '⚡', tier: 'gold' };
+    if (s >= 7) return { label: 'Great!', color: 'from-blue-400 to-indigo-500', emoji: '✨', tier: 'silver' };
+    if (s >= 3) return { label: 'Good!', color: 'from-green-400 to-emerald-500', emoji: '🌟', tier: 'bronze' };
+    if (s >= 1) return { label: 'Started!', color: 'from-cyan-400 to-blue-500', emoji: '🚀', tier: 'starter' };
+    return { label: 'Start today!', color: 'from-gray-400 to-gray-500', emoji: '💪', tier: 'none' };
+  };
 
-const info = getStreakInfo(streak);
+  const info = getStreakInfo(streak);
 
-return (
-<div className={bg-gradient-to-r ${info.color} rounded-2xl p-4 text-white shadow-lg relative overflow-hidden}>
-<div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
-<div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12" />
+  return (
+    <div className={`bg-gradient-to-r ${info.color} rounded-2xl p-4 text-white shadow-lg relative overflow-hidden`}>
+      <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
+      <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12" />
 
-text
-
-  <div className="relative z-10">
-    <div className="flex items-center justify-between mb-2">
-      <div className="flex items-center gap-2">
-        <Flame className="w-6 h-6" />
-        <span className="font-bold">Current Streak</span>
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Flame className="w-6 h-6" />
+            <span className="font-bold">Current Streak</span>
+          </div>
+          <span className="text-3xl">{info.emoji}</span>
+        </div>
+        <div className="flex items-end gap-3">
+          <div>
+            <p className="text-5xl font-bold">{streak}</p>
+            <p className="text-sm opacity-80">{streak === 1 ? 'day' : 'days'}</p>
+          </div>
+          <div className="flex-1 text-right">
+            <p className="text-lg font-bold">{info.label}</p>
+            <p className="text-xs opacity-80 flex items-center justify-end gap-1">
+              <Trophy className="w-3 h-3" /> Best: {maxStreak} days
+            </p>
+          </div>
+        </div>
       </div>
-      <span className="text-3xl">{info.emoji}</span>
     </div>
-    <div className="flex items-end gap-3">
-      <div>
-        <p className="text-5xl font-bold">{streak}</p>
-        <p className="text-sm opacity-80">{streak === 1 ? 'day' : 'days'}</p>
-      </div>
-      <div className="flex-1 text-right">
-        <p className="text-lg font-bold">{info.label}</p>
-        <p className="text-xs opacity-80 flex items-center justify-end gap-1">
-          <Trophy className="w-3 h-3" /> Best: {maxStreak} days
-        </p>
-      </div>
-    </div>
-  </div>
-</div>
-);
+  );
 };
 
 const QuickStatCard = ({ icon: Icon, value, label, color, sublabel }) => {
-const colorClasses = {
-green: 'bg-green-50 border-green-200 text-green-600',
-purple: 'bg-purple-50 border-purple-200 text-purple-600',
-blue: 'bg-blue-50 border-blue-200 text-blue-600',
-orange: 'bg-orange-50 border-orange-200 text-orange-600',
-yellow: 'bg-yellow-50 border-yellow-200 text-yellow-600',
-};
+  const colorClasses = {
+    green: 'bg-green-50 border-green-200 text-green-600',
+    purple: 'bg-purple-50 border-purple-200 text-purple-600',
+    blue: 'bg-blue-50 border-blue-200 text-blue-600',
+    orange: 'bg-orange-50 border-orange-200 text-orange-600',
+    yellow: 'bg-yellow-50 border-yellow-200 text-yellow-600',
+  };
 
-return (
-<div className={rounded-2xl p-4 border-2 ${colorClasses[color]} shadow-sm}>
-<div className="flex items-center justify-between mb-2">
-<Icon className="w-7 h-7" />
-{sublabel && (
-<span className="text-xs px-2 py-0.5 rounded-full bg-white/80 font-bold">
-{sublabel}
-</span>
-)}
-</div>
-<p className="text-3xl font-bold text-gray-800">{value}</p>
-<p className="text-xs text-gray-500 mt-1">{label}</p>
-</div>
-);
+  return (
+    <div className={`rounded-2xl p-4 border-2 ${colorClasses[color]} shadow-sm`}>
+      <div className="flex items-center justify-between mb-2">
+        <Icon className="w-7 h-7" />
+        {sublabel && (
+          <span className="text-xs px-2 py-0.5 rounded-full bg-white/80 font-bold">
+            {sublabel}
+          </span>
+        )}
+      </div>
+      <p className="text-3xl font-bold text-gray-800">{value}</p>
+      <p className="text-xs text-gray-500 mt-1">{label}</p>
+    </div>
+  );
 };
 
 const HelpTooltip = ({ text }) => {
@@ -700,7 +697,7 @@ return (
 <h3 className="text-lg font-bold">🏆 Leaderboard</h3>
 </div>
 <button onClick={fetchLeaderboard} disabled={isLoading} className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors" >
-<RefreshCw className={w-4 h-4 ${isLoading ? 'animate-spin' : ''}} />
+<RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
 </button>
 </div>
 <p className="text-sm opacity-80 mt-1">Top performers this month</p>
@@ -902,7 +899,7 @@ const commonSutras = ['નવકાર', 'પંચ પરમેષ્ઠી', '
 return (
 <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
 <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
-<div className={p-5 text-white ${activeTab === 'new' ? 'bg-gradient-to-r from-purple-500 to-indigo-600' : 'bg-gradient-to-r from-blue-500 to-cyan-600'}}>
+<div className={`p-5 text-white ${activeTab === 'new' ? 'bg-gradient-to-r from-purple-500 to-indigo-600' : 'bg-gradient-to-r from-blue-500 to-cyan-600'}`}>
 <div className="flex items-center justify-between">
 <div className="flex items-center gap-3">
 <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
@@ -1916,62 +1913,45 @@ return () => {
 }, []);
 
 // ✅ Initial load with online check for polling
+// ✅ Initial load with online check for polling
 useEffect(() => {
-const loadData = async () => {
-setIsLoading(true);
-const now = new Date();
-await Promise.all([
-fetchAttendance(),
-fetchGathas(),
-fetchPendingStatus(),
-fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1),
-]);
-setIsLoading(false);
-};
-loadData();
+  const loadData = async () => {
+    setIsLoading(true);
+    const now = new Date();
+    await Promise.all([
+      fetchAttendance(),
+      fetchGathas(),
+      fetchPendingStatus(),
+      fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1),
+    ]);
+    setIsLoading(false);
+  };
+  loadData();
 
-text
+  // Poll every 30 seconds - BUT only if online
+  const pollInterval = setInterval(() => {
+    if (navigator.onLine) {
+      fetchPendingStatus();
+      fetchAttendance();
+      fetchGathas();
+    }
+  }, 30000);
 
-// Poll every 30 seconds - 
-  // ✅ Initial load with online check for polling
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      const now = new Date();
-      await Promise.all([
-        fetchAttendance(),
-        fetchGathas(),
-        fetchPendingStatus(),
-        fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1),
-      ]);
-      setIsLoading(false);
-    };
-    loadData();
+  // Refresh when tab becomes visible - BUT only if online
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible' && navigator.onLine) {
+      fetchPendingStatus();
+      fetchAttendance();
+      fetchGathas();
+    }
+  };
+  document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Poll every 30 seconds - BUT only if online
-    const pollInterval = setInterval(() => {
-      if (navigator.onLine) {
-        fetchPendingStatus();
-        fetchAttendance();
-        fetchGathas();
-      }
-    }, 30000);
-
-    // Refresh when tab becomes visible - BUT only if online
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && navigator.onLine) {
-        fetchPendingStatus();
-        fetchAttendance();
-        fetchGathas();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      clearInterval(pollInterval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
+  return () => {
+    clearInterval(pollInterval);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+  };
+}, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
 
   const handleStatsMonthChange = (year, month) => {
     setStatsMonth({ year, month });
