@@ -5,7 +5,6 @@ import {
   Check,
   Clock,
   LogOut,
-  User,
   X as CloseIcon,
   AlertTriangle,
   CheckCircle,
@@ -19,14 +18,12 @@ import {
   ChevronDown,
   ChevronUp,
   Search,
-  Flame,
   Star,
   Activity,
   Target,
   Zap,
   CalendarDays,
   UserCheck,
-  BookMarked,
 } from 'lucide-react';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.vercel.app/api';
@@ -63,7 +60,7 @@ const formatLocalDateString = (input = new Date()) => {
   return `${y}-${m}-${d}`;
 };
 
-const getDateRangePreset = (preset, selectedMonth, selectedYear) => {
+const getDateRangePreset = (preset, month, year) => {
   const today = new Date();
 
   switch (preset) {
@@ -80,24 +77,16 @@ const getDateRangePreset = (preset, selectedMonth, selectedYear) => {
         end: formatLocalDateString(today),
       };
     case 'month':
-      // Use selected month/year for custom month selection
-      const monthStart = new Date(selectedYear, selectedMonth - 1, 1);
-      const monthEnd = new Date(selectedYear, selectedMonth, 0);
+    case 'custom':
+      const monthStart = new Date(year, month - 1, 1);
+      const monthEnd = new Date(year, month, 0);
       return {
         start: formatLocalDateString(monthStart),
         end: formatLocalDateString(monthEnd),
       };
-    case 'lastMonth':
-      const startLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const endLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-      return {
-        start: formatLocalDateString(startLastMonth),
-        end: formatLocalDateString(endLastMonth),
-      };
     case 'year':
-      // Use selected year for custom year selection
-      const yearStart = new Date(selectedYear, 0, 1);
-      const yearEnd = new Date(selectedYear, 11, 31);
+      const yearStart = new Date(year, 0, 1);
+      const yearEnd = new Date(year, 11, 31);
       return {
         start: formatLocalDateString(yearStart),
         end: formatLocalDateString(yearEnd),
@@ -107,16 +96,8 @@ const getDateRangePreset = (preset, selectedMonth, selectedYear) => {
         start: '2020-01-01',
         end: '2099-12-31',
       };
-    case 'custom':
-      // Custom uses selected month and year
-      const customStart = new Date(selectedYear, selectedMonth - 1, 1);
-      const customEnd = new Date(selectedYear, selectedMonth, 0);
-      return {
-        start: formatLocalDateString(customStart),
-        end: formatLocalDateString(customEnd),
-      };
     default:
-      return getDateRangePreset('month', selectedMonth, selectedYear);
+      return getDateRangePreset('month', month, year);
   }
 };
 
@@ -129,7 +110,6 @@ const getPerformanceBadge = (attendance, gatha) => {
   return { label: 'New', color: 'from-gray-400 to-gray-500', icon: '🌱' };
 };
 
-// Group activities by date
 const groupActivitiesByDate = (activities) => {
   if (!activities || activities.length === 0) return [];
   
@@ -152,21 +132,13 @@ const groupActivitiesByDate = (activities) => {
     }
   });
   
-  // Sort by date descending
   return Object.values(grouped).sort((a, b) => 
     new Date(b.date) - new Date(a.date)
   );
 };
 
 export default function AdminDashboard({ user, onLogout }) {
-
-  // Near the top of your component, with other useState declarations
-const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-const [datePreset, setDatePreset] = useState('month');
-const [showMonthDropdown, setShowMonthDropdown] = useState(false);
-const [showYearDropdown, setShowYearDropdown] = useState(false);
-  
+  // ============ ALL STATE VARIABLES (NO DUPLICATES) ============
   const [pendingData, setPendingData] = useState({ attendance: [], gatha: [] });
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -179,12 +151,6 @@ const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentDetail, setStudentDetail] = useState(null);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [datePreset, setDatePreset] = useState('month');
-  const [dateRange, setDateRange] = useState(() => 
-    getDateRangePreset('month', new Date().getMonth() + 1, new Date().getFullYear())
-  );
   const [topStudents, setTopStudents] = useState({ topAttendance: [], topGatha: [] });
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name');
@@ -192,25 +158,39 @@ const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [studentFilter, setStudentFilter] = useState('all');
   const [approvalFilter, setApprovalFilter] = useState('all');
   const [detailLoading, setDetailLoading] = useState(false);
-  const [showMonthPicker, setShowMonthPicker] = useState(false);
-  const [showYearPicker, setShowYearPicker] = useState(false);
 
-  // Add these new state variables with other useState declarations
+  // Date picker state (ONLY DECLARED ONCE)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [datePreset, setDatePreset] = useState('month');
+  const [dateRange, setDateRange] = useState(() => 
+    getDateRangePreset('month', new Date().getMonth() + 1, new Date().getFullYear())
+  );
   const [showMonthDropdown, setShowMonthDropdown] = useState(false);
   const [showYearDropdown, setShowYearDropdown] = useState(false);
 
+  // ============ EFFECTS ============
+  
   // Close dropdowns when clicking outside
-useEffect(() => {
-  const handleClickOutside = (event) => {
-    if (!event.target.closest('.relative')) {
-      setShowMonthDropdown(false);
-      setShowYearDropdown(false);
-    }
-  };
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showMonthDropdown || showYearDropdown) {
+        const isOutside = !event.target.closest('[data-dropdown]');
+        if (isOutside) {
+          setShowMonthDropdown(false);
+          setShowYearDropdown(false);
+        }
+      }
+    };
 
-  document.addEventListener('mousedown', handleClickOutside);
-  return () => document.removeEventListener('mousedown', handleClickOutside);
-}, []);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMonthDropdown, showYearDropdown]);
+
+  // Update date range when preset or month/year changes
+  useEffect(() => {
+    setDateRange(getDateRangePreset(datePreset, selectedMonth, selectedYear));
+  }, [datePreset, selectedMonth, selectedYear]);
 
   // Fetch pending data and stats
   const fetchPendingData = useCallback(async () => {
@@ -262,11 +242,10 @@ useEffect(() => {
     }
   }, [dateRange]);
 
-  // Fetch top students - ONLY NEW GATHAS
+  // Fetch top students
   const fetchTopStudents = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
-      // Add gathaType=new to only fetch new gathas for leaderboard
       const res = await fetch(
         `${API_BASE}/admin/top-students?startDate=${dateRange.start}&endDate=${dateRange.end}&limit=5&gathaType=new`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -280,12 +259,11 @@ useEffect(() => {
     }
   }, [dateRange]);
 
-  // Fetch single student details - with proper date range
+  // Fetch single student details
   const fetchStudentDetail = useCallback(async (studentId) => {
     const token = localStorage.getItem('jainPathshalaToken');
     setDetailLoading(true);
     try {
-      // Make sure we're using the correct date range
       const res = await fetch(
         `${API_BASE}/admin/student/${studentId}/activity?startDate=${dateRange.start}&endDate=${dateRange.end}&limit=500`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -312,7 +290,7 @@ useEffect(() => {
     fetchTopStudents();
   }, [fetchStudents, fetchTopStudents]);
 
-  // Fetch student detail when selected or date range changes
+  // Fetch student detail when selected
   useEffect(() => {
     if (selectedStudent) {
       fetchStudentDetail(selectedStudent);
@@ -321,45 +299,8 @@ useEffect(() => {
     }
   }, [selectedStudent, fetchStudentDetail]);
 
-  // Update date range when preset or month/year changes
-  useEffect(() => {
-    setDateRange(getDateRangePreset(datePreset, selectedMonth, selectedYear));
-  }, [datePreset, selectedMonth, selectedYear]);
-
-  // Handle month selection
-  const handleMonthChange = (month) => {
-    setSelectedMonth(month);
-    setDatePreset('custom');
-    setShowMonthPicker(false);
-  };
-
-  // Handle year selection
-  const handleYearChange = (year) => {
-    setSelectedYear(year);
-    if (datePreset === 'year') {
-      // Keep year preset but update the year
-    } else {
-      setDatePreset('custom');
-    }
-    setShowYearPicker(false);
-  };
-
-  // Handle preset change
-  const handlePresetChange = (preset) => {
-    setDatePreset(preset);
-    if (preset === 'month') {
-      setShowMonthPicker(true);
-      setShowYearPicker(false);
-    } else if (preset === 'year') {
-      setShowMonthPicker(false);
-      setShowYearPicker(true);
-    } else {
-      setShowMonthPicker(false);
-      setShowYearPicker(false);
-    }
-  };
-
-  // Approval handlers
+  // ============ HANDLERS ============
+  
   const handleApprove = async (type, id) => {
     const token = localStorage.getItem('jainPathshalaToken');
     setActionLoading(`approve-${type}-${id}`);
@@ -452,9 +393,10 @@ useEffect(() => {
     }
   };
 
+  // ============ COMPUTED VALUES ============
+  
   const totalPending = pendingData.attendance.length + pendingData.gatha.length;
 
-  // Filter and sort students - ALPHABETICALLY by default
   const filteredStudents = students
     .filter(student => {
       const matchesSearch = student.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -475,10 +417,8 @@ useEffect(() => {
       } else if (sortBy === 'attendance') {
         return (b.attendance_count || 0) - (a.attendance_count || 0);
       } else if (sortBy === 'gatha') {
-        // Sort by NEW gathas only
         return (b.new_gathas || 0) - (a.new_gathas || 0);
       } else if (sortBy === 'total') {
-        // Only count new gathas in total
         const totalA = (a.attendance_count || 0) + (a.new_gathas || 0);
         const totalB = (b.attendance_count || 0) + (b.new_gathas || 0);
         return totalB - totalA;
@@ -486,215 +426,241 @@ useEffect(() => {
       return 0;
     });
 
-  // Filter pending items
   const filteredPendingAttendance = approvalFilter === 'gatha' ? [] : pendingData.attendance;
   const filteredPendingGatha = approvalFilter === 'attendance' ? [] : pendingData.gatha;
 
-  // Calculate stats - ONLY NEW GATHAS
   const activeStudentsCount = students.filter(s => 
     (s.attendance_count || 0) + (s.new_gathas || 0) > 0
   ).length;
   
   const totalAttendanceCount = students.reduce((sum, s) => sum + (s.attendance_count || 0), 0);
-  // Only count NEW gathas
   const totalNewGathaCount = students.reduce((sum, s) => sum + (s.new_gathas || 0), 0);
 
   const attendanceRate = students.length > 0 
     ? Math.round((stats?.today_attendance || 0) / students.length * 100)
     : 0;
 
-  // ==================== RENDER DATE PICKER COMPONENT ====================
-const renderDatePicker = () => (
-  <div className="bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-sm">
-    <p className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-      <CalendarDays className="w-5 h-5 text-indigo-500" />
-      Select Date Range
-    </p>
-    
-    {/* Quick Presets */}
-    <div className="flex flex-wrap gap-2 mb-4">
-      {[
-        { key: 'today', label: 'Today', icon: '📍' },
-        { key: 'week', label: 'This Week', icon: '📅' },
-        { key: 'month', label: 'This Month', icon: '🗓️' },
-        { key: 'year', label: 'This Year', icon: '📆' },
-        { key: 'all', label: 'All Time', icon: '♾️' },
-      ].map((preset) => (
+  // ============ RENDER DATE PICKER ============
+  const renderDatePicker = () => (
+    <div className="bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-sm">
+      <p className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+        <CalendarDays className="w-5 h-5 text-indigo-500" />
+        Select Date Range
+      </p>
+      
+      {/* Quick Presets */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {[
+          { key: 'today', label: 'Today', icon: '📍' },
+          { key: 'week', label: 'Week', icon: '📅' },
+          { key: 'month', label: 'Month', icon: '🗓️' },
+          { key: 'year', label: 'Year', icon: '📆' },
+          { key: 'all', label: 'All', icon: '♾️' },
+        ].map((preset) => (
+          <button
+            key={preset.key}
+            onClick={() => {
+              setDatePreset(preset.key);
+              setShowMonthDropdown(false);
+              setShowYearDropdown(false);
+            }}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              datePreset === preset.key && datePreset !== 'custom'
+                ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg scale-105'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 active:scale-95'
+            }`}
+          >
+            <span>{preset.icon}</span>
+            {preset.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Custom Month/Year Selection */}
+      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border-2 border-indigo-100">
+        <p className="text-xs font-bold text-indigo-600 mb-3 flex items-center gap-2">
+          <Target className="w-4 h-4" />
+          Pick Month & Year
+        </p>
+        
+        <div className="flex gap-3">
+          {/* Month Dropdown */}
+          <div className="flex-1 relative" data-dropdown="month">
+            <button
+              onClick={() => {
+                setShowMonthDropdown(!showMonthDropdown);
+                setShowYearDropdown(false);
+              }}
+              className={`w-full px-4 py-3 rounded-xl border-2 text-left font-bold text-sm flex items-center justify-between transition-all ${
+                showMonthDropdown 
+                  ? 'border-indigo-500 bg-white shadow-lg ring-4 ring-indigo-100' 
+                  : 'border-indigo-200 bg-white hover:border-indigo-400'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                  <span className="text-base">📅</span>
+                </div>
+                <div>
+                  <p className="text-xs text-indigo-500 font-medium">Month</p>
+                  <p className="text-gray-800">{MONTH_NAMES[selectedMonth - 1]}</p>
+                </div>
+              </div>
+              <ChevronDown className={`w-5 h-5 text-indigo-500 transition-transform duration-200 ${showMonthDropdown ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {/* Month Dropdown Menu */}
+            {showMonthDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border-2 border-indigo-200 shadow-2xl z-50 overflow-hidden">
+                <div className="max-h-72 overflow-y-auto p-2">
+                  {MONTH_NAMES.map((month, idx) => {
+                    const isCurrentMonth = new Date().getMonth() === idx && selectedYear === new Date().getFullYear();
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setSelectedMonth(idx + 1);
+                          setDatePreset('custom');
+                          setShowMonthDropdown(false);
+                        }}
+                        className={`w-full px-3 py-2.5 rounded-xl text-left font-semibold text-sm flex items-center gap-3 transition-all mb-1 ${
+                          selectedMonth === idx + 1
+                            ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md'
+                            : 'text-gray-700 hover:bg-indigo-50 active:bg-indigo-100'
+                        }`}
+                      >
+                        <span className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold ${
+                          selectedMonth === idx + 1 
+                            ? 'bg-white/20 text-white' 
+                            : 'bg-indigo-100 text-indigo-600'
+                        }`}>
+                          {String(idx + 1).padStart(2, '0')}
+                        </span>
+                        <div className="flex-1">
+                          <span>{month}</span>
+                          {isCurrentMonth && (
+                            <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
+                              selectedMonth === idx + 1 
+                                ? 'bg-white/20 text-white' 
+                                : 'bg-green-100 text-green-600'
+                            }`}>
+                              Current
+                            </span>
+                          )}
+                        </div>
+                        {selectedMonth === idx + 1 && (
+                          <Check className="w-5 h-5" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Year Dropdown */}
+          <div className="relative" style={{ minWidth: '130px' }} data-dropdown="year">
+            <button
+              onClick={() => {
+                setShowYearDropdown(!showYearDropdown);
+                setShowMonthDropdown(false);
+              }}
+              className={`w-full px-4 py-3 rounded-xl border-2 text-left font-bold text-sm flex items-center justify-between transition-all ${
+                showYearDropdown 
+                  ? 'border-purple-500 bg-white shadow-lg ring-4 ring-purple-100' 
+                  : 'border-purple-200 bg-white hover:border-purple-400'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <span className="text-base">📆</span>
+                </div>
+                <div>
+                  <p className="text-xs text-purple-500 font-medium">Year</p>
+                  <p className="text-gray-800">{selectedYear}</p>
+                </div>
+              </div>
+              <ChevronDown className={`w-5 h-5 text-purple-500 transition-transform duration-200 ${showYearDropdown ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {/* Year Dropdown Menu */}
+            {showYearDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border-2 border-purple-200 shadow-2xl z-50 overflow-hidden">
+                <div className="max-h-64 overflow-y-auto p-2">
+                  {getYearOptions().map((year) => {
+                    const isCurrentYear = year === new Date().getFullYear();
+                    return (
+                      <button
+                        key={year}
+                        onClick={() => {
+                          setSelectedYear(year);
+                          setDatePreset('custom');
+                          setShowYearDropdown(false);
+                        }}
+                        className={`w-full px-3 py-2.5 rounded-xl text-left font-semibold text-sm flex items-center justify-between transition-all mb-1 ${
+                          selectedYear === year
+                            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md'
+                            : 'text-gray-700 hover:bg-purple-50 active:bg-purple-100'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Calendar className={`w-5 h-5 ${selectedYear === year ? 'text-white' : 'text-purple-500'}`} />
+                          <span>{year}</span>
+                          {isCurrentYear && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              selectedYear === year 
+                                ? 'bg-white/20 text-white' 
+                                : 'bg-green-100 text-green-600'
+                            }`}>
+                              Current
+                            </span>
+                          )}
+                        </div>
+                        {selectedYear === year && (
+                          <Check className="w-5 h-5" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Apply Button */}
         <button
-          key={preset.key}
           onClick={() => {
-            setDatePreset(preset.key);
+            setDatePreset('custom');
             setShowMonthDropdown(false);
             setShowYearDropdown(false);
           }}
-          className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-            datePreset === preset.key
-              ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg scale-105'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 active:scale-95'
-          }`}
+          className="w-full mt-4 py-3 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] shadow-lg"
         >
-          <span>{preset.icon}</span>
-          {preset.label}
+          <Check className="w-5 h-5" />
+          Apply Selection
         </button>
-      ))}
-    </div>
-
-    {/* Custom Month/Year Selection */}
-    <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border-2 border-indigo-100">
-      <p className="text-xs font-bold text-indigo-600 mb-3 flex items-center gap-2">
-        <Target className="w-4 h-4" />
-        Custom Selection
-      </p>
-      
-      <div className="flex gap-3">
-        {/* Month Dropdown */}
-        <div className="flex-1 relative">
-          <button
-            onClick={() => {
-              setShowMonthDropdown(!showMonthDropdown);
-              setShowYearDropdown(false);
-            }}
-            className={`w-full px-4 py-3 rounded-xl border-2 text-left font-bold text-sm flex items-center justify-between transition-all ${
-              showMonthDropdown 
-                ? 'border-indigo-500 bg-white shadow-lg' 
-                : 'border-indigo-200 bg-white hover:border-indigo-300'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-lg">📅</span>
-              <span className="text-gray-800">{MONTH_NAMES[selectedMonth - 1]}</span>
-            </div>
-            <ChevronDown className={`w-5 h-5 text-indigo-500 transition-transform ${showMonthDropdown ? 'rotate-180' : ''}`} />
-          </button>
-          
-          {/* Month Dropdown Menu */}
-          {showMonthDropdown && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl border-2 border-indigo-200 shadow-2xl z-50 max-h-64 overflow-y-auto">
-              <div className="p-2">
-                {MONTH_NAMES.map((month, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => {
-                      setSelectedMonth(idx + 1);
-                      setDatePreset('custom');
-                      setShowMonthDropdown(false);
-                    }}
-                    className={`w-full px-4 py-3 rounded-lg text-left font-semibold text-sm flex items-center gap-3 transition-all ${
-                      selectedMonth === idx + 1
-                        ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white'
-                        : 'text-gray-700 hover:bg-indigo-50 active:bg-indigo-100'
-                    }`}
-                  >
-                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                      selectedMonth === idx + 1 
-                        ? 'bg-white/20' 
-                        : 'bg-indigo-100 text-indigo-600'
-                    }`}>
-                      {idx + 1}
-                    </span>
-                    {month}
-                    {selectedMonth === idx + 1 && (
-                      <Check className="w-5 h-5 ml-auto" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Year Dropdown */}
-        <div className="relative" style={{ minWidth: '120px' }}>
-          <button
-            onClick={() => {
-              setShowYearDropdown(!showYearDropdown);
-              setShowMonthDropdown(false);
-            }}
-            className={`w-full px-4 py-3 rounded-xl border-2 text-left font-bold text-sm flex items-center justify-between transition-all ${
-              showYearDropdown 
-                ? 'border-purple-500 bg-white shadow-lg' 
-                : 'border-purple-200 bg-white hover:border-purple-300'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-lg">📆</span>
-              <span className="text-gray-800">{selectedYear}</span>
-            </div>
-            <ChevronDown className={`w-5 h-5 text-purple-500 transition-transform ${showYearDropdown ? 'rotate-180' : ''}`} />
-          </button>
-          
-          {/* Year Dropdown Menu */}
-          {showYearDropdown && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl border-2 border-purple-200 shadow-2xl z-50 max-h-64 overflow-y-auto">
-              <div className="p-2">
-                {getYearOptions().map((year) => (
-                  <button
-                    key={year}
-                    onClick={() => {
-                      setSelectedYear(year);
-                      setDatePreset('custom');
-                      setShowYearDropdown(false);
-                    }}
-                    className={`w-full px-4 py-3 rounded-lg text-left font-semibold text-sm flex items-center justify-between transition-all ${
-                      selectedYear === year
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
-                        : 'text-gray-700 hover:bg-purple-50 active:bg-purple-100'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Calendar className={`w-4 h-4 ${selectedYear === year ? 'text-white' : 'text-purple-500'}`} />
-                      {year}
-                    </div>
-                    {selectedYear === year && (
-                      <Check className="w-5 h-5" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Apply Button */}
-      <button
-        onClick={() => {
-          setDatePreset('custom');
-          setShowMonthDropdown(false);
-          setShowYearDropdown(false);
-          // Trigger refetch
-          fetchStudents();
-          fetchTopStudents();
-          if (selectedStudent) {
-            fetchStudentDetail(selectedStudent);
-          }
-        }}
-        className="w-full mt-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] shadow-lg"
-      >
-        <RefreshCw className="w-4 h-4" />
-        Apply & Refresh
-      </button>
-    </div>
-
-    {/* Selected Range Display */}
-    <div className="mt-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 border-2 border-green-200">
-      <div className="flex items-center justify-center gap-3">
-        <div className="text-center">
-          <p className="text-xs text-green-600 font-semibold">From</p>
-          <p className="text-sm font-bold text-green-800">{formatDate(dateRange.start)}</p>
-        </div>
-        <div className="text-2xl">→</div>
-        <div className="text-center">
-          <p className="text-xs text-green-600 font-semibold">To</p>
-          <p className="text-sm font-bold text-green-800">{formatDate(dateRange.end)}</p>
+      {/* Selected Range Display */}
+      <div className="mt-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 border-2 border-green-200">
+        <div className="flex items-center justify-center gap-4">
+          <div className="text-center px-4 py-2 bg-white rounded-lg shadow-sm">
+            <p className="text-xs text-green-600 font-semibold mb-1">📅 From</p>
+            <p className="text-sm font-bold text-green-800">{formatDate(dateRange.start)}</p>
+          </div>
+          <div className="text-xl text-green-500">➡️</div>
+          <div className="text-center px-4 py-2 bg-white rounded-lg shadow-sm">
+            <p className="text-xs text-green-600 font-semibold mb-1">📅 To</p>
+            <p className="text-sm font-bold text-green-800">{formatDate(dateRange.end)}</p>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
 
-  // ==================== RENDER FUNCTIONS ====================
-
+  // ============ RENDER OVERVIEW ============
   const renderOverview = () => (
     <div className="space-y-4">
       {/* Today's Summary Card */}
@@ -787,7 +753,7 @@ const renderDatePicker = () => (
         </button>
       </div>
 
-      {/* Top Performers - ONLY NEW GATHAS */}
+      {/* Top Performers */}
       <div className="bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -833,7 +799,7 @@ const renderDatePicker = () => (
         </div>
         
         <p className="text-xs text-gray-400 text-center mt-2">
-          * Gatha leaderboard counts NEW gathas only (not revisions)
+          * Gatha leaderboard counts NEW gathas only
         </p>
       </div>
 
@@ -868,9 +834,9 @@ const renderDatePicker = () => (
     </div>
   );
 
+  // ============ RENDER APPROVALS ============
   const renderApprovals = () => (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-gray-800">Pending Approvals</h3>
         <button
@@ -882,7 +848,6 @@ const renderDatePicker = () => (
         </button>
       </div>
 
-      {/* Approve All Button */}
       {totalPending > 0 && (
         <button
           onClick={handleApproveAll}
@@ -894,7 +859,6 @@ const renderDatePicker = () => (
         </button>
       )}
 
-      {/* Filter Tabs */}
       <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
         <button
           onClick={() => setApprovalFilter('all')}
@@ -922,7 +886,6 @@ const renderDatePicker = () => (
         </button>
       </div>
 
-      {/* Content */}
       {isLoading ? (
         <div className="bg-white rounded-xl p-8 border-2 border-indigo-200 text-center">
           <RefreshCw className="w-10 h-10 animate-spin text-indigo-500 mx-auto" />
@@ -936,7 +899,6 @@ const renderDatePicker = () => (
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Attendance Items */}
           {filteredPendingAttendance.map((item) => (
             <div key={`att-${item.id}`} className="bg-white border-2 border-yellow-200 rounded-xl p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
@@ -986,7 +948,6 @@ const renderDatePicker = () => (
             </div>
           ))}
 
-          {/* Gatha Items */}
           {filteredPendingGatha.map((item) => (
             <div key={`gatha-${item.id}`} className="bg-white border-2 border-purple-200 rounded-xl p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
@@ -1045,9 +1006,9 @@ const renderDatePicker = () => (
     </div>
   );
 
+  // ============ RENDER STUDENTS LIST ============
   const renderStudentsList = () => (
     <div className="space-y-4">
-      {/* Search */}
       <div className="bg-white rounded-xl p-3 border-2 border-indigo-200 shadow-sm">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -1061,10 +1022,8 @@ const renderDatePicker = () => (
         </div>
       </div>
 
-      {/* Date Range Picker */}
       {renderDatePicker()}
 
-      {/* Filters */}
       <div className="flex gap-2 overflow-x-auto pb-1">
         {['all', 'active', 'inactive'].map((filter) => (
           <button
@@ -1083,7 +1042,6 @@ const renderDatePicker = () => (
         ))}
       </div>
 
-      {/* Sort Options */}
       <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
         {[
           { key: 'name', label: 'A-Z', icon: '🔤' },
@@ -1103,15 +1061,12 @@ const renderDatePicker = () => (
         ))}
       </div>
 
-      {/* Students Count */}
       <p className="text-sm text-gray-600 font-semibold">
         Showing {filteredStudents.length} students
       </p>
 
-      {/* Students List */}
       <div className="space-y-3">
         {filteredStudents.map((student, index) => {
-          // Only use NEW gathas for badge
           const newGathas = student.new_gathas || 0;
           const badge = getPerformanceBadge(student.attendance_count, newGathas);
           
@@ -1174,12 +1129,11 @@ const renderDatePicker = () => (
                     </div>
                   ) : studentDetail ? (
                     <>
-                      {/* Summary Stats - ONLY NEW GATHAS */}
                       <div className="grid grid-cols-3 gap-2 mb-4">
                         <div className="bg-white rounded-xl p-3 border-2 border-green-200 text-center">
                           <Calendar className="w-5 h-5 text-green-500 mx-auto mb-1" />
                           <p className="text-xl font-bold text-green-600">
-                            {studentDetail.summary?.totalAttendance || studentDetail.attendance?.length || 0}
+                            {studentDetail.summary?.totalAttendance || 0}
                           </p>
                           <p className="text-xs text-gray-500">Days</p>
                         </div>
@@ -1199,24 +1153,21 @@ const renderDatePicker = () => (
                         </div>
                       </div>
 
-                      {/* Total Activity Count */}
                       <div className="bg-white rounded-xl p-3 border-2 border-gray-200 mb-4">
                         <p className="text-sm text-center text-gray-600">
-                          📊 Total activities in range: <span className="font-bold text-indigo-600">{studentDetail.recentActivity?.length || 0}</span>
+                          📊 Total activities: <span className="font-bold text-indigo-600">{studentDetail.recentActivity?.length || 0}</span>
                         </p>
                       </div>
 
-                      {/* Activity Grouped by Date */}
                       {studentDetail.recentActivity && studentDetail.recentActivity.length > 0 && (
                         <div>
                           <h4 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
                             <Activity className="w-4 h-4" />
-                            Activity by Date ({groupActivitiesByDate(studentDetail.recentActivity).length} days)
+                            Activity ({groupActivitiesByDate(studentDetail.recentActivity).length} days)
                           </h4>
                           <div className="space-y-3 max-h-80 overflow-y-auto">
                             {groupActivitiesByDate(studentDetail.recentActivity).map((dayGroup, idx) => (
                               <div key={idx} className="bg-white rounded-xl p-3 border-2 border-gray-200 shadow-sm">
-                                {/* Date Header */}
                                 <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100">
                                   <span className="font-bold text-gray-800 text-sm flex items-center gap-2">
                                     <CalendarDays className="w-4 h-4 text-indigo-500" />
@@ -1224,42 +1175,26 @@ const renderDatePicker = () => (
                                   </span>
                                 </div>
 
-                                {/* Day's Activities */}
                                 <div className="space-y-2">
-                                  {/* Attendance */}
                                   {dayGroup.attendance && (
                                     <div className="flex items-center gap-2 bg-green-50 rounded-lg p-2">
                                       <UserCheck className="w-4 h-4 text-green-600" />
-                                      <span className="text-sm text-green-700 font-medium">
-                                        ✅ Present
-                                      </span>
-                                      {dayGroup.attendance.formatted_time && (
-                                        <span className="text-xs text-green-600 ml-auto">
-                                          {dayGroup.attendance.formatted_time}
-                                        </span>
-                                      )}
+                                      <span className="text-sm text-green-700 font-medium">✅ Present</span>
                                     </div>
                                   )}
 
-                                  {/* Gathas */}
                                   {dayGroup.gathas.map((gatha, gIdx) => (
                                     <div key={gIdx} className={`rounded-lg p-2 ${
-                                      gatha.gatha_type === 'new' 
-                                        ? 'bg-purple-50' 
-                                        : 'bg-blue-50'
+                                      gatha.gatha_type === 'new' ? 'bg-purple-50' : 'bg-blue-50'
                                     }`}>
                                       <div className="flex items-center gap-2">
                                         <BookOpen className={`w-4 h-4 ${
-                                          gatha.gatha_type === 'new' 
-                                            ? 'text-purple-600' 
-                                            : 'text-blue-600'
+                                          gatha.gatha_type === 'new' ? 'text-purple-600' : 'text-blue-600'
                                         }`} />
                                         <span className={`text-sm font-medium ${
-                                          gatha.gatha_type === 'new' 
-                                            ? 'text-purple-700' 
-                                            : 'text-blue-700'
+                                          gatha.gatha_type === 'new' ? 'text-purple-700' : 'text-blue-700'
                                         }`}>
-                                          {gatha.gatha_type === 'new' ? '✨ New Gatha' : '🔄 Revision'}
+                                          {gatha.gatha_type === 'new' ? '✨ New' : '🔄 Revision'}
                                         </span>
                                         <span className={`text-xs px-2 py-0.5 rounded-full ml-auto ${
                                           gatha.gatha_type === 'new' 
@@ -1274,11 +1209,6 @@ const renderDatePicker = () => (
                                       </p>
                                     </div>
                                   ))}
-
-                                  {/* If nothing on this day */}
-                                  {!dayGroup.attendance && dayGroup.gathas.length === 0 && (
-                                    <p className="text-xs text-gray-400 text-center py-2">No activity</p>
-                                  )}
                                 </div>
                               </div>
                             ))}
@@ -1288,10 +1218,7 @@ const renderDatePicker = () => (
 
                       {(!studentDetail.recentActivity || studentDetail.recentActivity.length === 0) && (
                         <div className="text-center py-4">
-                          <p className="text-gray-500 text-sm">No activity in selected date range</p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            Try selecting a different date range
-                          </p>
+                          <p className="text-gray-500 text-sm">No activity in selected range</p>
                         </div>
                       )}
                     </>
@@ -1314,12 +1241,11 @@ const renderDatePicker = () => (
     </div>
   );
 
+  // ============ RENDER ANALYTICS ============
   const renderAnalytics = () => (
     <div className="space-y-4">
-      {/* Date Range Picker */}
       {renderDatePicker()}
 
-      {/* Refresh Button */}
       <button
         onClick={() => { fetchStudents(); fetchTopStudents(); }}
         className="w-full bg-indigo-500 text-white py-3 rounded-xl active:scale-[0.98] text-sm font-bold flex items-center justify-center gap-2"
@@ -1328,7 +1254,6 @@ const renderDatePicker = () => (
         Refresh Data
       </button>
 
-      {/* Summary Stats - ONLY NEW GATHAS */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl p-4 text-white shadow-lg">
           <Calendar className="w-8 h-8 mb-2 opacity-80" />
@@ -1339,7 +1264,7 @@ const renderDatePicker = () => (
         <div className="bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl p-4 text-white shadow-lg">
           <Star className="w-8 h-8 mb-2 opacity-80" />
           <p className="text-3xl font-bold">{totalNewGathaCount}</p>
-          <p className="text-xs opacity-80">✨ New Gathas Only</p>
+          <p className="text-xs opacity-80">✨ New Gathas</p>
         </div>
 
         <div className="bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl p-4 text-white shadow-lg">
@@ -1347,21 +1272,18 @@ const renderDatePicker = () => (
           <p className="text-3xl font-bold">
             {students.length > 0 ? (totalNewGathaCount / students.length).toFixed(1) : 0}
           </p>
-          <p className="text-xs opacity-80">Avg New/Student</p>
+          <p className="text-xs opacity-80">Avg/Student</p>
         </div>
 
         <div className="bg-gradient-to-br from-orange-400 to-red-500 rounded-xl p-4 text-white shadow-lg">
           <Users className="w-8 h-8 mb-2 opacity-80" />
           <p className="text-3xl font-bold">{activeStudentsCount}</p>
-          <p className="text-xs opacity-80">Active Students</p>
+          <p className="text-xs opacity-80">Active</p>
         </div>
       </div>
 
-      {/* Top 5 Students - Attendance */}
       <div className="bg-white rounded-xl p-4 border-2 border-yellow-200 shadow-sm">
-        <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-          🏆 Top 5 - Attendance
-        </h3>
+        <h3 className="text-lg font-bold text-gray-800 mb-3">🏆 Top 5 - Attendance</h3>
         <div className="space-y-2">
           {topStudents.topAttendance?.slice(0, 5).map((student, index) => {
             const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
@@ -1379,24 +1301,21 @@ const renderDatePicker = () => (
                   <span className="text-2xl">{medals[index]}</span>
                   <span className="font-bold text-gray-800">{student.name}</span>
                 </div>
-                <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold text-sm">
+                                <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold text-sm">
                   {student.count} days
                 </span>
               </div>
             );
           })}
           {(!topStudents.topAttendance || topStudents.topAttendance.length === 0) && (
-            <p className="text-center text-gray-500 py-4">No data available</p>
+            <p className="text-center text-gray-500 py-4">No data</p>
           )}
         </div>
       </div>
 
-      {/* Top 5 Students - NEW Gatha Only */}
       <div className="bg-white rounded-xl p-4 border-2 border-purple-200 shadow-sm">
-        <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-          ✨ Top 5 - New Gathas Only
-        </h3>
-        <p className="text-xs text-gray-500 mb-3">* Revision gathas are NOT counted</p>
+        <h3 className="text-lg font-bold text-gray-800 mb-3">✨ Top 5 - New Gathas</h3>
+        <p className="text-xs text-gray-500 mb-3">* Revisions not counted</p>
         <div className="space-y-2">
           {topStudents.topGatha?.slice(0, 5).map((student, index) => {
             const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
@@ -1415,21 +1334,20 @@ const renderDatePicker = () => (
                   <span className="font-bold text-gray-800">{student.name}</span>
                 </div>
                 <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-bold text-sm">
-                  {student.count} new ✨
+                  {student.count} new
                 </span>
               </div>
             );
           })}
           {(!topStudents.topGatha || topStudents.topGatha.length === 0) && (
-            <p className="text-center text-gray-500 py-4">No data available</p>
+            <p className="text-center text-gray-500 py-4">No data</p>
           )}
         </div>
       </div>
     </div>
   );
 
-  // ==================== MAIN RETURN ====================
-
+  // ============ MAIN RETURN ============
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-3 pb-6">
       <div className="max-w-4xl mx-auto">
