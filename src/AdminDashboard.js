@@ -159,6 +159,14 @@ const groupActivitiesByDate = (activities) => {
 };
 
 export default function AdminDashboard({ user, onLogout }) {
+
+  // Near the top of your component, with other useState declarations
+const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+const [datePreset, setDatePreset] = useState('month');
+const [showMonthDropdown, setShowMonthDropdown] = useState(false);
+const [showYearDropdown, setShowYearDropdown] = useState(false);
+  
   const [pendingData, setPendingData] = useState({ attendance: [], gatha: [] });
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -186,6 +194,23 @@ export default function AdminDashboard({ user, onLogout }) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [showYearPicker, setShowYearPicker] = useState(false);
+
+  // Add these new state variables with other useState declarations
+  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
+
+  // Close dropdowns when clicking outside
+useEffect(() => {
+  const handleClickOutside = (event) => {
+    if (!event.target.closest('.relative')) {
+      setShowMonthDropdown(false);
+      setShowYearDropdown(false);
+    }
+  };
+
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, []);
 
   // Fetch pending data and stats
   const fetchPendingData = useCallback(async () => {
@@ -479,91 +504,194 @@ export default function AdminDashboard({ user, onLogout }) {
     : 0;
 
   // ==================== RENDER DATE PICKER COMPONENT ====================
-  const renderDatePicker = () => (
-    <div className="bg-white rounded-xl p-3 border-2 border-indigo-200 shadow-sm">
-      <p className="text-xs font-bold text-gray-600 mb-2 flex items-center gap-2">
-        <CalendarDays className="w-4 h-4" />
-        Date Range
+const renderDatePicker = () => (
+  <div className="bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-sm">
+    <p className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+      <CalendarDays className="w-5 h-5 text-indigo-500" />
+      Select Date Range
+    </p>
+    
+    {/* Quick Presets */}
+    <div className="flex flex-wrap gap-2 mb-4">
+      {[
+        { key: 'today', label: 'Today', icon: '📍' },
+        { key: 'week', label: 'This Week', icon: '📅' },
+        { key: 'month', label: 'This Month', icon: '🗓️' },
+        { key: 'year', label: 'This Year', icon: '📆' },
+        { key: 'all', label: 'All Time', icon: '♾️' },
+      ].map((preset) => (
+        <button
+          key={preset.key}
+          onClick={() => {
+            setDatePreset(preset.key);
+            setShowMonthDropdown(false);
+            setShowYearDropdown(false);
+          }}
+          className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+            datePreset === preset.key
+              ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg scale-105'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 active:scale-95'
+          }`}
+        >
+          <span>{preset.icon}</span>
+          {preset.label}
+        </button>
+      ))}
+    </div>
+
+    {/* Custom Month/Year Selection */}
+    <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border-2 border-indigo-100">
+      <p className="text-xs font-bold text-indigo-600 mb-3 flex items-center gap-2">
+        <Target className="w-4 h-4" />
+        Custom Selection
       </p>
       
-      {/* Quick Presets */}
-      <div className="flex flex-wrap gap-2 mb-3">
-        {[
-          { key: 'today', label: 'Today' },
-          { key: 'week', label: 'Week' },
-          { key: 'month', label: '📅 Month' },
-          { key: 'year', label: '📆 Year' },
-          { key: 'all', label: 'All Time' },
-        ].map((preset) => (
+      <div className="flex gap-3">
+        {/* Month Dropdown */}
+        <div className="flex-1 relative">
           <button
-            key={preset.key}
-            onClick={() => handlePresetChange(preset.key)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              datePreset === preset.key || 
-              (datePreset === 'custom' && (preset.key === 'month' || preset.key === 'year'))
-                ? 'bg-indigo-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            onClick={() => {
+              setShowMonthDropdown(!showMonthDropdown);
+              setShowYearDropdown(false);
+            }}
+            className={`w-full px-4 py-3 rounded-xl border-2 text-left font-bold text-sm flex items-center justify-between transition-all ${
+              showMonthDropdown 
+                ? 'border-indigo-500 bg-white shadow-lg' 
+                : 'border-indigo-200 bg-white hover:border-indigo-300'
             }`}
           >
-            {preset.label}
+            <div className="flex items-center gap-2">
+              <span className="text-lg">📅</span>
+              <span className="text-gray-800">{MONTH_NAMES[selectedMonth - 1]}</span>
+            </div>
+            <ChevronDown className={`w-5 h-5 text-indigo-500 transition-transform ${showMonthDropdown ? 'rotate-180' : ''}`} />
           </button>
-        ))}
+          
+          {/* Month Dropdown Menu */}
+          {showMonthDropdown && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl border-2 border-indigo-200 shadow-2xl z-50 max-h-64 overflow-y-auto">
+              <div className="p-2">
+                {MONTH_NAMES.map((month, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setSelectedMonth(idx + 1);
+                      setDatePreset('custom');
+                      setShowMonthDropdown(false);
+                    }}
+                    className={`w-full px-4 py-3 rounded-lg text-left font-semibold text-sm flex items-center gap-3 transition-all ${
+                      selectedMonth === idx + 1
+                        ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white'
+                        : 'text-gray-700 hover:bg-indigo-50 active:bg-indigo-100'
+                    }`}
+                  >
+                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                      selectedMonth === idx + 1 
+                        ? 'bg-white/20' 
+                        : 'bg-indigo-100 text-indigo-600'
+                    }`}>
+                      {idx + 1}
+                    </span>
+                    {month}
+                    {selectedMonth === idx + 1 && (
+                      <Check className="w-5 h-5 ml-auto" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Year Dropdown */}
+        <div className="relative" style={{ minWidth: '120px' }}>
+          <button
+            onClick={() => {
+              setShowYearDropdown(!showYearDropdown);
+              setShowMonthDropdown(false);
+            }}
+            className={`w-full px-4 py-3 rounded-xl border-2 text-left font-bold text-sm flex items-center justify-between transition-all ${
+              showYearDropdown 
+                ? 'border-purple-500 bg-white shadow-lg' 
+                : 'border-purple-200 bg-white hover:border-purple-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-lg">📆</span>
+              <span className="text-gray-800">{selectedYear}</span>
+            </div>
+            <ChevronDown className={`w-5 h-5 text-purple-500 transition-transform ${showYearDropdown ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {/* Year Dropdown Menu */}
+          {showYearDropdown && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl border-2 border-purple-200 shadow-2xl z-50 max-h-64 overflow-y-auto">
+              <div className="p-2">
+                {getYearOptions().map((year) => (
+                  <button
+                    key={year}
+                    onClick={() => {
+                      setSelectedYear(year);
+                      setDatePreset('custom');
+                      setShowYearDropdown(false);
+                    }}
+                    className={`w-full px-4 py-3 rounded-lg text-left font-semibold text-sm flex items-center justify-between transition-all ${
+                      selectedYear === year
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                        : 'text-gray-700 hover:bg-purple-50 active:bg-purple-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Calendar className={`w-4 h-4 ${selectedYear === year ? 'text-white' : 'text-purple-500'}`} />
+                      {year}
+                    </div>
+                    {selectedYear === year && (
+                      <Check className="w-5 h-5" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Month Picker Dropdown */}
-      {(showMonthPicker || datePreset === 'custom' || datePreset === 'month') && (
-        <div className="mb-3 p-3 bg-indigo-50 rounded-xl border-2 border-indigo-200">
-          <p className="text-xs font-bold text-indigo-700 mb-2">📅 Select Month & Year</p>
-          <div className="flex gap-2">
-            <select
-              value={selectedMonth}
-              onChange={(e) => handleMonthChange(parseInt(e.target.value))}
-              className="flex-1 px-3 py-2 border-2 border-indigo-300 rounded-xl text-sm font-bold focus:outline-none focus:border-indigo-500 bg-white"
-            >
-              {MONTH_NAMES.map((name, idx) => (
-                <option key={idx} value={idx + 1}>{name}</option>
-              ))}
-            </select>
+      {/* Apply Button */}
+      <button
+        onClick={() => {
+          setDatePreset('custom');
+          setShowMonthDropdown(false);
+          setShowYearDropdown(false);
+          // Trigger refetch
+          fetchStudents();
+          fetchTopStudents();
+          if (selectedStudent) {
+            fetchStudentDetail(selectedStudent);
+          }
+        }}
+        className="w-full mt-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] shadow-lg"
+      >
+        <RefreshCw className="w-4 h-4" />
+        Apply & Refresh
+      </button>
+    </div>
 
-            <select
-              value={selectedYear}
-              onChange={(e) => handleYearChange(parseInt(e.target.value))}
-              className="px-3 py-2 border-2 border-indigo-300 rounded-xl text-sm font-bold focus:outline-none focus:border-indigo-500 bg-white"
-            >
-              {getYearOptions().map((year) => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-          </div>
+    {/* Selected Range Display */}
+    <div className="mt-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 border-2 border-green-200">
+      <div className="flex items-center justify-center gap-3">
+        <div className="text-center">
+          <p className="text-xs text-green-600 font-semibold">From</p>
+          <p className="text-sm font-bold text-green-800">{formatDate(dateRange.start)}</p>
         </div>
-      )}
-
-      {/* Year Picker Dropdown */}
-      {(showYearPicker || datePreset === 'year') && !showMonthPicker && datePreset !== 'custom' && datePreset !== 'month' && (
-        <div className="mb-3 p-3 bg-green-50 rounded-xl border-2 border-green-200">
-          <p className="text-xs font-bold text-green-700 mb-2">📆 Select Year</p>
-          <select
-            value={selectedYear}
-            onChange={(e) => handleYearChange(parseInt(e.target.value))}
-            className="w-full px-3 py-2 border-2 border-green-300 rounded-xl text-sm font-bold focus:outline-none focus:border-green-500 bg-white"
-          >
-            {getYearOptions().map((year) => (
-              <option key={year} value={year}>{year}</option>
-            ))}
-          </select>
+        <div className="text-2xl">→</div>
+        <div className="text-center">
+          <p className="text-xs text-green-600 font-semibold">To</p>
+          <p className="text-sm font-bold text-green-800">{formatDate(dateRange.end)}</p>
         </div>
-      )}
-
-      {/* Show selected range */}
-      <div className="bg-gray-100 rounded-lg p-2 text-center">
-        <p className="text-xs text-gray-600">
-          📅 <span className="font-bold">{formatDate(dateRange.start)}</span>
-          {' → '}
-          <span className="font-bold">{formatDate(dateRange.end)}</span>
-        </p>
       </div>
     </div>
-  );
+  </div>
+);
 
   // ==================== RENDER FUNCTIONS ====================
 
