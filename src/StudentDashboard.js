@@ -2304,8 +2304,7 @@ useEffect(() => {
               <BookOpen className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="font-bold text-gray-800">શ્રી સોમચીન્તામણી વસુપૂજ્યસ્વામી જૈન પાઠશાળા</h1>
-              <p className="text-xs text-gray-500">Shree Somchintamani vasupujyaswami Jain Pathshala</p>
+              <h1 className="font-bold text-gray-800">શ્રી સોમચીન્તામણી વાસુપૂજ્યસ્વામી જૈન પાઠશાળા</h1>
             </div>
           </div>
           <button
