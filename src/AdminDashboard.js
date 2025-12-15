@@ -1847,50 +1847,7 @@ const fetchAttendance = useCallback(async () => {
     console.error('Error fetching attendance:', error);
   }
 }, []);
-
-const fetchGathas = useCallback(async () => {
-  const token = localStorage.getItem('jainPathshalaToken');
-  try {
-    const res = await fetch(`${API_BASE}/gatha`, { headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) {
-      const data = await res.json();
-      const entries = Array.isArray(data) ? data.map(normalizeEntry) : [];
-      setGathaEntries(entries);
-
-      const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
-      const monthlyNew = entries
-        .filter((e) => {
-          const date = new Date(e.created_at);
-          return date.getMonth() === currentMonth && date.getFullYear() === currentYear && e.type === 'new';
-        })
-        .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
-      setMonthlyNewGathas(monthlyNew);
-    }
-  } catch (error) {
-    console.error('Error fetching gathas:', error);
-  }
-}, []);
-
-const fetchMonthlyStats = useCallback(async (year, month) => {
-  const token = localStorage.getItem('jainPathshalaToken');
-  try {
-    const res = await fetch(`${API_BASE}/stats/comprehensive?year=${year}&month=${month}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setMonthlyAttendance(data.monthlyAttendance ?? 0);
-      setMonthlyNewGathas(data.monthlyNewGathas ?? 0);
-      setMonthlyRevisionGathas(data.monthlyRevisionGathas ?? 0);
-      setCurrentStreak(data.currentStreak ?? 0);
-      setMaxStreak(data.maxStreak ?? 0);
-      setWorkingDays(data.workingDays ?? DEFAULT_WORKING_DAYS);
-    }
-  } catch (error) {
-    console.error('Error fetching stats:', error);
-  }
-}, []);
+  
 const fetchGathas = useCallback(async () => {
 const token = localStorage.getItem('jainPathshalaToken');
 try {
