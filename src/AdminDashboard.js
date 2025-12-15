@@ -104,6 +104,35 @@ const getPerformanceBadge = (attendance, gatha) => {
   return { label: 'New', color: 'from-gray-400 to-gray-500', icon: '🌱' };
 };
 
+// Group activities by date
+const groupActivitiesByDate = (activities) => {
+  if (!activities || activities.length === 0) return [];
+  
+  const grouped = {};
+  
+  activities.forEach(activity => {
+    const dateKey = activity.date?.split('T')[0] || activity.date;
+    if (!grouped[dateKey]) {
+      grouped[dateKey] = {
+        date: dateKey,
+        attendance: null,
+        gathas: []
+      };
+    }
+    
+    if (activity.type === 'attendance') {
+      grouped[dateKey].attendance = activity;
+    } else if (activity.type === 'gatha') {
+      grouped[dateKey].gathas.push(activity);
+    }
+  });
+  
+  // Sort by date descending
+  return Object.values(grouped).sort((a, b) => 
+    new Date(b.date) - new Date(a.date)
+  );
+};
+
 export default function AdminDashboard({ user, onLogout }) {
   const [pendingData, setPendingData] = useState({ attendance: [], gatha: [] });
   const [stats, setStats] = useState(null);
@@ -117,8 +146,8 @@ export default function AdminDashboard({ user, onLogout }) {
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentDetail, setStudentDetail] = useState(null);
-  const [dateRange, setDateRange] = useState(getDateRangePreset('all'));
-  const [datePreset, setDatePreset] = useState('all');
+  const [dateRange, setDateRange] = useState(getDateRangePreset('month')); // Changed to month
+  const [datePreset, setDatePreset] = useState('month'); // Changed to month
   const [topStudents, setTopStudents] = useState({ topAttendance: [], topGatha: [] });
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name');
@@ -345,9 +374,9 @@ export default function AdminDashboard({ user, onLogout }) {
       if (!matchesSearch) return false;
       
       if (studentFilter === 'active') {
-        return (student.attendance_count || 0) + (student.total_gathas || 0) > 0;
+        return (student.attendance_count || 0) + (student.new_gathas || 0) > 0;
       } else if (studentFilter === 'inactive') {
-        return (student.attendance_count || 0) + (student.total_gathas || 0) === 0;
+        return (student.attendance_count || 0) + (student.new_gathas || 0) === 0;
       }
       return true;
     })
@@ -357,10 +386,10 @@ export default function AdminDashboard({ user, onLogout }) {
       } else if (sortBy === 'attendance') {
         return (b.attendance_count || 0) - (a.attendance_count || 0);
       } else if (sortBy === 'gatha') {
-        return (b.total_gathas || 0) - (a.total_gathas || 0);
+        return (b.new_gathas || b.total_gathas || 0) - (a.new_gathas || a.total_gathas || 0);
       } else if (sortBy === 'total') {
-        const totalA = (a.attendance_count || 0) + (a.total_gathas || 0);
-        const totalB = (b.attendance_count || 0) + (b.total_gathas || 0);
+        const totalA = (a.attendance_count || 0) + (a.new_gathas || a.total_gathas || 0);
+        const totalB = (b.attendance_count || 0) + (b.new_gathas || b.total_gathas || 0);
         return totalB - totalA;
       }
       return 0;
@@ -372,10 +401,11 @@ export default function AdminDashboard({ user, onLogout }) {
 
   // Calculate stats
   const activeStudentsCount = students.filter(s => 
-    (s.attendance_count || 0) + (s.total_gathas || 0) > 0
+    (s.attendance_count || 0) + (s.new_gathas || s.total_gathas || 0) > 0
   ).length;
   
   const totalAttendanceCount = students.reduce((sum, s) => sum + (s.attendance_count || 0), 0);
+  const totalNewGathaCount = students.reduce((sum, s) => sum + (s.new_gathas || 0), 0);
   const totalGathaCount = students.reduce((sum, s) => sum + (s.total_gathas || 0), 0);
 
   const attendanceRate = students.length > 0 
@@ -448,10 +478,12 @@ export default function AdminDashboard({ user, onLogout }) {
         <div className="bg-white rounded-xl p-4 border-2 border-purple-200 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <BookOpen className="w-8 h-8 text-purple-500" />
-            <Flame className="w-5 h-5 text-orange-500" />
+            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-bold">
+              ✨ New
+            </span>
           </div>
-          <p className="text-3xl font-bold text-gray-800">{totalGathaCount}</p>
-          <p className="text-xs text-gray-500 mt-1">Total Gathas (All Time)</p>
+          <p className="text-3xl font-bold text-gray-800">{totalNewGathaCount || totalGathaCount}</p>
+          <p className="text-xs text-gray-500 mt-1">New Gathas (This Month)</p>
         </div>
 
         <button
@@ -506,14 +538,14 @@ export default function AdminDashboard({ user, onLogout }) {
 
           <div className="relative bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-300 rounded-xl p-4 overflow-hidden">
             <div className="absolute top-2 right-2 text-3xl">📚</div>
-            <p className="text-xs font-bold text-purple-800 mb-1">Gatha Master</p>
+            <p className="text-xs font-bold text-purple-800 mb-1">New Gatha Master</p>
             <p className="text-lg font-bold text-gray-800 truncate pr-8">
               {topStudents.topGatha?.[0]?.name || 'N/A'}
             </p>
             <div className="flex items-center gap-1 mt-2">
               <BookOpen className="w-4 h-4 text-purple-600" />
               <span className="text-sm font-bold text-purple-700">
-                {topStudents.topGatha?.[0]?.count || 0} gathas
+                {topStudents.topGatha?.[0]?.count || 0} new
               </span>
             </div>
           </div>
@@ -744,6 +776,32 @@ export default function AdminDashboard({ user, onLogout }) {
         </div>
       </div>
 
+      {/* Date Range for Students */}
+      <div className="bg-white rounded-xl p-3 border-2 border-indigo-200 shadow-sm">
+        <p className="text-xs font-bold text-gray-600 mb-2">📅 Date Range</p>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: 'today', label: 'Today' },
+            { key: 'week', label: 'Week' },
+            { key: 'month', label: 'Month' },
+            { key: 'year', label: 'Year' },
+            { key: 'all', label: 'All' },
+          ].map((preset) => (
+            <button
+              key={preset.key}
+              onClick={() => setDatePreset(preset.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+                datePreset === preset.key
+                  ? 'bg-indigo-500 text-white'
+                  : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="flex gap-2 overflow-x-auto pb-1">
         {['all', 'active', 'inactive'].map((filter) => (
@@ -768,7 +826,7 @@ export default function AdminDashboard({ user, onLogout }) {
         {[
           { key: 'name', label: 'A-Z', icon: '🔤' },
           { key: 'attendance', label: 'Days', icon: '📅' },
-          { key: 'gatha', label: 'Gatha', icon: '📖' },
+          { key: 'gatha', label: 'New', icon: '✨' },
           { key: 'total', label: 'Total', icon: '⭐' },
         ].map((option) => (
           <button
@@ -791,7 +849,8 @@ export default function AdminDashboard({ user, onLogout }) {
       {/* Students List */}
       <div className="space-y-3">
         {filteredStudents.map((student, index) => {
-          const badge = getPerformanceBadge(student.attendance_count, student.total_gathas);
+          const newGathas = student.new_gathas || student.total_gathas || 0;
+          const badge = getPerformanceBadge(student.attendance_count, newGathas);
           
           return (
             <div key={student.id} className="bg-white rounded-xl border-2 border-indigo-200 overflow-hidden shadow-sm">
@@ -831,8 +890,8 @@ export default function AdminDashboard({ user, onLogout }) {
                       <p className="text-xs text-gray-400">Days</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-lg font-bold text-purple-600">{student.total_gathas || 0}</p>
-                      <p className="text-xs text-gray-400">Gathas</p>
+                      <p className="text-lg font-bold text-purple-600">{newGathas}</p>
+                      <p className="text-xs text-gray-400">New</p>
                     </div>
                     {expandedStudent === student.id ? (
                       <ChevronUp className="w-5 h-5 text-gray-400" />
@@ -852,64 +911,105 @@ export default function AdminDashboard({ user, onLogout }) {
                     </div>
                   ) : studentDetail ? (
                     <>
-                      <div className="grid grid-cols-2 gap-3 mb-4">
+                      {/* Summary Stats */}
+                      <div className="grid grid-cols-3 gap-2 mb-4">
                         <div className="bg-white rounded-xl p-3 border-2 border-green-200 text-center">
-                          <Calendar className="w-6 h-6 text-green-500 mx-auto mb-1" />
-                          <p className="text-2xl font-bold text-green-600">
+                          <Calendar className="w-5 h-5 text-green-500 mx-auto mb-1" />
+                          <p className="text-xl font-bold text-green-600">
                             {studentDetail.summary?.totalAttendance || studentDetail.attendance?.length || 0}
                           </p>
-                          <p className="text-xs text-gray-500">Attendance</p>
+                          <p className="text-xs text-gray-500">Days</p>
                         </div>
                         <div className="bg-white rounded-xl p-3 border-2 border-purple-200 text-center">
-                          <Star className="w-6 h-6 text-purple-500 mx-auto mb-1" />
-                          <p className="text-2xl font-bold text-purple-600">
+                          <Star className="w-5 h-5 text-purple-500 mx-auto mb-1" />
+                          <p className="text-xl font-bold text-purple-600">
                             {studentDetail.gathaStats?.new || 0}
                           </p>
-                          <p className="text-xs text-gray-500">New Gathas</p>
+                          <p className="text-xs text-gray-500">New</p>
                         </div>
                         <div className="bg-white rounded-xl p-3 border-2 border-blue-200 text-center">
-                          <RefreshCw className="w-6 h-6 text-blue-500 mx-auto mb-1" />
-                          <p className="text-2xl font-bold text-blue-600">
+                          <RefreshCw className="w-5 h-5 text-blue-500 mx-auto mb-1" />
+                          <p className="text-xl font-bold text-blue-600">
                             {studentDetail.gathaStats?.revision || 0}
                           </p>
-                          <p className="text-xs text-gray-500">Revisions</p>
-                        </div>
-                        <div className="bg-white rounded-xl p-3 border-2 border-orange-200 text-center">
-                          <Flame className="w-6 h-6 text-orange-500 mx-auto mb-1" />
-                          <p className="text-2xl font-bold text-orange-600">
-                            {studentDetail.summary?.totalGathas || 
-                              ((studentDetail.gathaStats?.new || 0) + (studentDetail.gathaStats?.revision || 0))}
-                          </p>
-                          <p className="text-xs text-gray-500">Total</p>
+                          <p className="text-xs text-gray-500">Revision</p>
                         </div>
                       </div>
 
+                      {/* Activity Grouped by Date */}
                       {studentDetail.recentActivity && studentDetail.recentActivity.length > 0 && (
                         <div>
                           <h4 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
                             <Activity className="w-4 h-4" />
-                            Recent Activity
+                            Activity by Date
                           </h4>
-                          <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {studentDetail.recentActivity.slice(0, 10).map((activity, idx) => (
-                              <div key={idx} className="bg-white rounded-lg p-3 border border-gray-200">
-                                <div className="flex items-center justify-between">
-                                  <span className="font-semibold text-gray-700 text-sm flex items-center gap-2">
-                                    {activity.type === 'attendance' ? (
-                                      <><Calendar className="w-4 h-4 text-green-500" /> Attended</>
-                                    ) : (
-                                      <><BookOpen className="w-4 h-4 text-purple-500" /> 
-                                        {activity.gatha_type === 'new' ? 'New Gatha' : 'Revision'}
-                                      </>
-                                    )}
+                          <div className="space-y-3 max-h-64 overflow-y-auto">
+                            {groupActivitiesByDate(studentDetail.recentActivity).slice(0, 15).map((dayGroup, idx) => (
+                              <div key={idx} className="bg-white rounded-xl p-3 border-2 border-gray-200 shadow-sm">
+                                {/* Date Header */}
+                                <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100">
+                                  <span className="font-bold text-gray-800 text-sm flex items-center gap-2">
+                                    <CalendarDays className="w-4 h-4 text-indigo-500" />
+                                    {formatDate(dayGroup.date)}
                                   </span>
-                                  <span className="text-xs text-gray-500">{formatDate(activity.date)}</span>
                                 </div>
-                                {activity.type === 'gatha' && (
-                                  <p className="text-xs text-gray-600 mt-1 ml-6">
-                                    {activity.sutra_name} • {activity.which_gatha} ({activity.total_gatha})
-                                  </p>
-                                )}
+
+                                {/* Day's Activities */}
+                                <div className="space-y-2">
+                                  {/* Attendance */}
+                                  {dayGroup.attendance && (
+                                    <div className="flex items-center gap-2 bg-green-50 rounded-lg p-2">
+                                      <UserCheck className="w-4 h-4 text-green-600" />
+                                      <span className="text-sm text-green-700 font-medium">
+                                        ✅ Present
+                                      </span>
+                                      {dayGroup.attendance.formatted_time && (
+                                        <span className="text-xs text-green-600 ml-auto">
+                                          {dayGroup.attendance.formatted_time}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Gathas */}
+                                  {dayGroup.gathas.map((gatha, gIdx) => (
+                                    <div key={gIdx} className={`rounded-lg p-2 ${
+                                      gatha.gatha_type === 'new' 
+                                        ? 'bg-purple-50' 
+                                        : 'bg-blue-50'
+                                    }`}>
+                                      <div className="flex items-center gap-2">
+                                        <BookOpen className={`w-4 h-4 ${
+                                          gatha.gatha_type === 'new' 
+                                            ? 'text-purple-600' 
+                                            : 'text-blue-600'
+                                        }`} />
+                                        <span className={`text-sm font-medium ${
+                                          gatha.gatha_type === 'new' 
+                                            ? 'text-purple-700' 
+                                            : 'text-blue-700'
+                                        }`}>
+                                          {gatha.gatha_type === 'new' ? '✨ New Gatha' : '🔄 Revision'}
+                                        </span>
+                                        <span className={`text-xs px-2 py-0.5 rounded-full ml-auto ${
+                                          gatha.gatha_type === 'new' 
+                                            ? 'bg-purple-200 text-purple-700' 
+                                            : 'bg-blue-200 text-blue-700'
+                                        }`}>
+                                          {gatha.total_gatha} gathas
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-gray-600 mt-1 ml-6">
+                                        📖 {gatha.sutra_name} • {gatha.which_gatha}
+                                      </p>
+                                    </div>
+                                  ))}
+
+                                  {/* If nothing on this day */}
+                                  {!dayGroup.attendance && dayGroup.gathas.length === 0 && (
+                                    <p className="text-xs text-gray-400 text-center py-2">No activity</p>
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -989,14 +1089,14 @@ export default function AdminDashboard({ user, onLogout }) {
 
         <div className="bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl p-4 text-white shadow-lg">
           <BookOpen className="w-8 h-8 mb-2 opacity-80" />
-          <p className="text-3xl font-bold">{totalGathaCount}</p>
-          <p className="text-xs opacity-80">Total Gathas</p>
+          <p className="text-3xl font-bold">{totalNewGathaCount || totalGathaCount}</p>
+          <p className="text-xs opacity-80">New Gathas</p>
         </div>
 
         <div className="bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl p-4 text-white shadow-lg">
           <TrendingUp className="w-8 h-8 mb-2 opacity-80" />
           <p className="text-3xl font-bold">
-            {students.length > 0 ? Math.round(totalGathaCount / students.length) : 0}
+            {students.length > 0 ? Math.round((totalNewGathaCount || totalGathaCount) / students.length) : 0}
           </p>
           <p className="text-xs opacity-80">Avg Gathas/Student</p>
         </div>
@@ -1042,10 +1142,10 @@ export default function AdminDashboard({ user, onLogout }) {
         </div>
       </div>
 
-      {/* Top 5 Students - Gatha */}
+      {/* Top 5 Students - New Gatha */}
       <div className="bg-white rounded-xl p-4 border-2 border-purple-200 shadow-sm">
         <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-          📚 Top 5 - Gathas
+          ✨ Top 5 - New Gathas
         </h3>
         <div className="space-y-2">
           {topStudents.topGatha?.slice(0, 5).map((student, index) => {
@@ -1065,7 +1165,7 @@ export default function AdminDashboard({ user, onLogout }) {
                   <span className="font-bold text-gray-800">{student.name}</span>
                 </div>
                 <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-bold text-sm">
-                  {student.count} gathas
+                  {student.count} new
                 </span>
               </div>
             );
@@ -1123,13 +1223,13 @@ export default function AdminDashboard({ user, onLogout }) {
           </div>
         )}
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs - PENDING MOVED TO LAST */}
         <div className="grid grid-cols-4 gap-2 mb-4">
           {[
             { key: 'overview', icon: BarChart3, label: 'Home' },
-            { key: 'approvals', icon: Clock, label: 'Pending', badge: totalPending },
             { key: 'students', icon: Users, label: 'Students' },
             { key: 'analytics', icon: TrendingUp, label: 'Stats' },
+            { key: 'approvals', icon: Clock, label: 'Pending', badge: totalPending },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -1159,4 +1259,4 @@ export default function AdminDashboard({ user, onLogout }) {
       </div>
     </div>
   );
-            }
+}
