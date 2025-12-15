@@ -1014,6 +1014,23 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData }) 
   );
 };
 
+// Add this state
+const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+// Add this useEffect to track online status
+useEffect(() => {
+  const handleOnline = () => setIsOnline(true);
+  const handleOffline = () => setIsOnline(false);
+
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('offline', handleOffline);
+
+  return () => {
+    window.removeEventListener('online', handleOnline);
+    window.removeEventListener('offline', handleOffline);
+  };
+}, []);
+              
 // ============================================
 // HISTORY PAGE COMPONENT
 // ============================================
@@ -1835,7 +1852,7 @@ export default function StudentDashboard({ user, onLogout }) {
   }, []);
 
   // Initial load
-// Replace the existing initial data useEffect with this:
+// Replace your existing data loading useEffect with this:
 useEffect(() => {
   const loadData = async () => {
     setIsLoading(true);
@@ -1850,16 +1867,18 @@ useEffect(() => {
   };
   loadData();
 
-  // Poll every 30 seconds
+  // Poll every 30 seconds - BUT only if online
   const pollInterval = setInterval(() => {
-    fetchPendingStatus();
-    fetchAttendance();
-    fetchGathas();
+    if (navigator.onLine) {  // <-- ADD THIS CHECK
+      fetchPendingStatus();
+      fetchAttendance();
+      fetchGathas();
+    }
   }, 30000);
 
-  // Also refresh when tab becomes visible
+  // Refresh when tab becomes visible - BUT only if online
   const handleVisibilityChange = () => {
-    if (document.visibilityState === 'visible') {
+    if (document.visibilityState === 'visible' && navigator.onLine) {  // <-- ADD THIS CHECK
       fetchPendingStatus();
       fetchAttendance();
       fetchGathas();
@@ -1867,7 +1886,6 @@ useEffect(() => {
   };
   document.addEventListener('visibilitychange', handleVisibilityChange);
 
-  // Cleanup
   return () => {
     clearInterval(pollInterval);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
