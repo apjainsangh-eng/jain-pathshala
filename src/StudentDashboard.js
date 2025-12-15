@@ -31,6 +31,7 @@ import {
   Users,
   X as CloseIcon,
   Zap,
+  Sparkles,
 } from 'lucide-react';
 
 // Import Achievement Components
@@ -53,7 +54,7 @@ import StudentAchievementPage, {
 const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.vercel.app/api';
 const DEFAULT_DATE_OPTIONS = { day: 'numeric', month: 'long', year: 'numeric' };
 
-// Page Navigation - Reordered: Home, Stats, History, Pending
+// Page Navigation
 const PAGES = {
   HOME: 'home',
   STATS: 'stats',
@@ -61,7 +62,7 @@ const PAGES = {
   PENDING: 'pending',
 };
 
-// Motivational Quotes in Gujarati & Hindi
+// Motivational Quotes
 const QUOTES = [
   { text: "अहिंसा परमो धर्मः", meaning: "Non-violence is the supreme religion", emoji: "🙏", lang: "Sanskrit" },
   { text: "क्षमा वीरस्य भूषणम्", meaning: "Forgiveness is the ornament of the brave", emoji: "💪", lang: "Sanskrit" },
@@ -137,7 +138,6 @@ const getDateRangePreset = (preset) => {
   }
 };
 
-// Get greeting based on time of day
 const getGreeting = () => {
   const hour = new Date().getHours();
   if (hour < 5) return { text: 'Good Night', emoji: '🌙', period: 'night' };
@@ -147,7 +147,6 @@ const getGreeting = () => {
   return { text: 'Good Night', emoji: '🌙', period: 'night' };
 };
 
-// Get motivational message based on stats
 const getMotivationalMessage = (streak, attendance, gathas) => {
   if (streak >= 7) return { text: "You're on fire! Keep the streak going! 🔥", type: "streak" };
   if (attendance >= 50) return { text: "Amazing dedication! You're a star! ⭐", type: "attendance" };
@@ -161,7 +160,6 @@ const getMotivationalMessage = (streak, attendance, gathas) => {
 // REUSABLE COMPONENTS
 // ============================================
 
-// Confirmation Modal
 const ConfirmationModal = ({ title, message, onConfirm, onCancel, confirmText = "Delete", confirmColor = "red" }) => {
   if (!title) return null;
 
@@ -194,7 +192,6 @@ const ConfirmationModal = ({ title, message, onConfirm, onCancel, confirmText = 
   );
 };
 
-// Pending Status Badge
 const PendingBadge = ({ status, size = 'normal' }) => {
   const badges = {
     pending: { className: 'text-yellow-700 bg-yellow-100 border-yellow-200', icon: Clock, label: 'Pending' },
@@ -216,7 +213,6 @@ const PendingBadge = ({ status, size = 'normal' }) => {
   );
 };
 
-// Success Toast
 const SuccessToast = ({ message, onClose }) => {
   if (!message) return null;
 
@@ -233,7 +229,6 @@ const SuccessToast = ({ message, onClose }) => {
   );
 };
 
-// Error Banner
 const ErrorBanner = ({ message, onClose }) => {
   if (!message) return null;
 
@@ -250,7 +245,6 @@ const ErrorBanner = ({ message, onClose }) => {
   );
 };
 
-// Streak Display Component
 const StreakDisplay = ({ streak, maxStreak }) => {
   const getStreakInfo = (s) => {
     if (s >= 30) return { label: 'Legendary!', color: 'from-yellow-400 to-orange-500', emoji: '🔥', tier: 'diamond' };
@@ -265,7 +259,6 @@ const StreakDisplay = ({ streak, maxStreak }) => {
 
   return (
     <div className={`bg-gradient-to-r ${info.color} rounded-2xl p-4 text-white shadow-lg relative overflow-hidden`}>
-      {/* Background decoration */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
       <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12" />
 
@@ -294,7 +287,6 @@ const StreakDisplay = ({ streak, maxStreak }) => {
   );
 };
 
-// Quick Stats Card
 const QuickStatCard = ({ icon: Icon, value, label, color, sublabel }) => {
   const colorClasses = {
     green: 'bg-green-50 border-green-200 text-green-600',
@@ -320,7 +312,6 @@ const QuickStatCard = ({ icon: Icon, value, label, color, sublabel }) => {
   );
 };
 
-// Help Tooltip
 const HelpTooltip = ({ text }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -346,24 +337,21 @@ const HelpTooltip = ({ text }) => {
 };
 
 // ============================================
-// LEVEL DETAILS MODAL - NEW COMPONENT
+// LEVEL DETAILS MODAL
 // ============================================
 
 const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel, stats }) => {
   if (!isOpen) return null;
 
-  // Define all levels if not imported from Student_achievement
   const allLevels = LEVELS || [
-    { level: 1, name: 'Beginner', minXP: 0, icon: '🌱', color: 'from-gray-400 to-gray-500' },
-    { level: 2, name: 'Learner', minXP: 100, icon: '📖', color: 'from-green-400 to-green-500' },
-    { level: 3, name: 'Explorer', minXP: 250, icon: '🔍', color: 'from-blue-400 to-blue-500' },
-    { level: 4, name: 'Achiever', minXP: 500, icon: '⭐', color: 'from-purple-400 to-purple-500' },
-    { level: 5, name: 'Scholar', minXP: 1000, icon: '🎓', color: 'from-indigo-400 to-indigo-500' },
-    { level: 6, name: 'Expert', minXP: 2000, icon: '💎', color: 'from-pink-400 to-pink-500' },
-    { level: 7, name: 'Master', minXP: 3500, icon: '🏆', color: 'from-yellow-400 to-orange-500' },
-    { level: 8, name: 'Grandmaster', minXP: 5000, icon: '👑', color: 'from-amber-400 to-red-500' },
-    { level: 9, name: 'Legend', minXP: 7500, icon: '🌟', color: 'from-rose-400 to-rose-600' },
-    { level: 10, name: 'Enlightened', minXP: 10000, icon: '✨', color: 'from-violet-400 to-purple-600' },
+    { level: 1, name: 'Beginner', minXP: 0, icon: '🌱' },
+    { level: 2, name: 'Learner', minXP: 50, icon: '📚' },
+    { level: 3, name: 'Student', minXP: 150, icon: '✨' },
+    { level: 4, name: 'Scholar', minXP: 300, icon: '⭐' },
+    { level: 5, name: 'Expert', minXP: 500, icon: '🏆' },
+    { level: 6, name: 'Master', minXP: 800, icon: '👑' },
+    { level: 7, name: 'Guru', minXP: 1200, icon: '🔱' },
+    { level: 8, name: 'Legend', minXP: 2000, icon: '💎' },
   ];
 
   return (
@@ -373,7 +361,7 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className={`p-5 text-white bg-gradient-to-r ${userLevel.color || 'from-orange-400 to-amber-500'}`}>
+        <div className="p-5 text-white bg-gradient-to-r from-indigo-500 to-purple-600">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center text-3xl">
@@ -392,7 +380,7 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
 
         <div className="overflow-y-auto max-h-[calc(90vh-200px)]">
           {/* Current Status */}
-          <div className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 border-b">
+          <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 border-b">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-sm text-gray-600">Current Level</p>
@@ -403,19 +391,19 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
               </div>
               <div className="text-right">
                 <p className="text-sm text-gray-600">Total XP</p>
-                <p className="text-3xl font-bold text-orange-600">{currentXP}</p>
+                <p className="text-3xl font-bold text-indigo-600">{currentXP}</p>
               </div>
             </div>
             
             {userLevel.nextLevel && (
-              <div className="bg-white rounded-xl p-3 border border-orange-200">
+              <div className="bg-white rounded-xl p-3 border border-indigo-200">
                 <div className="flex items-center justify-between text-sm mb-2">
                   <span className="text-gray-600">Next: {userLevel.nextLevel.name} {userLevel.nextLevel.icon}</span>
-                  <span className="font-bold text-orange-600">{userLevel.xpToNext} XP needed</span>
+                  <span className="font-bold text-indigo-600">{userLevel.xpToNextLevel - userLevel.xpInCurrentLevel} XP needed</span>
                 </div>
                 <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
                   <div 
-                    className={`h-full bg-gradient-to-r ${userLevel.color || 'from-orange-400 to-amber-500'} rounded-full transition-all duration-500`}
+                    className="h-full bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full transition-all duration-500"
                     style={{ width: `${userLevel.progressToNext * 100}%` }}
                   />
                 </div>
@@ -427,10 +415,9 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
           <div className="p-4 border-b">
             <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
               <Zap className="w-5 h-5 text-yellow-500" />
-              How You Earned XP
+              How You Earned XP This Month
             </h4>
             <div className="space-y-2">
-              {/* Attendance XP */}
               <div className="flex items-center justify-between p-3 bg-green-50 rounded-xl border border-green-200">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-green-200 rounded-lg flex items-center justify-center">
@@ -444,7 +431,6 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
                 <p className="font-bold text-green-600">+{(stats?.monthlyAttendance || 0) * XP_VALUES.attendance} XP</p>
               </div>
 
-              {/* New Gatha XP */}
               <div className="flex items-center justify-between p-3 bg-purple-50 rounded-xl border border-purple-200">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-purple-200 rounded-lg flex items-center justify-center">
@@ -452,27 +438,12 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
                   </div>
                   <div>
                     <p className="font-bold text-gray-800">New Gathas</p>
-                    <p className="text-xs text-gray-500">{stats?.monthlyNewGathas || 0} gathas × {XP_VALUES.newGatha} XP</p>
+                    <p className="text-xs text-gray-500">{stats?.monthlyNewGathas || 0} gathas × {XP_VALUES.new_gatha || 2} XP</p>
                   </div>
                 </div>
-                <p className="font-bold text-purple-600">+{(stats?.monthlyNewGathas || 0) * XP_VALUES.newGatha} XP</p>
+                <p className="font-bold text-purple-600">+{(stats?.monthlyNewGathas || 0) * (XP_VALUES.new_gatha || 2)} XP</p>
               </div>
 
-              {/* Streak Bonus */}
-              <div className="flex items-center justify-between p-3 bg-orange-50 rounded-xl border border-orange-200">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-orange-200 rounded-lg flex items-center justify-center">
-                    <Flame className="w-5 h-5 text-orange-700" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-gray-800">Streak Bonus</p>
-                    <p className="text-xs text-gray-500">{stats?.currentStreak || 0} days × {XP_VALUES.streakBonus || 5} XP</p>
-                  </div>
-                </div>
-                <p className="font-bold text-orange-600">+{(stats?.currentStreak || 0) * (XP_VALUES.streakBonus || 5)} XP</p>
-              </div>
-
-              {/* Achievement XP */}
               <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-xl border border-yellow-200">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-yellow-200 rounded-lg flex items-center justify-center">
@@ -505,7 +476,7 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
                     key={level.level}
                     className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all ${
                       isCurrentLevel 
-                        ? 'bg-gradient-to-r from-orange-100 to-amber-100 border-orange-400 shadow-md' 
+                        ? 'bg-gradient-to-r from-indigo-100 to-purple-100 border-indigo-400 shadow-md' 
                         : isUnlocked
                         ? 'bg-green-50 border-green-200'
                         : isNext
@@ -515,7 +486,7 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
                   >
                     <div className="flex items-center gap-3">
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${
-                        isCurrentLevel ? 'bg-orange-200' : isUnlocked ? 'bg-green-200' : 'bg-gray-200'
+                        isCurrentLevel ? 'bg-indigo-200' : isUnlocked ? 'bg-green-200' : 'bg-gray-200'
                       }`}>
                         {level.icon}
                       </div>
@@ -523,7 +494,7 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-gray-800">Lv.{level.level} {level.name}</p>
                           {isCurrentLevel && (
-                            <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded-full">YOU</span>
+                            <span className="text-xs bg-indigo-500 text-white px-2 py-0.5 rounded-full">YOU</span>
                           )}
                           {isNext && (
                             <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">NEXT</span>
@@ -550,13 +521,12 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
           </div>
         </div>
 
-        {/* Footer */}
         <div className="p-4 bg-gray-50 border-t">
           <button
             onClick={onClose}
-            className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold py-3.5 rounded-xl active:scale-[0.98] transition-transform shadow-lg"
+            className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold py-3.5 rounded-xl active:scale-[0.98] transition-transform shadow-lg"
           >
-            Got it!
+            Got it! 💪
           </button>
         </div>
       </div>
@@ -565,11 +535,97 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
 };
 
 // ============================================
-// LEADERBOARD COMPONENT - NEW
+// LEADERBOARD COMPONENT - IMPROVED
 // ============================================
 
-const LeaderboardSection = ({ leaderboardData, isLoading, currentUserId }) => {
+const LeaderboardSection = ({ currentUserId, currentUserName }) => {
   const [activeTab, setActiveTab] = useState('attendance');
+  const [leaderboardData, setLeaderboardData] = useState({ attendanceLeaders: [], gathaLeaders: [] });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch leaderboard data
+  const fetchLeaderboard = useCallback(async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // Get current month date range
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      // Try the leaderboard endpoint first
+      let res = await fetch(
+        `${API_BASE}/leaderboard?startDate=${formatLocalDateString(startOfMonth)}&endDate=${formatLocalDateString(endOfMonth)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (res.ok) {
+        const data = await res.json();
+        setLeaderboardData(data);
+      } else {
+        // If leaderboard endpoint doesn't exist, try analytics endpoint
+        res = await fetch(
+          `${API_BASE}/analytics/leaderboard?startDate=${formatLocalDateString(startOfMonth)}&endDate=${formatLocalDateString(endOfMonth)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        if (res.ok) {
+          const data = await res.json();
+          // Transform data if needed
+          setLeaderboardData({
+            attendanceLeaders: data.attendanceLeaders || data.topAttendance || [],
+            gathaLeaders: data.gathaLeaders || data.topGathas || [],
+          });
+        } else {
+          // If both fail, try to get all students and calculate locally
+          const studentsRes = await fetch(`${API_BASE}/students/stats`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          if (studentsRes.ok) {
+            const studentsData = await studentsRes.json();
+            const students = Array.isArray(studentsData) ? studentsData : studentsData.students || [];
+            
+            // Sort by attendance
+            const attendanceLeaders = [...students]
+              .sort((a, b) => (b.monthlyAttendance || b.attendance || 0) - (a.monthlyAttendance || a.attendance || 0))
+              .slice(0, 5)
+              .map((s, i) => ({
+                ...s,
+                rank: i + 1,
+                totalAttendance: s.monthlyAttendance || s.attendance || 0,
+              }));
+            
+            // Sort by gathas
+            const gathaLeaders = [...students]
+              .sort((a, b) => (b.monthlyNewGathas || b.newGathas || b.gathas || 0) - (a.monthlyNewGathas || a.newGathas || a.gathas || 0))
+              .slice(0, 5)
+              .map((s, i) => ({
+                ...s,
+                rank: i + 1,
+                totalGathas: s.monthlyNewGathas || s.newGathas || s.gathas || 0,
+              }));
+            
+            setLeaderboardData({ attendanceLeaders, gathaLeaders });
+          } else {
+            throw new Error('Could not load leaderboard data');
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching leaderboard:', err);
+      setError('Unable to load leaderboard');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
 
   const getRankIcon = (rank) => {
     switch (rank) {
@@ -581,7 +637,7 @@ const LeaderboardSection = ({ leaderboardData, isLoading, currentUserId }) => {
   };
 
   const getRankBg = (rank, isCurrentUser) => {
-    if (isCurrentUser) return 'bg-orange-100 border-orange-400';
+    if (isCurrentUser) return 'bg-gradient-to-r from-orange-100 to-amber-100 border-orange-400';
     switch (rank) {
       case 1: return 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-300';
       case 2: return 'bg-gray-50 border-gray-300';
@@ -590,15 +646,14 @@ const LeaderboardSection = ({ leaderboardData, isLoading, currentUserId }) => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-2xl p-6 border-2 border-blue-200 shadow-sm">
-        <div className="flex items-center justify-center py-8">
-          <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
-        </div>
-      </div>
-    );
-  }
+  const getRankEmoji = (rank) => {
+    switch (rank) {
+      case 1: return '🥇';
+      case 2: return '🥈';
+      case 3: return '🥉';
+      default: return '';
+    }
+  };
 
   const attendanceLeaders = leaderboardData?.attendanceLeaders || [];
   const gathaLeaders = leaderboardData?.gathaLeaders || [];
@@ -607,9 +662,18 @@ const LeaderboardSection = ({ leaderboardData, isLoading, currentUserId }) => {
     <div className="bg-white rounded-2xl border-2 border-blue-200 shadow-sm overflow-hidden">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-4 text-white">
-        <div className="flex items-center gap-2">
-          <Users className="w-6 h-6" />
-          <h3 className="text-lg font-bold">Leaderboard</h3>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="w-6 h-6" />
+            <h3 className="text-lg font-bold">🏆 Leaderboard</h3>
+          </div>
+          <button
+            onClick={fetchLeaderboard}
+            disabled={isLoading}
+            className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
         </div>
         <p className="text-sm opacity-80 mt-1">Top performers this month</p>
       </div>
@@ -634,32 +698,59 @@ const LeaderboardSection = ({ leaderboardData, isLoading, currentUserId }) => {
         </button>
       </div>
 
-      {/* Leaderboard List */}
+      {/* Content */}
       <div className="p-4">
-        {activeTab === 'attendance' ? (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-8">
+            <RefreshCw className="w-10 h-10 animate-spin text-blue-500 mb-3" />
+            <p className="text-gray-500">Loading leaderboard...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+            <p className="text-gray-500">{error}</p>
+            <button
+              onClick={fetchLeaderboard}
+              className="mt-3 px-4 py-2 bg-blue-100 text-blue-700 rounded-xl font-medium text-sm"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : activeTab === 'attendance' ? (
           attendanceLeaders.length === 0 ? (
             <div className="text-center py-8">
               <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-              <p className="text-gray-500">No data available yet</p>
+              <p className="text-gray-500 font-medium">No data yet this month</p>
+              <p className="text-gray-400 text-sm mt-1">Be the first to top the leaderboard! 🚀</p>
             </div>
           ) : (
             <div className="space-y-2">
               {attendanceLeaders.slice(0, 5).map((user, index) => {
-                const isCurrentUser = user.userId === currentUserId || user._id === currentUserId;
+                const odometer = user.userId || user._id || user.id;
+                const isCurrentUser = odometer === currentUserId || 
+                  user.name === currentUserName || 
+                  user.username === currentUserName;
+                const rank = index + 1;
+                
                 return (
                   <div 
-                    key={user.userId || user._id || index}
-                    className={`flex items-center justify-between p-3 rounded-xl border-2 ${getRankBg(index + 1, isCurrentUser)}`}
+                    key={odometer || index}
+                    className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all ${getRankBg(rank, isCurrentUser)}`}
                   >
                     <div className="flex items-center gap-3">
-                      {getRankIcon(index + 1)}
-                      <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold">
+                      <div className="flex items-center gap-1">
+                        {getRankIcon(rank)}
+                        <span className="text-lg">{getRankEmoji(rank)}</span>
+                      </div>
+                      <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold shadow-md">
                         {(user.name || user.username || 'U').charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <p className="font-bold text-gray-800 flex items-center gap-2">
                           {user.name || user.username}
-                          {isCurrentUser && <span className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded">You</span>}
+                          {isCurrentUser && (
+                            <span className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded animate-pulse">You</span>
+                          )}
                         </p>
                         <p className="text-xs text-gray-500">{user.totalAttendance || user.count || 0} days present</p>
                       </div>
@@ -677,26 +768,37 @@ const LeaderboardSection = ({ leaderboardData, isLoading, currentUserId }) => {
           gathaLeaders.length === 0 ? (
             <div className="text-center py-8">
               <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-              <p className="text-gray-500">No data available yet</p>
+              <p className="text-gray-500 font-medium">No data yet this month</p>
+              <p className="text-gray-400 text-sm mt-1">Start learning gathas to rank up! 📚</p>
             </div>
           ) : (
             <div className="space-y-2">
               {gathaLeaders.slice(0, 5).map((user, index) => {
-                const isCurrentUser = user.userId === currentUserId || user._id === currentUserId;
+                const odometer = user.userId || user._id || user.id;
+                const isCurrentUser = odometer === currentUserId || 
+                  user.name === currentUserName || 
+                  user.username === currentUserName;
+                const rank = index + 1;
+                
                 return (
                   <div 
-                    key={user.userId || user._id || index}
-                    className={`flex items-center justify-between p-3 rounded-xl border-2 ${getRankBg(index + 1, isCurrentUser)}`}
+                    key={odometer || index}
+                    className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all ${getRankBg(rank, isCurrentUser)}`}
                   >
                     <div className="flex items-center gap-3">
-                      {getRankIcon(index + 1)}
-                      <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                      <div className="flex items-center gap-1">
+                        {getRankIcon(rank)}
+                        <span className="text-lg">{getRankEmoji(rank)}</span>
+                      </div>
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white font-bold shadow-md">
                         {(user.name || user.username || 'U').charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <p className="font-bold text-gray-800 flex items-center gap-2">
                           {user.name || user.username}
-                          {isCurrentUser && <span className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded">You</span>}
+                          {isCurrentUser && (
+                            <span className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded animate-pulse">You</span>
+                          )}
                         </p>
                         <p className="text-xs text-gray-500">{user.totalGathas || user.count || 0} new gathas</p>
                       </div>
@@ -711,6 +813,16 @@ const LeaderboardSection = ({ leaderboardData, isLoading, currentUserId }) => {
             </div>
           )
         )}
+      </div>
+
+      {/* Footer tip */}
+      <div className="px-4 pb-4">
+        <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
+          <p className="text-xs text-blue-700 text-center">
+            <Sparkles className="w-3 h-3 inline mr-1" />
+            Leaderboard resets every month. Keep learning to stay on top! 🌟
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -753,14 +865,11 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData }) 
   };
 
   const isValid = form.sutraName && form.whichGatha && form.totalGatha;
-
-  // Quick preset buttons for common sutra names
   const commonSutras = ['નવકાર', 'પંચ પરમેષ્ઠી', 'લોગસ્સ', 'ઉવસગ્ગહરં'];
 
   return (
     <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
         <div className={`p-5 text-white ${activeTab === 'new' ? 'bg-gradient-to-r from-purple-500 to-indigo-600' : 'bg-gradient-to-r from-blue-500 to-cyan-600'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -778,7 +887,6 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData }) 
           </div>
         </div>
 
-        {/* Tab Switcher */}
         {!editData && (
           <div className="flex p-2 bg-gray-100 gap-2">
             <button
@@ -800,9 +908,7 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData }) 
           </div>
         )}
 
-        {/* Form */}
         <div className="p-5 space-y-4">
-          {/* Quick Sutra Selection */}
           <div>
             <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
               📖 Sutra Name
@@ -988,7 +1094,6 @@ const HistoryPage = () => {
     return { presentDays: presentCount, newGathas, revisionGathas };
   }, [activityData]);
 
-  // Calendar rendering
   const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
   const firstDayOfMonth = new Date(selectedYear, selectedMonth - 1, 1).getDay();
 
@@ -1037,7 +1142,6 @@ const HistoryPage = () => {
 
   return (
     <div className="space-y-4">
-      {/* Help Banner */}
       <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
         <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
         <div>
@@ -1048,7 +1152,6 @@ const HistoryPage = () => {
         </div>
       </div>
 
-      {/* Month Navigation */}
       <div className="bg-white rounded-2xl p-4 border-2 border-orange-200 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <button
@@ -1090,7 +1193,6 @@ const HistoryPage = () => {
           </div>
         ) : (
           <>
-            {/* Calendar */}
             <div className="bg-gray-50 rounded-xl p-3 mb-4">
               <div className="grid grid-cols-7 gap-1 mb-2">
                 {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
@@ -1104,7 +1206,6 @@ const HistoryPage = () => {
               </div>
             </div>
 
-            {/* Legend */}
             <div className="flex items-center justify-center gap-4 text-xs mb-4 flex-wrap">
               <div className="flex items-center gap-1.5">
                 <div className="w-5 h-5 rounded-md bg-gradient-to-br from-green-400 to-green-600" />
@@ -1120,7 +1221,6 @@ const HistoryPage = () => {
               </div>
             </div>
 
-            {/* Monthly Stats */}
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-green-50 border-2 border-green-200 rounded-xl p-3 text-center">
                 <Calendar className="w-6 h-6 text-green-500 mx-auto mb-1" />
@@ -1142,7 +1242,6 @@ const HistoryPage = () => {
         )}
       </div>
 
-      {/* Day Detail Modal */}
       {selectedDay && (
         <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setSelectedDay(null)}>
           <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl max-h-[80vh] overflow-y-auto animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
@@ -1164,7 +1263,6 @@ const HistoryPage = () => {
             </div>
 
             <div className="space-y-4">
-              {/* New Gathas */}
               <div className="bg-purple-50 rounded-xl p-4 border-2 border-purple-200">
                 <h4 className="font-bold text-purple-800 mb-3 flex items-center gap-2">
                   <Plus size={18} className="text-purple-600" />
@@ -1185,7 +1283,6 @@ const HistoryPage = () => {
                 )}
               </div>
 
-              {/* Revisions */}
               <div className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
                 <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2">
                   <RefreshCw size={18} className="text-blue-600" />
@@ -1239,7 +1336,6 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
 
   return (
     <div className="space-y-4">
-      {/* Help Banner */}
       <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 flex items-start gap-3">
         <Clock className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
         <div>
@@ -1251,7 +1347,6 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
         </div>
       </div>
 
-      {/* Pending Summary */}
       <div className="bg-gradient-to-r from-yellow-400 to-orange-400 rounded-2xl p-5 text-white shadow-lg relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
 
@@ -1276,7 +1371,6 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
         </div>
       </div>
 
-      {/* Pending Items */}
       {totalPendingCount === 0 ? (
         <div className="bg-white rounded-2xl p-8 border-2 border-green-200 text-center shadow-sm">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1351,7 +1445,6 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
         </div>
       )}
 
-      {/* Rejected Items */}
       {allRejected.length > 0 && (
         <div className="bg-white rounded-2xl p-4 border-2 border-red-200 shadow-sm">
           <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -1395,7 +1488,7 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
   );
 };
 
-// Recent Badges Component (Simplified)
+// Recent Badges Component
 const RecentBadges = ({ stats, onBadgeClick }) => {
   const recentlyUnlocked = useMemo(() => {
     return MONTHLY_ACHIEVEMENTS
@@ -1437,7 +1530,7 @@ const RecentBadges = ({ stats, onBadgeClick }) => {
   );
 };
 
-// Next Badges to Unlock (Simplified)
+// Next Badges to Unlock
 const NextBadges = ({ stats, onBadgeClick }) => {
   const nextAchievements = useMemo(() => {
     return MONTHLY_ACHIEVEMENTS
@@ -1505,8 +1598,6 @@ export default function StudentDashboard({ user, onLogout }) {
   const [attendanceHistory, setAttendanceHistory] = useState([]);
   const [gathaEntries, setGathaEntries] = useState([]);
   const [pendingStatus, setPendingStatus] = useState({ attendance: [], gatha: [] });
-  const [leaderboardData, setLeaderboardData] = useState({ attendanceLeaders: [], gathaLeaders: [] });
-  const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(false);
 
   // Stats (Monthly focused)
   const [monthlyAttendance, setMonthlyAttendance] = useState(0);
@@ -1532,8 +1623,6 @@ export default function StudentDashboard({ user, onLogout }) {
   const [successMessage, setSuccessMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState(null);
   const [showTips, setShowTips] = useState(true);
-  const [datePreset, setDatePreset] = useState('month');
-  const [dateRange, setDateRange] = useState(getDateRangePreset('month'));
 
   // Modals
   const [showGathaModal, setShowGathaModal] = useState(false);
@@ -1688,7 +1777,6 @@ export default function StudentDashboard({ user, onLogout }) {
         setCurrentStreak(streakData.current);
         setMaxStreak(streakData.max);
 
-        // Calculate monthly attendance
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
         const monthlyCount = data.filter((r) => {
@@ -1711,23 +1799,21 @@ export default function StudentDashboard({ user, onLogout }) {
         const entries = Array.isArray(data) ? data.map(normalizeEntry) : [];
         setGathaEntries(entries);
 
-        // Calculate monthly gathas
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
-        const monthlyCount = entries
+        const monthlyNew = entries
           .filter((e) => {
             const date = new Date(e.created_at);
-            return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+            return date.getMonth() === currentMonth && date.getFullYear() === currentYear && e.type === 'new';
           })
           .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
-        setMonthlyNewGathas(monthlyCount);
+        setMonthlyNewGathas(monthlyNew);
       }
     } catch (error) {
       console.error('Error fetching gathas:', error);
     }
   }, []);
 
-  // Fetch comprehensive stats for a specific month
   const fetchMonthlyStats = useCallback(async (year, month) => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
@@ -1748,32 +1834,6 @@ export default function StudentDashboard({ user, onLogout }) {
     }
   }, []);
 
-  // Fetch leaderboard data
-  const fetchLeaderboard = useCallback(async () => {
-    const token = localStorage.getItem('jainPathshalaToken');
-    setIsLeaderboardLoading(true);
-    try {
-      // Get current month date range
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      
-      const res = await fetch(
-        `${API_BASE}/leaderboard?startDate=${formatLocalDateString(startOfMonth)}&endDate=${formatLocalDateString(endOfMonth)}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      if (res.ok) {
-        const data = await res.json();
-        setLeaderboardData(data);
-      }
-    } catch (error) {
-      console.error('Error fetching leaderboard:', error);
-    } finally {
-      setIsLeaderboardLoading(false);
-    }
-  }, []);
-
   // Initial load
   useEffect(() => {
     const loadData = async () => {
@@ -1784,24 +1844,16 @@ export default function StudentDashboard({ user, onLogout }) {
         fetchGathas(),
         fetchPendingStatus(),
         fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1),
-        fetchLeaderboard(),
       ]);
       setIsLoading(false);
     };
     loadData();
-  }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats, fetchLeaderboard]);
+  }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
 
-  // Handle month change in stats page
   const handleStatsMonthChange = (year, month) => {
     setStatsMonth({ year, month });
     fetchMonthlyStats(year, month);
   };
-
-  useEffect(() => {
-    if (datePreset !== 'custom') {
-      setDateRange(getDateRangePreset(datePreset));
-    }
-  }, [datePreset]);
 
   // Handlers
   const markAttendance = async () => {
@@ -1880,12 +1932,11 @@ export default function StudentDashboard({ user, onLogout }) {
   // ==================== RENDER HOME PAGE ====================
   const renderHome = () => (
     <div className="space-y-4">
-      {/* Welcome Card - NOW CLICKABLE */}
+      {/* Welcome Card - CLICKABLE */}
       <button
         onClick={() => setShowLevelModal(true)}
         className="w-full text-left bg-gradient-to-br from-orange-400 via-amber-400 to-yellow-400 rounded-3xl p-5 text-white shadow-lg relative overflow-hidden active:scale-[0.99] transition-transform"
       >
-        {/* Background decorations */}
         <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -mr-20 -mt-20" />
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full -ml-16 -mb-16" />
 
@@ -1909,7 +1960,6 @@ export default function StudentDashboard({ user, onLogout }) {
             </div>
           </div>
 
-          {/* XP Progress */}
           <div className="bg-white/20 backdrop-blur rounded-xl p-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-sm font-bold">{userLevel.name}</span>
@@ -1973,7 +2023,6 @@ export default function StudentDashboard({ user, onLogout }) {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          {/* Attendance Button */}
           <button
             onClick={markAttendance}
             disabled={todayAttendanceStatus !== 'not_marked' || isSubmitting}
@@ -2006,7 +2055,6 @@ export default function StudentDashboard({ user, onLogout }) {
             )}
           </button>
 
-          {/* Gatha Button */}
           <button
             onClick={() => {
               setEditingGatha(null);
@@ -2025,7 +2073,6 @@ export default function StudentDashboard({ user, onLogout }) {
           </button>
         </div>
 
-        {/* Today's Entries */}
         {(todaysApprovedGathas.length > 0 || todaysPendingGathas.length > 0) && (
           <div className="mt-4 pt-4 border-t-2 border-gray-100">
             <p className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
@@ -2091,7 +2138,7 @@ export default function StudentDashboard({ user, onLogout }) {
         )}
       </div>
 
-      {/* Quick Stats - Monthly */}
+      {/* Quick Stats */}
       <div className="grid grid-cols-2 gap-3">
         <QuickStatCard
           icon={CalendarDays}
@@ -2126,7 +2173,7 @@ export default function StudentDashboard({ user, onLogout }) {
         <RecentBadges stats={userStats} onBadgeClick={setSelectedAchievement} />
       </div>
 
-      {/* Next Badges to Unlock */}
+      {/* Next Badges */}
       <NextBadges stats={userStats} onBadgeClick={setSelectedAchievement} />
 
       {/* Daily Quote */}
@@ -2152,9 +2199,8 @@ export default function StudentDashboard({ user, onLogout }) {
       
       {/* Leaderboard Section */}
       <LeaderboardSection 
-        leaderboardData={leaderboardData} 
-        isLoading={isLeaderboardLoading}
         currentUserId={user?._id || user?.id}
+        currentUserName={user?.name || user?.username}
       />
     </div>
   );
@@ -2207,7 +2253,6 @@ export default function StudentDashboard({ user, onLogout }) {
   // ==================== MAIN RETURN ====================
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 pb-24">
-      {/* Success Toast */}
       <SuccessToast message={successMessage} onClose={() => setSuccessMessage('')} />
 
       {/* Header */}
@@ -2233,10 +2278,9 @@ export default function StudentDashboard({ user, onLogout }) {
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-4">
-        {/* Error Banner */}
         <ErrorBanner message={globalError} onClose={() => setGlobalError('')} />
 
-        {/* Navigation Tabs - Reordered: Home, Stats, History, Pending */}
+        {/* Navigation Tabs */}
         <div className="grid grid-cols-4 gap-2 mb-4">
           {[
             { key: PAGES.HOME, icon: Home, label: 'Home' },
@@ -2270,12 +2314,10 @@ export default function StudentDashboard({ user, onLogout }) {
           ))}
         </div>
 
-        {/* Content */}
         {renderContent()}
 
-        {/* Footer */}
         <div className="mt-8 text-center py-4">
-          <p className="text-gray-400 text-xs">© 2024 Jain Pathshala • Made with ❤️ for our students</p>
+          <p className="text-gray-400 text-xs">© 2025 Aadinath Parshwanth Jain Sangh</p>
         </div>
       </div>
 
@@ -2304,7 +2346,6 @@ export default function StudentDashboard({ user, onLogout }) {
         onClose={() => setSelectedAchievement(null)}
       />
 
-      {/* Level Details Modal - NEW */}
       <LevelDetailsModal
         isOpen={showLevelModal}
         onClose={() => setShowLevelModal(false)}
