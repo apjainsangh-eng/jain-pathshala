@@ -1835,20 +1835,30 @@ export default function StudentDashboard({ user, onLogout }) {
   }, []);
 
   // Initial load
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      const now = new Date();
-      await Promise.all([
-        fetchAttendance(),
-        fetchGathas(),
-        fetchPendingStatus(),
-        fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1),
-      ]);
-      setIsLoading(false);
-    };
-    loadData();
-  }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
+useEffect(() => {
+  const loadData = async () => {
+    setIsLoading(true);
+    const now = new Date();
+    await Promise.all([
+      fetchAttendance(),
+      fetchGathas(),
+      fetchPendingStatus(),
+      fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1),
+    ]);
+    setIsLoading(false);
+  };
+  loadData();
+
+  // ADD THIS: Poll for updates every 30 seconds
+  const pollInterval = setInterval(() => {
+    fetchPendingStatus();
+    fetchAttendance();
+    fetchGathas();
+  }, 30000); // 30 seconds
+
+  // Cleanup on unmount
+  return () => clearInterval(pollInterval);
+}, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
 
   const handleStatsMonthChange = (year, month) => {
     setStatsMonth({ year, month });
