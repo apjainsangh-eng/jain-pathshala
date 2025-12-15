@@ -826,7 +826,7 @@ export default function AdminDashboard({ user, onLogout }) {
         {[
           { key: 'name', label: 'A-Z', icon: '🔤' },
           { key: 'attendance', label: 'Days', icon: '📅' },
-          { key: 'gatha', label: 'New', icon: '✨' },
+          { key: 'gatha', label: 'Gatha', icon: '✨' },
           { key: 'total', label: 'Total', icon: '⭐' },
         ].map((option) => (
           <button
