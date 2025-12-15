@@ -785,7 +785,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
           <div className="relative bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-300 rounded-xl p-4 overflow-hidden">
             <div className="absolute top-2 right-2 text-3xl">📚</div>
-            <p className="text-xs font-bold text-purple-800 mb-1">✨ New Gatha Master</p>
+            <p className="text-xs font-bold text-purple-800 mb-1">✨ Gatha Master</p>
             <p className="text-lg font-bold text-gray-800 truncate pr-8">
               {topStudents.topGatha?.[0]?.name || 'N/A'}
             </p>
