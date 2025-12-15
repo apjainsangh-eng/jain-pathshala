@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Crown,
   Edit2,
   Flame,
   HelpCircle,
@@ -19,12 +20,17 @@ import {
   Info,
   Loader,
   LogOut,
+  Medal,
   Plus,
   RefreshCw,
+  Star,
   Target,
   Trash2,
   Trophy,
+  TrendingUp,
+  Users,
   X as CloseIcon,
+  Zap,
 } from 'lucide-react';
 
 // Import Achievement Components
@@ -37,6 +43,7 @@ import StudentAchievementPage, {
   DEFAULT_WORKING_DAYS,
   AchievementDetailModal,
   ACHIEVEMENT_COLORS,
+  LEVELS,
 } from './Student_achievement';
 
 // ============================================
@@ -334,6 +341,377 @@ const HelpTooltip = ({ text }) => {
           </div>
         </>
       )}
+    </div>
+  );
+};
+
+// ============================================
+// LEVEL DETAILS MODAL - NEW COMPONENT
+// ============================================
+
+const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel, stats }) => {
+  if (!isOpen) return null;
+
+  // Define all levels if not imported from Student_achievement
+  const allLevels = LEVELS || [
+    { level: 1, name: 'Beginner', minXP: 0, icon: '🌱', color: 'from-gray-400 to-gray-500' },
+    { level: 2, name: 'Learner', minXP: 100, icon: '📖', color: 'from-green-400 to-green-500' },
+    { level: 3, name: 'Explorer', minXP: 250, icon: '🔍', color: 'from-blue-400 to-blue-500' },
+    { level: 4, name: 'Achiever', minXP: 500, icon: '⭐', color: 'from-purple-400 to-purple-500' },
+    { level: 5, name: 'Scholar', minXP: 1000, icon: '🎓', color: 'from-indigo-400 to-indigo-500' },
+    { level: 6, name: 'Expert', minXP: 2000, icon: '💎', color: 'from-pink-400 to-pink-500' },
+    { level: 7, name: 'Master', minXP: 3500, icon: '🏆', color: 'from-yellow-400 to-orange-500' },
+    { level: 8, name: 'Grandmaster', minXP: 5000, icon: '👑', color: 'from-amber-400 to-red-500' },
+    { level: 9, name: 'Legend', minXP: 7500, icon: '🌟', color: 'from-rose-400 to-rose-600' },
+    { level: 10, name: 'Enlightened', minXP: 10000, icon: '✨', color: 'from-violet-400 to-purple-600' },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div 
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden animate-in zoom-in duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className={`p-5 text-white bg-gradient-to-r ${userLevel.color || 'from-orange-400 to-amber-500'}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center text-3xl">
+                {userLevel.icon}
+              </div>
+              <div>
+                <h3 className="text-xl font-bold">Level Progress</h3>
+                <p className="text-sm opacity-80">Your XP Journey</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors">
+              <CloseIcon size={24} />
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-y-auto max-h-[calc(90vh-200px)]">
+          {/* Current Status */}
+          <div className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 border-b">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-sm text-gray-600">Current Level</p>
+                <p className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                  <span className="text-3xl">{userLevel.icon}</span>
+                  {userLevel.name}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-600">Total XP</p>
+                <p className="text-3xl font-bold text-orange-600">{currentXP}</p>
+              </div>
+            </div>
+            
+            {userLevel.nextLevel && (
+              <div className="bg-white rounded-xl p-3 border border-orange-200">
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="text-gray-600">Next: {userLevel.nextLevel.name} {userLevel.nextLevel.icon}</span>
+                  <span className="font-bold text-orange-600">{userLevel.xpToNext} XP needed</span>
+                </div>
+                <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full bg-gradient-to-r ${userLevel.color || 'from-orange-400 to-amber-500'} rounded-full transition-all duration-500`}
+                    style={{ width: `${userLevel.progressToNext * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* XP Breakdown */}
+          <div className="p-4 border-b">
+            <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-yellow-500" />
+              How You Earned XP
+            </h4>
+            <div className="space-y-2">
+              {/* Attendance XP */}
+              <div className="flex items-center justify-between p-3 bg-green-50 rounded-xl border border-green-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-200 rounded-lg flex items-center justify-center">
+                    <Calendar className="w-5 h-5 text-green-700" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-800">Attendance</p>
+                    <p className="text-xs text-gray-500">{stats?.monthlyAttendance || 0} days × {XP_VALUES.attendance} XP</p>
+                  </div>
+                </div>
+                <p className="font-bold text-green-600">+{(stats?.monthlyAttendance || 0) * XP_VALUES.attendance} XP</p>
+              </div>
+
+              {/* New Gatha XP */}
+              <div className="flex items-center justify-between p-3 bg-purple-50 rounded-xl border border-purple-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-purple-200 rounded-lg flex items-center justify-center">
+                    <BookOpen className="w-5 h-5 text-purple-700" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-800">New Gathas</p>
+                    <p className="text-xs text-gray-500">{stats?.monthlyNewGathas || 0} gathas × {XP_VALUES.newGatha} XP</p>
+                  </div>
+                </div>
+                <p className="font-bold text-purple-600">+{(stats?.monthlyNewGathas || 0) * XP_VALUES.newGatha} XP</p>
+              </div>
+
+              {/* Streak Bonus */}
+              <div className="flex items-center justify-between p-3 bg-orange-50 rounded-xl border border-orange-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-orange-200 rounded-lg flex items-center justify-center">
+                    <Flame className="w-5 h-5 text-orange-700" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-800">Streak Bonus</p>
+                    <p className="text-xs text-gray-500">{stats?.currentStreak || 0} days × {XP_VALUES.streakBonus || 5} XP</p>
+                  </div>
+                </div>
+                <p className="font-bold text-orange-600">+{(stats?.currentStreak || 0) * (XP_VALUES.streakBonus || 5)} XP</p>
+              </div>
+
+              {/* Achievement XP */}
+              <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-xl border border-yellow-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-yellow-200 rounded-lg flex items-center justify-center">
+                    <Trophy className="w-5 h-5 text-yellow-700" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-800">Achievements</p>
+                    <p className="text-xs text-gray-500">Badges unlocked</p>
+                  </div>
+                </div>
+                <p className="font-bold text-yellow-600">+{xpBreakdown?.achievements || 0} XP</p>
+              </div>
+            </div>
+          </div>
+
+          {/* All Levels */}
+          <div className="p-4">
+            <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-blue-500" />
+              All Levels
+            </h4>
+            <div className="space-y-2">
+              {allLevels.map((level, index) => {
+                const isCurrentLevel = level.level === userLevel.level;
+                const isUnlocked = currentXP >= level.minXP;
+                const isNext = !isUnlocked && (index === 0 || currentXP >= allLevels[index - 1].minXP);
+
+                return (
+                  <div 
+                    key={level.level}
+                    className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all ${
+                      isCurrentLevel 
+                        ? 'bg-gradient-to-r from-orange-100 to-amber-100 border-orange-400 shadow-md' 
+                        : isUnlocked
+                        ? 'bg-green-50 border-green-200'
+                        : isNext
+                        ? 'bg-blue-50 border-blue-300 border-dashed'
+                        : 'bg-gray-50 border-gray-200 opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${
+                        isCurrentLevel ? 'bg-orange-200' : isUnlocked ? 'bg-green-200' : 'bg-gray-200'
+                      }`}>
+                        {level.icon}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-gray-800">Lv.{level.level} {level.name}</p>
+                          {isCurrentLevel && (
+                            <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded-full">YOU</span>
+                          )}
+                          {isNext && (
+                            <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">NEXT</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          {level.minXP === 0 ? 'Starting level' : `${level.minXP} XP required`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {isUnlocked ? (
+                        <CheckCircle className="w-6 h-6 text-green-500" />
+                      ) : (
+                        <p className="text-sm font-bold text-gray-400">
+                          {level.minXP - currentXP} XP
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 bg-gray-50 border-t">
+          <button
+            onClick={onClose}
+            className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold py-3.5 rounded-xl active:scale-[0.98] transition-transform shadow-lg"
+          >
+            Got it!
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// LEADERBOARD COMPONENT - NEW
+// ============================================
+
+const LeaderboardSection = ({ leaderboardData, isLoading, currentUserId }) => {
+  const [activeTab, setActiveTab] = useState('attendance');
+
+  const getRankIcon = (rank) => {
+    switch (rank) {
+      case 1: return <Crown className="w-5 h-5 text-yellow-500" />;
+      case 2: return <Medal className="w-5 h-5 text-gray-400" />;
+      case 3: return <Medal className="w-5 h-5 text-amber-600" />;
+      default: return <span className="w-5 h-5 flex items-center justify-center text-sm font-bold text-gray-500">#{rank}</span>;
+    }
+  };
+
+  const getRankBg = (rank, isCurrentUser) => {
+    if (isCurrentUser) return 'bg-orange-100 border-orange-400';
+    switch (rank) {
+      case 1: return 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-300';
+      case 2: return 'bg-gray-50 border-gray-300';
+      case 3: return 'bg-amber-50 border-amber-300';
+      default: return 'bg-white border-gray-200';
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-2xl p-6 border-2 border-blue-200 shadow-sm">
+        <div className="flex items-center justify-center py-8">
+          <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
+        </div>
+      </div>
+    );
+  }
+
+  const attendanceLeaders = leaderboardData?.attendanceLeaders || [];
+  const gathaLeaders = leaderboardData?.gathaLeaders || [];
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-blue-200 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-4 text-white">
+        <div className="flex items-center gap-2">
+          <Users className="w-6 h-6" />
+          <h3 className="text-lg font-bold">Leaderboard</h3>
+        </div>
+        <p className="text-sm opacity-80 mt-1">Top performers this month</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex p-2 bg-gray-100 gap-2">
+        <button
+          onClick={() => setActiveTab('attendance')}
+          className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'attendance' ? 'bg-green-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+          }`}
+        >
+          <Calendar className="w-4 h-4" /> Attendance
+        </button>
+        <button
+          onClick={() => setActiveTab('gatha')}
+          className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'gatha' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" /> New Gathas
+        </button>
+      </div>
+
+      {/* Leaderboard List */}
+      <div className="p-4">
+        {activeTab === 'attendance' ? (
+          attendanceLeaders.length === 0 ? (
+            <div className="text-center py-8">
+              <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+              <p className="text-gray-500">No data available yet</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {attendanceLeaders.slice(0, 5).map((user, index) => {
+                const isCurrentUser = user.userId === currentUserId || user._id === currentUserId;
+                return (
+                  <div 
+                    key={user.userId || user._id || index}
+                    className={`flex items-center justify-between p-3 rounded-xl border-2 ${getRankBg(index + 1, isCurrentUser)}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {getRankIcon(index + 1)}
+                      <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold">
+                        {(user.name || user.username || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-800 flex items-center gap-2">
+                          {user.name || user.username}
+                          {isCurrentUser && <span className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded">You</span>}
+                        </p>
+                        <p className="text-xs text-gray-500">{user.totalAttendance || user.count || 0} days present</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-green-600">{user.totalAttendance || user.count || 0}</p>
+                      <p className="text-xs text-gray-400">days</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ) : (
+          gathaLeaders.length === 0 ? (
+            <div className="text-center py-8">
+              <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+              <p className="text-gray-500">No data available yet</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {gathaLeaders.slice(0, 5).map((user, index) => {
+                const isCurrentUser = user.userId === currentUserId || user._id === currentUserId;
+                return (
+                  <div 
+                    key={user.userId || user._id || index}
+                    className={`flex items-center justify-between p-3 rounded-xl border-2 ${getRankBg(index + 1, isCurrentUser)}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {getRankIcon(index + 1)}
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                        {(user.name || user.username || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-800 flex items-center gap-2">
+                          {user.name || user.username}
+                          {isCurrentUser && <span className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded">You</span>}
+                        </p>
+                        <p className="text-xs text-gray-500">{user.totalGathas || user.count || 0} new gathas</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-purple-600">{user.totalGathas || user.count || 0}</p>
+                      <p className="text-xs text-gray-400">gathas</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        )}
+      </div>
     </div>
   );
 };
@@ -1127,7 +1505,8 @@ export default function StudentDashboard({ user, onLogout }) {
   const [attendanceHistory, setAttendanceHistory] = useState([]);
   const [gathaEntries, setGathaEntries] = useState([]);
   const [pendingStatus, setPendingStatus] = useState({ attendance: [], gatha: [] });
-  const [analyticsData, setAnalyticsData] = useState({ attendanceLeader: null, gathaStats: null });
+  const [leaderboardData, setLeaderboardData] = useState({ attendanceLeaders: [], gathaLeaders: [] });
+  const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(false);
 
   // Stats (Monthly focused)
   const [monthlyAttendance, setMonthlyAttendance] = useState(0);
@@ -1160,6 +1539,7 @@ export default function StudentDashboard({ user, onLogout }) {
   const [showGathaModal, setShowGathaModal] = useState(false);
   const [editingGatha, setEditingGatha] = useState(null);
   const [selectedAchievement, setSelectedAchievement] = useState(null);
+  const [showLevelModal, setShowLevelModal] = useState(false);
 
   const todayIso = formatLocalDateString(new Date());
   const greeting = getGreeting();
@@ -1368,6 +1748,32 @@ export default function StudentDashboard({ user, onLogout }) {
     }
   }, []);
 
+  // Fetch leaderboard data
+  const fetchLeaderboard = useCallback(async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    setIsLeaderboardLoading(true);
+    try {
+      // Get current month date range
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      const res = await fetch(
+        `${API_BASE}/leaderboard?startDate=${formatLocalDateString(startOfMonth)}&endDate=${formatLocalDateString(endOfMonth)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (res.ok) {
+        const data = await res.json();
+        setLeaderboardData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error);
+    } finally {
+      setIsLeaderboardLoading(false);
+    }
+  }, []);
+
   // Initial load
   useEffect(() => {
     const loadData = async () => {
@@ -1378,34 +1784,18 @@ export default function StudentDashboard({ user, onLogout }) {
         fetchGathas(),
         fetchPendingStatus(),
         fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1),
+        fetchLeaderboard(),
       ]);
       setIsLoading(false);
     };
     loadData();
-  }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
+  }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats, fetchLeaderboard]);
 
   // Handle month change in stats page
   const handleStatsMonthChange = (year, month) => {
     setStatsMonth({ year, month });
     fetchMonthlyStats(year, month);
   };
-
-  const fetchAnalytics = useCallback(async () => {
-    const token = localStorage.getItem('jainPathshalaToken');
-    try {
-      const res = await fetch(
-        `${API_BASE}/analytics/leaderboard?startDate=${dateRange.start}&endDate=${dateRange.end}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (res.ok) setAnalyticsData(await res.json());
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
-    }
-  }, [dateRange]);
-
-  useEffect(() => {
-    fetchAnalytics();
-  }, [fetchAnalytics]);
 
   useEffect(() => {
     if (datePreset !== 'custom') {
@@ -1490,8 +1880,11 @@ export default function StudentDashboard({ user, onLogout }) {
   // ==================== RENDER HOME PAGE ====================
   const renderHome = () => (
     <div className="space-y-4">
-      {/* Welcome Card */}
-      <div className="bg-gradient-to-br from-orange-400 via-amber-400 to-yellow-400 rounded-3xl p-5 text-white shadow-lg relative overflow-hidden">
+      {/* Welcome Card - NOW CLICKABLE */}
+      <button
+        onClick={() => setShowLevelModal(true)}
+        className="w-full text-left bg-gradient-to-br from-orange-400 via-amber-400 to-yellow-400 rounded-3xl p-5 text-white shadow-lg relative overflow-hidden active:scale-[0.99] transition-transform"
+      >
         {/* Background decorations */}
         <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -mr-20 -mt-20" />
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full -ml-16 -mb-16" />
@@ -1520,7 +1913,10 @@ export default function StudentDashboard({ user, onLogout }) {
           <div className="bg-white/20 backdrop-blur rounded-xl p-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-sm font-bold">{userLevel.name}</span>
-              <span className="text-xs">{xpBreakdown.total} XP</span>
+              <span className="text-xs flex items-center gap-1">
+                {xpBreakdown.total} XP
+                <Info className="w-3 h-3 opacity-60" />
+              </span>
             </div>
             {userLevel.nextLevel && (
               <div className="h-2 bg-white/30 rounded-full overflow-hidden">
@@ -1530,9 +1926,10 @@ export default function StudentDashboard({ user, onLogout }) {
                 />
               </div>
             )}
+            <p className="text-xs text-orange-100 mt-1 text-center">Tap to see level details & XP breakdown</p>
           </div>
         </div>
-      </div>
+      </button>
 
       {/* Tips for new users */}
       {showTips && (
@@ -1749,11 +2146,17 @@ export default function StudentDashboard({ user, onLogout }) {
 
   // ==================== RENDER STATS PAGE ====================
   const renderStats = () => (
-    <StudentAchievementPage
-      stats={userStats}
-      onMonthChange={handleStatsMonthChange}
-      workingDays={workingDays}
-    />
+    <div className="space-y-4">
+      {/* Student Achievement Page */}
+      <StudentAchievementPage stats={userStats} onMonthChange={handleStatsMonthChange} workingDays={workingDays} />
+      
+      {/* Leaderboard Section */}
+      <LeaderboardSection 
+        leaderboardData={leaderboardData} 
+        isLoading={isLeaderboardLoading}
+        currentUserId={user?._id || user?.id}
+      />
+    </div>
   );
 
   // ==================== RENDER CONTENT ====================
@@ -1899,6 +2302,16 @@ export default function StudentDashboard({ user, onLogout }) {
         achievement={selectedAchievement}
         stats={userStats}
         onClose={() => setSelectedAchievement(null)}
+      />
+
+      {/* Level Details Modal - NEW */}
+      <LevelDetailsModal
+        isOpen={showLevelModal}
+        onClose={() => setShowLevelModal(false)}
+        currentXP={xpBreakdown.total}
+        xpBreakdown={xpBreakdown}
+        userLevel={userLevel}
+        stats={userStats}
       />
     </div>
   );
