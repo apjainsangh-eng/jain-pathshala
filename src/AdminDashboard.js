@@ -41,6 +41,20 @@ const formatDate = (dateStr) => {
   });
 };
 
+const getYearOptions = () => {
+  const currentYear = new Date().getFullYear();
+  const years = [];
+  for (let y = currentYear; y >= 2020; y--) {
+    years.push(y);
+  }
+  return years;
+};
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
 const formatLocalDateString = (input = new Date()) => {
   const parsed = input instanceof Date ? input : new Date(input);
   const y = parsed.getFullYear();
@@ -51,7 +65,7 @@ const formatLocalDateString = (input = new Date()) => {
 
 const getDateRangePreset = (preset) => {
   const today = new Date();
-  
+
   switch (preset) {
     case 'today':
       return {
@@ -155,6 +169,8 @@ export default function AdminDashboard({ user, onLogout }) {
   const [studentFilter, setStudentFilter] = useState('all');
   const [approvalFilter, setApprovalFilter] = useState('all');
   const [detailLoading, setDetailLoading] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
   // Fetch pending data and stats
   const fetchPendingData = useCallback(async () => {
@@ -777,30 +793,81 @@ export default function AdminDashboard({ user, onLogout }) {
       </div>
 
       {/* Date Range for Students */}
-      <div className="bg-white rounded-xl p-3 border-2 border-indigo-200 shadow-sm">
-        <p className="text-xs font-bold text-gray-600 mb-2">📅 Date Range</p>
-        <div className="flex flex-wrap gap-2">
-          {[
-            { key: 'today', label: 'Today' },
-            { key: 'week', label: 'Week' },
-            { key: 'month', label: 'Month' },
-            { key: 'year', label: 'Year' },
-            { key: 'all', label: 'All' },
-          ].map((preset) => (
-            <button
-              key={preset.key}
-              onClick={() => setDatePreset(preset.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
-                datePreset === preset.key
-                  ? 'bg-indigo-500 text-white'
-                  : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
-      </div>
+<div className="bg-white rounded-xl p-3 border-2 border-indigo-200 shadow-sm">
+  <p className="text-xs font-bold text-gray-600 mb-2">📅 Date Range</p>
+  
+  {/* Quick Presets */}
+  <div className="flex flex-wrap gap-2 mb-3">
+    {[
+      { key: 'today', label: 'Today' },
+      { key: 'week', label: 'Week' },
+      { key: 'month', label: 'Month' },
+      { key: 'year', label: 'Year' },
+      { key: 'all', label: 'All' },
+      { key: 'custom', label: '📅 Custom' },
+    ].map((preset) => (
+      <button
+        key={preset.key}
+        onClick={() => setDatePreset(preset.key)}
+        className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+          datePreset === preset.key
+            ? 'bg-indigo-500 text-white'
+            : 'bg-gray-100 text-gray-600'
+        }`}
+      >
+        {preset.label}
+      </button>
+    ))}
+  </div>
+
+  {/* Month/Year Dropdowns - Show when custom */}
+  {datePreset === 'custom' && (
+    <div className="flex gap-2 mb-3">
+      <select
+        value={selectedMonth}
+        onChange={(e) => {
+          const month = parseInt(e.target.value);
+          setSelectedMonth(month);
+          const start = new Date(selectedYear, month - 1, 1);
+          const end = new Date(selectedYear, month, 0);
+          setDateRange({
+            start: formatLocalDateString(start),
+            end: formatLocalDateString(end),
+          });
+        }}
+        className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-indigo-400"
+      >
+        {MONTH_NAMES.map((name, idx) => (
+          <option key={idx} value={idx + 1}>{name}</option>
+        ))}
+      </select>
+
+      <select
+        value={selectedYear}
+        onChange={(e) => {
+          const year = parseInt(e.target.value);
+          setSelectedYear(year);
+          const start = new Date(year, selectedMonth - 1, 1);
+          const end = new Date(year, selectedMonth, 0);
+          setDateRange({
+            start: formatLocalDateString(start),
+            end: formatLocalDateString(end),
+          });
+        }}
+        className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-indigo-400"
+      >
+        {getYearOptions().map((year) => (
+          <option key={year} value={year}>{year}</option>
+        ))}
+      </select>
+    </div>
+  )}
+
+  {/* Show selected range */}
+  <p className="text-xs text-gray-500 text-center">
+    📅 {formatDate(dateRange.start)} - {formatDate(dateRange.end)}
+  </p>
+</div>
 
       {/* Filters */}
       <div className="flex gap-2 overflow-x-auto pb-1">
@@ -944,7 +1011,7 @@ export default function AdminDashboard({ user, onLogout }) {
                             Activity by Date
                           </h4>
                           <div className="space-y-3 max-h-64 overflow-y-auto">
-                            {groupActivitiesByDate(studentDetail.recentActivity).slice(0, 15).map((dayGroup, idx) => (
+                            {groupActivitiesByDate(studentDetail.recentActivity).map((dayGroup, idx) => (
                               <div key={idx} className="bg-white rounded-xl p-3 border-2 border-gray-200 shadow-sm">
                                 {/* Date Header */}
                                 <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100">
