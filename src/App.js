@@ -108,7 +108,7 @@ export default function App() {
               <BookOpen className="w-8 h-8 text-orange-500" />
             </div>
             <h1 className="text-2xl font-bold mb-1">પ્રણામ</h1>
-            <p className="text-orange-100 text-sm">શ્રી શોંચીન્તામણી વસુપૂજ્યસ્વામી જૈન પાઠશાળા</p>
+            <p className="text-orange-100 text-sm">શ્રી સોમચીન્તામણી વસુપૂજ્યસ્વામી જૈન પાઠશાળા</p>
           </div>
 
           {/* Toggle Buttons */}
@@ -206,7 +206,7 @@ export default function App() {
         </div>
         
         <p className="text-center text-gray-400 text-xs mt-4">
-          © આદિનાથ પાર્શ્વનાથ જૈન સંઘ
+          © 2025 આદિનાથ પાર્શ્વનાથ જૈન સંઘ
         </p>
       </div>
     </div>
