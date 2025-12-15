@@ -63,7 +63,7 @@ const formatLocalDateString = (input = new Date()) => {
   return `${y}-${m}-${d}`;
 };
 
-const getDateRangePreset = (preset) => {
+const getDateRangePreset = (preset, selectedMonth, selectedYear) => {
   const today = new Date();
 
   switch (preset) {
@@ -80,11 +80,12 @@ const getDateRangePreset = (preset) => {
         end: formatLocalDateString(today),
       };
     case 'month':
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      // Use selected month/year for custom month selection
+      const monthStart = new Date(selectedYear, selectedMonth - 1, 1);
+      const monthEnd = new Date(selectedYear, selectedMonth, 0);
       return {
-        start: formatLocalDateString(startOfMonth),
-        end: formatLocalDateString(endOfMonth),
+        start: formatLocalDateString(monthStart),
+        end: formatLocalDateString(monthEnd),
       };
     case 'lastMonth':
       const startLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
@@ -94,18 +95,28 @@ const getDateRangePreset = (preset) => {
         end: formatLocalDateString(endLastMonth),
       };
     case 'year':
-      const startOfYear = new Date(today.getFullYear(), 0, 1);
+      // Use selected year for custom year selection
+      const yearStart = new Date(selectedYear, 0, 1);
+      const yearEnd = new Date(selectedYear, 11, 31);
       return {
-        start: formatLocalDateString(startOfYear),
-        end: formatLocalDateString(today),
+        start: formatLocalDateString(yearStart),
+        end: formatLocalDateString(yearEnd),
       };
     case 'all':
       return {
         start: '2020-01-01',
         end: '2099-12-31',
       };
+    case 'custom':
+      // Custom uses selected month and year
+      const customStart = new Date(selectedYear, selectedMonth - 1, 1);
+      const customEnd = new Date(selectedYear, selectedMonth, 0);
+      return {
+        start: formatLocalDateString(customStart),
+        end: formatLocalDateString(customEnd),
+      };
     default:
-      return getDateRangePreset('month');
+      return getDateRangePreset('month', selectedMonth, selectedYear);
   }
 };
 
@@ -160,8 +171,12 @@ export default function AdminDashboard({ user, onLogout }) {
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentDetail, setStudentDetail] = useState(null);
-  const [dateRange, setDateRange] = useState(getDateRangePreset('month')); // Changed to month
-  const [datePreset, setDatePreset] = useState('month'); // Changed to month
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [datePreset, setDatePreset] = useState('month');
+  const [dateRange, setDateRange] = useState(() => 
+    getDateRangePreset('month', new Date().getMonth() + 1, new Date().getFullYear())
+  );
   const [topStudents, setTopStudents] = useState({ topAttendance: [], topGatha: [] });
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name');
@@ -169,8 +184,8 @@ export default function AdminDashboard({ user, onLogout }) {
   const [studentFilter, setStudentFilter] = useState('all');
   const [approvalFilter, setApprovalFilter] = useState('all');
   const [detailLoading, setDetailLoading] = useState(false);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [showYearPicker, setShowYearPicker] = useState(false);
 
   // Fetch pending data and stats
   const fetchPendingData = useCallback(async () => {
@@ -222,12 +237,13 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   }, [dateRange]);
 
-  // Fetch top students
+  // Fetch top students - ONLY NEW GATHAS
   const fetchTopStudents = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
+      // Add gathaType=new to only fetch new gathas for leaderboard
       const res = await fetch(
-        `${API_BASE}/admin/top-students?startDate=${dateRange.start}&endDate=${dateRange.end}&limit=5`,
+        `${API_BASE}/admin/top-students?startDate=${dateRange.start}&endDate=${dateRange.end}&limit=5&gathaType=new`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
@@ -239,13 +255,14 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   }, [dateRange]);
 
-  // Fetch single student details
+  // Fetch single student details - with proper date range
   const fetchStudentDetail = useCallback(async (studentId) => {
     const token = localStorage.getItem('jainPathshalaToken');
     setDetailLoading(true);
     try {
+      // Make sure we're using the correct date range
       const res = await fetch(
-        `${API_BASE}/admin/student/${studentId}/activity?startDate=${dateRange.start}&endDate=${dateRange.end}`,
+        `${API_BASE}/admin/student/${studentId}/activity?startDate=${dateRange.start}&endDate=${dateRange.end}&limit=500`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.ok) {
@@ -270,7 +287,7 @@ export default function AdminDashboard({ user, onLogout }) {
     fetchTopStudents();
   }, [fetchStudents, fetchTopStudents]);
 
-  // Fetch student detail when selected
+  // Fetch student detail when selected or date range changes
   useEffect(() => {
     if (selectedStudent) {
       fetchStudentDetail(selectedStudent);
@@ -279,12 +296,43 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   }, [selectedStudent, fetchStudentDetail]);
 
-  // Update date range when preset changes
+  // Update date range when preset or month/year changes
   useEffect(() => {
-    if (datePreset !== 'custom') {
-      setDateRange(getDateRangePreset(datePreset));
+    setDateRange(getDateRangePreset(datePreset, selectedMonth, selectedYear));
+  }, [datePreset, selectedMonth, selectedYear]);
+
+  // Handle month selection
+  const handleMonthChange = (month) => {
+    setSelectedMonth(month);
+    setDatePreset('custom');
+    setShowMonthPicker(false);
+  };
+
+  // Handle year selection
+  const handleYearChange = (year) => {
+    setSelectedYear(year);
+    if (datePreset === 'year') {
+      // Keep year preset but update the year
+    } else {
+      setDatePreset('custom');
     }
-  }, [datePreset]);
+    setShowYearPicker(false);
+  };
+
+  // Handle preset change
+  const handlePresetChange = (preset) => {
+    setDatePreset(preset);
+    if (preset === 'month') {
+      setShowMonthPicker(true);
+      setShowYearPicker(false);
+    } else if (preset === 'year') {
+      setShowMonthPicker(false);
+      setShowYearPicker(true);
+    } else {
+      setShowMonthPicker(false);
+      setShowYearPicker(false);
+    }
+  };
 
   // Approval handlers
   const handleApprove = async (type, id) => {
@@ -402,10 +450,12 @@ export default function AdminDashboard({ user, onLogout }) {
       } else if (sortBy === 'attendance') {
         return (b.attendance_count || 0) - (a.attendance_count || 0);
       } else if (sortBy === 'gatha') {
-        return (b.new_gathas || b.total_gathas || 0) - (a.new_gathas || a.total_gathas || 0);
+        // Sort by NEW gathas only
+        return (b.new_gathas || 0) - (a.new_gathas || 0);
       } else if (sortBy === 'total') {
-        const totalA = (a.attendance_count || 0) + (a.new_gathas || a.total_gathas || 0);
-        const totalB = (b.attendance_count || 0) + (b.new_gathas || b.total_gathas || 0);
+        // Only count new gathas in total
+        const totalA = (a.attendance_count || 0) + (a.new_gathas || 0);
+        const totalB = (b.attendance_count || 0) + (b.new_gathas || 0);
         return totalB - totalA;
       }
       return 0;
@@ -415,18 +465,105 @@ export default function AdminDashboard({ user, onLogout }) {
   const filteredPendingAttendance = approvalFilter === 'gatha' ? [] : pendingData.attendance;
   const filteredPendingGatha = approvalFilter === 'attendance' ? [] : pendingData.gatha;
 
-  // Calculate stats
+  // Calculate stats - ONLY NEW GATHAS
   const activeStudentsCount = students.filter(s => 
-    (s.attendance_count || 0) + (s.new_gathas || s.total_gathas || 0) > 0
+    (s.attendance_count || 0) + (s.new_gathas || 0) > 0
   ).length;
   
   const totalAttendanceCount = students.reduce((sum, s) => sum + (s.attendance_count || 0), 0);
+  // Only count NEW gathas
   const totalNewGathaCount = students.reduce((sum, s) => sum + (s.new_gathas || 0), 0);
-  const totalGathaCount = students.reduce((sum, s) => sum + (s.total_gathas || 0), 0);
 
   const attendanceRate = students.length > 0 
     ? Math.round((stats?.today_attendance || 0) / students.length * 100)
     : 0;
+
+  // ==================== RENDER DATE PICKER COMPONENT ====================
+  const renderDatePicker = () => (
+    <div className="bg-white rounded-xl p-3 border-2 border-indigo-200 shadow-sm">
+      <p className="text-xs font-bold text-gray-600 mb-2 flex items-center gap-2">
+        <CalendarDays className="w-4 h-4" />
+        Date Range
+      </p>
+      
+      {/* Quick Presets */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        {[
+          { key: 'today', label: 'Today' },
+          { key: 'week', label: 'Week' },
+          { key: 'month', label: '📅 Month' },
+          { key: 'year', label: '📆 Year' },
+          { key: 'all', label: 'All Time' },
+        ].map((preset) => (
+          <button
+            key={preset.key}
+            onClick={() => handlePresetChange(preset.key)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              datePreset === preset.key || 
+              (datePreset === 'custom' && (preset.key === 'month' || preset.key === 'year'))
+                ? 'bg-indigo-500 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Month Picker Dropdown */}
+      {(showMonthPicker || datePreset === 'custom' || datePreset === 'month') && (
+        <div className="mb-3 p-3 bg-indigo-50 rounded-xl border-2 border-indigo-200">
+          <p className="text-xs font-bold text-indigo-700 mb-2">📅 Select Month & Year</p>
+          <div className="flex gap-2">
+            <select
+              value={selectedMonth}
+              onChange={(e) => handleMonthChange(parseInt(e.target.value))}
+              className="flex-1 px-3 py-2 border-2 border-indigo-300 rounded-xl text-sm font-bold focus:outline-none focus:border-indigo-500 bg-white"
+            >
+              {MONTH_NAMES.map((name, idx) => (
+                <option key={idx} value={idx + 1}>{name}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedYear}
+              onChange={(e) => handleYearChange(parseInt(e.target.value))}
+              className="px-3 py-2 border-2 border-indigo-300 rounded-xl text-sm font-bold focus:outline-none focus:border-indigo-500 bg-white"
+            >
+              {getYearOptions().map((year) => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Year Picker Dropdown */}
+      {(showYearPicker || datePreset === 'year') && !showMonthPicker && datePreset !== 'custom' && datePreset !== 'month' && (
+        <div className="mb-3 p-3 bg-green-50 rounded-xl border-2 border-green-200">
+          <p className="text-xs font-bold text-green-700 mb-2">📆 Select Year</p>
+          <select
+            value={selectedYear}
+            onChange={(e) => handleYearChange(parseInt(e.target.value))}
+            className="w-full px-3 py-2 border-2 border-green-300 rounded-xl text-sm font-bold focus:outline-none focus:border-green-500 bg-white"
+          >
+            {getYearOptions().map((year) => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Show selected range */}
+      <div className="bg-gray-100 rounded-lg p-2 text-center">
+        <p className="text-xs text-gray-600">
+          📅 <span className="font-bold">{formatDate(dateRange.start)}</span>
+          {' → '}
+          <span className="font-bold">{formatDate(dateRange.end)}</span>
+        </p>
+      </div>
+    </div>
+  );
 
   // ==================== RENDER FUNCTIONS ====================
 
@@ -495,10 +632,10 @@ export default function AdminDashboard({ user, onLogout }) {
           <div className="flex items-center justify-between mb-2">
             <BookOpen className="w-8 h-8 text-purple-500" />
             <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-bold">
-              ✨ New
+              ✨ New Only
             </span>
           </div>
-          <p className="text-3xl font-bold text-gray-800">{totalNewGathaCount || totalGathaCount}</p>
+          <p className="text-3xl font-bold text-gray-800">{totalNewGathaCount}</p>
           <p className="text-xs text-gray-500 mt-1">New Gathas (This Month)</p>
         </div>
 
@@ -522,7 +659,7 @@ export default function AdminDashboard({ user, onLogout }) {
         </button>
       </div>
 
-      {/* Top Performers */}
+      {/* Top Performers - ONLY NEW GATHAS */}
       <div className="bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -554,18 +691,22 @@ export default function AdminDashboard({ user, onLogout }) {
 
           <div className="relative bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-300 rounded-xl p-4 overflow-hidden">
             <div className="absolute top-2 right-2 text-3xl">📚</div>
-            <p className="text-xs font-bold text-purple-800 mb-1">New Gatha Master</p>
+            <p className="text-xs font-bold text-purple-800 mb-1">✨ New Gatha Master</p>
             <p className="text-lg font-bold text-gray-800 truncate pr-8">
               {topStudents.topGatha?.[0]?.name || 'N/A'}
             </p>
             <div className="flex items-center gap-1 mt-2">
-              <BookOpen className="w-4 h-4 text-purple-600" />
+              <Star className="w-4 h-4 text-purple-600" />
               <span className="text-sm font-bold text-purple-700">
                 {topStudents.topGatha?.[0]?.count || 0} new
               </span>
             </div>
           </div>
         </div>
+        
+        <p className="text-xs text-gray-400 text-center mt-2">
+          * Gatha leaderboard counts NEW gathas only (not revisions)
+        </p>
       </div>
 
       {/* Quick Navigation */}
@@ -792,82 +933,8 @@ export default function AdminDashboard({ user, onLogout }) {
         </div>
       </div>
 
-      {/* Date Range for Students */}
-<div className="bg-white rounded-xl p-3 border-2 border-indigo-200 shadow-sm">
-  <p className="text-xs font-bold text-gray-600 mb-2">📅 Date Range</p>
-  
-  {/* Quick Presets */}
-  <div className="flex flex-wrap gap-2 mb-3">
-    {[
-      { key: 'today', label: 'Today' },
-      { key: 'week', label: 'Week' },
-      { key: 'month', label: 'Month' },
-      { key: 'year', label: 'Year' },
-      { key: 'all', label: 'All' },
-      { key: 'custom', label: '📅 Custom' },
-    ].map((preset) => (
-      <button
-        key={preset.key}
-        onClick={() => setDatePreset(preset.key)}
-        className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
-          datePreset === preset.key
-            ? 'bg-indigo-500 text-white'
-            : 'bg-gray-100 text-gray-600'
-        }`}
-      >
-        {preset.label}
-      </button>
-    ))}
-  </div>
-
-  {/* Month/Year Dropdowns - Show when custom */}
-  {datePreset === 'custom' && (
-    <div className="flex gap-2 mb-3">
-      <select
-        value={selectedMonth}
-        onChange={(e) => {
-          const month = parseInt(e.target.value);
-          setSelectedMonth(month);
-          const start = new Date(selectedYear, month - 1, 1);
-          const end = new Date(selectedYear, month, 0);
-          setDateRange({
-            start: formatLocalDateString(start),
-            end: formatLocalDateString(end),
-          });
-        }}
-        className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-indigo-400"
-      >
-        {MONTH_NAMES.map((name, idx) => (
-          <option key={idx} value={idx + 1}>{name}</option>
-        ))}
-      </select>
-
-      <select
-        value={selectedYear}
-        onChange={(e) => {
-          const year = parseInt(e.target.value);
-          setSelectedYear(year);
-          const start = new Date(year, selectedMonth - 1, 1);
-          const end = new Date(year, selectedMonth, 0);
-          setDateRange({
-            start: formatLocalDateString(start),
-            end: formatLocalDateString(end),
-          });
-        }}
-        className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-indigo-400"
-      >
-        {getYearOptions().map((year) => (
-          <option key={year} value={year}>{year}</option>
-        ))}
-      </select>
-    </div>
-  )}
-
-  {/* Show selected range */}
-  <p className="text-xs text-gray-500 text-center">
-    📅 {formatDate(dateRange.start)} - {formatDate(dateRange.end)}
-  </p>
-</div>
+      {/* Date Range Picker */}
+      {renderDatePicker()}
 
       {/* Filters */}
       <div className="flex gap-2 overflow-x-auto pb-1">
@@ -893,7 +960,7 @@ export default function AdminDashboard({ user, onLogout }) {
         {[
           { key: 'name', label: 'A-Z', icon: '🔤' },
           { key: 'attendance', label: 'Days', icon: '📅' },
-          { key: 'gatha', label: 'Gatha', icon: '✨' },
+          { key: 'gatha', label: 'New ✨', icon: '📖' },
           { key: 'total', label: 'Total', icon: '⭐' },
         ].map((option) => (
           <button
@@ -916,7 +983,8 @@ export default function AdminDashboard({ user, onLogout }) {
       {/* Students List */}
       <div className="space-y-3">
         {filteredStudents.map((student, index) => {
-          const newGathas = student.new_gathas || student.total_gathas || 0;
+          // Only use NEW gathas for badge
+          const newGathas = student.new_gathas || 0;
           const badge = getPerformanceBadge(student.attendance_count, newGathas);
           
           return (
@@ -958,7 +1026,7 @@ export default function AdminDashboard({ user, onLogout }) {
                     </div>
                     <div className="text-center">
                       <p className="text-lg font-bold text-purple-600">{newGathas}</p>
-                      <p className="text-xs text-gray-400">New</p>
+                      <p className="text-xs text-gray-400">New ✨</p>
                     </div>
                     {expandedStudent === student.id ? (
                       <ChevronUp className="w-5 h-5 text-gray-400" />
@@ -978,7 +1046,7 @@ export default function AdminDashboard({ user, onLogout }) {
                     </div>
                   ) : studentDetail ? (
                     <>
-                      {/* Summary Stats */}
+                      {/* Summary Stats - ONLY NEW GATHAS */}
                       <div className="grid grid-cols-3 gap-2 mb-4">
                         <div className="bg-white rounded-xl p-3 border-2 border-green-200 text-center">
                           <Calendar className="w-5 h-5 text-green-500 mx-auto mb-1" />
@@ -992,7 +1060,7 @@ export default function AdminDashboard({ user, onLogout }) {
                           <p className="text-xl font-bold text-purple-600">
                             {studentDetail.gathaStats?.new || 0}
                           </p>
-                          <p className="text-xs text-gray-500">New</p>
+                          <p className="text-xs text-gray-500">New ✨</p>
                         </div>
                         <div className="bg-white rounded-xl p-3 border-2 border-blue-200 text-center">
                           <RefreshCw className="w-5 h-5 text-blue-500 mx-auto mb-1" />
@@ -1003,14 +1071,21 @@ export default function AdminDashboard({ user, onLogout }) {
                         </div>
                       </div>
 
+                      {/* Total Activity Count */}
+                      <div className="bg-white rounded-xl p-3 border-2 border-gray-200 mb-4">
+                        <p className="text-sm text-center text-gray-600">
+                          📊 Total activities in range: <span className="font-bold text-indigo-600">{studentDetail.recentActivity?.length || 0}</span>
+                        </p>
+                      </div>
+
                       {/* Activity Grouped by Date */}
                       {studentDetail.recentActivity && studentDetail.recentActivity.length > 0 && (
                         <div>
                           <h4 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
                             <Activity className="w-4 h-4" />
-                            Activity by Date
+                            Activity by Date ({groupActivitiesByDate(studentDetail.recentActivity).length} days)
                           </h4>
-                          <div className="space-y-3 max-h-64 overflow-y-auto">
+                          <div className="space-y-3 max-h-80 overflow-y-auto">
                             {groupActivitiesByDate(studentDetail.recentActivity).map((dayGroup, idx) => (
                               <div key={idx} className="bg-white rounded-xl p-3 border-2 border-gray-200 shadow-sm">
                                 {/* Date Header */}
@@ -1084,7 +1159,12 @@ export default function AdminDashboard({ user, onLogout }) {
                       )}
 
                       {(!studentDetail.recentActivity || studentDetail.recentActivity.length === 0) && (
-                        <p className="text-center text-gray-500 py-4 text-sm">No recent activity</p>
+                        <div className="text-center py-4">
+                          <p className="text-gray-500 text-sm">No activity in selected date range</p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Try selecting a different date range
+                          </p>
+                        </div>
                       )}
                     </>
                   ) : (
@@ -1108,45 +1188,19 @@ export default function AdminDashboard({ user, onLogout }) {
 
   const renderAnalytics = () => (
     <div className="space-y-4">
-      {/* Date Range Presets */}
-      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-          <CalendarDays className="w-4 h-4" />
-          Date Range
-        </h3>
-        
-        <div className="flex flex-wrap gap-2 mb-3">
-          {[
-            { key: 'today', label: 'Today' },
-            { key: 'week', label: 'This Week' },
-            { key: 'month', label: 'This Month' },
-            { key: 'year', label: 'This Year' },
-            { key: 'all', label: 'All Time' },
-          ].map((preset) => (
-            <button
-              key={preset.key}
-              onClick={() => setDatePreset(preset.key)}
-              className={`px-3 py-2 rounded-lg text-xs font-bold ${
-                datePreset === preset.key
-                  ? 'bg-indigo-500 text-white'
-                  : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
+      {/* Date Range Picker */}
+      {renderDatePicker()}
 
-        <button
-          onClick={() => { fetchStudents(); fetchTopStudents(); }}
-          className="w-full bg-indigo-500 text-white py-2 rounded-lg active:scale-[0.98] text-sm font-bold flex items-center justify-center gap-2"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh Data
-        </button>
-      </div>
+      {/* Refresh Button */}
+      <button
+        onClick={() => { fetchStudents(); fetchTopStudents(); }}
+        className="w-full bg-indigo-500 text-white py-3 rounded-xl active:scale-[0.98] text-sm font-bold flex items-center justify-center gap-2"
+      >
+        <RefreshCw className="w-4 h-4" />
+        Refresh Data
+      </button>
 
-      {/* Summary Stats */}
+      {/* Summary Stats - ONLY NEW GATHAS */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl p-4 text-white shadow-lg">
           <Calendar className="w-8 h-8 mb-2 opacity-80" />
@@ -1155,17 +1209,17 @@ export default function AdminDashboard({ user, onLogout }) {
         </div>
 
         <div className="bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl p-4 text-white shadow-lg">
-          <BookOpen className="w-8 h-8 mb-2 opacity-80" />
-          <p className="text-3xl font-bold">{totalNewGathaCount || totalGathaCount}</p>
-          <p className="text-xs opacity-80">New Gathas</p>
+          <Star className="w-8 h-8 mb-2 opacity-80" />
+          <p className="text-3xl font-bold">{totalNewGathaCount}</p>
+          <p className="text-xs opacity-80">✨ New Gathas Only</p>
         </div>
 
         <div className="bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl p-4 text-white shadow-lg">
           <TrendingUp className="w-8 h-8 mb-2 opacity-80" />
           <p className="text-3xl font-bold">
-            {students.length > 0 ? Math.round((totalNewGathaCount || totalGathaCount) / students.length) : 0}
+            {students.length > 0 ? (totalNewGathaCount / students.length).toFixed(1) : 0}
           </p>
-          <p className="text-xs opacity-80">Avg Gathas/Student</p>
+          <p className="text-xs opacity-80">Avg New/Student</p>
         </div>
 
         <div className="bg-gradient-to-br from-orange-400 to-red-500 rounded-xl p-4 text-white shadow-lg">
@@ -1209,11 +1263,12 @@ export default function AdminDashboard({ user, onLogout }) {
         </div>
       </div>
 
-      {/* Top 5 Students - New Gatha */}
+      {/* Top 5 Students - NEW Gatha Only */}
       <div className="bg-white rounded-xl p-4 border-2 border-purple-200 shadow-sm">
         <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-          ✨ Top 5 - New Gathas
+          ✨ Top 5 - New Gathas Only
         </h3>
+        <p className="text-xs text-gray-500 mb-3">* Revision gathas are NOT counted</p>
         <div className="space-y-2">
           {topStudents.topGatha?.slice(0, 5).map((student, index) => {
             const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
@@ -1232,7 +1287,7 @@ export default function AdminDashboard({ user, onLogout }) {
                   <span className="font-bold text-gray-800">{student.name}</span>
                 </div>
                 <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-bold text-sm">
-                  {student.count} new
+                  {student.count} new ✨
                 </span>
               </div>
             );
@@ -1290,7 +1345,7 @@ export default function AdminDashboard({ user, onLogout }) {
           </div>
         )}
 
-        {/* Navigation Tabs - PENDING MOVED TO LAST */}
+        {/* Navigation Tabs */}
         <div className="grid grid-cols-4 gap-2 mb-4">
           {[
             { key: 'overview', icon: BarChart3, label: 'Home' },
