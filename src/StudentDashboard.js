@@ -74,13 +74,28 @@ const QUOTES = [
   { text: "મહેનત નો કોઈ વિકલ્પ નથી", meaning: "There is no substitute for hard work", emoji: "⭐", lang: "Gujarati" },
 ];
 
+// Tips icon color classes (static mapping to avoid dynamic class issues)
+const TIP_ICON_COLORS = {
+  blue: 'text-blue-500',
+  purple: 'text-purple-500',
+  yellow: 'text-yellow-500',
+  orange: 'text-orange-500',
+};
+
 // Tips for new users
 const HELPFUL_TIPS = [
-  { icon: Calendar, text: "Tap the blue button to mark your attendance daily", color: "blue" },
-  { icon: BookOpen, text: "Record your gatha learning with the purple button", color: "purple" },
-  { icon: Trophy, text: "Check Stats to see your achievements and progress", color: "yellow" },
-  { icon: Clock, text: "Pending tab shows items waiting for teacher approval", color: "orange" },
+  { icon: Calendar, tipText: "Tap the blue button to mark your attendance daily", color: "blue" },
+  { icon: BookOpen, tipText: "Record your gatha learning with the purple button", color: "purple" },
+  { icon: Trophy, tipText: "Check Stats to see your achievements and progress", color: "yellow" },
+  { icon: Clock, tipText: "Pending tab shows items waiting for teacher approval", color: "orange" },
 ];
+
+const TIP_ICON_COLORS = {
+  blue: 'text-blue-500',
+  purple: 'text-purple-500',
+  yellow: 'text-yellow-500',
+  orange: 'text-orange-500',
+};
 
 // ============================================
 // HELPER UTILITIES
@@ -2023,30 +2038,35 @@ useEffect(() => {
       </button>
 
       {/* Tips for new users */}
-      {showTips && (
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <HelpCircle className="w-5 h-5 text-blue-500" />
-              <span className="font-bold text-blue-800">Quick Tips</span>
-            </div>
-            <button
-              onClick={() => setShowTips(false)}
-              className="text-blue-400 p-1"
-            >
-              <CloseIcon size={18} />
-            </button>
+     {/* Tips for new users */}
+{showTips && (
+  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2">
+        <HelpCircle className="w-5 h-5 text-blue-500" />
+        <span className="font-bold text-blue-800">Quick Tips</span>
+      </div>
+      <button
+        onClick={() => setShowTips(false)}
+        className="text-blue-400 p-1"
+      >
+        <CloseIcon size={18} />
+      </button>
+    </div>
+    <div className="grid grid-cols-2 gap-2">
+      {HELPFUL_TIPS.map((tip, i) => {
+        const TipIcon = tip.icon;
+        const iconColorClass = TIP_ICON_COLORS[tip.color] || 'text-gray-500';
+        return (
+          <div key={i} className="flex items-start gap-2 bg-white p-2 rounded-lg">
+            <TipIcon className={`w-4 h-4 ${iconColorClass} flex-shrink-0 mt-0.5`} />
+            <span className="text-xs text-gray-600">{tip.tipText}</span>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            {HELPFUL_TIPS.map((tip, i) => (
-              <div key={i} className="flex items-start gap-2 bg-white p-2 rounded-lg">
-                <tip.icon className={`w-4 h-4 text-${tip.color}-500 flex-shrink-0 mt-0.5`} />
-                <span className="text-xs text-gray-600">{tip.text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        );
+      })}
+    </div>
+  </div>
+)}
 
       {/* Streak Card */}
       <StreakDisplay streak={currentStreak} maxStreak={maxStreak} />
