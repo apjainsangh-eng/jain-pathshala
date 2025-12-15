@@ -1,11 +1,3 @@
-# Updated Admin Dashboard with Custom Date Selection & Export Feature
-
-Here's the complete updated code with:
-1. **Custom date range picker** (From date - To date)
-2. **Mobile-optimized design**
-3. **Export report feature** (PDF/CSV style report)
-
-```jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   BookOpen,
@@ -37,9 +29,14 @@ import {
   Share2,
   Copy,
   CheckCheck,
+  Filter,
 } from 'lucide-react';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.vercel.app/api';
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
 
 const formatDate = (dateStr) => {
   if (!dateStr) return '';
@@ -169,6 +166,10 @@ const groupActivitiesByDate = (activities) => {
   );
 };
 
+// ============================================
+// MAIN COMPONENT
+// ============================================
+
 export default function AdminDashboard({ user, onLogout }) {
   // ============ STATE VARIABLES ============
   const [pendingData, setPendingData] = useState({ attendance: [], gatha: [] });
@@ -208,6 +209,8 @@ export default function AdminDashboard({ user, onLogout }) {
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportCopied, setExportCopied] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportData, setExportData] = useState(null);
+  const [exportLoading, setExportLoading] = useState(false);
 
   // ============ EFFECTS ============
   
@@ -234,6 +237,7 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   }, [datePreset, selectedMonth, selectedYear, customStartDate, customEndDate]);
 
+  // Fetch pending data
   const fetchPendingData = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     setIsLoading(true);
@@ -266,6 +270,7 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   }, []);
 
+  // Fetch students with stats
   const fetchStudents = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
@@ -282,6 +287,7 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   }, [dateRange]);
 
+  // Fetch top students
   const fetchTopStudents = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
@@ -298,6 +304,7 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   }, [dateRange]);
 
+  // Fetch student detail
   const fetchStudentDetail = useCallback(async (studentId) => {
     const token = localStorage.getItem('jainPathshalaToken');
     setDetailLoading(true);
@@ -317,6 +324,26 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   }, [dateRange]);
 
+  // Fetch export data from API
+  const fetchExportData = useCallback(async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    setExportLoading(true);
+    try {
+      const res = await fetch(
+        `${API_BASE}/admin/export-report?startDate=${dateRange.start}&endDate=${dateRange.end}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setExportData(data);
+      }
+    } catch (err) {
+      console.error('Error fetching export data:', err);
+    } finally {
+      setExportLoading(false);
+    }
+  }, [dateRange]);
+
   useEffect(() => {
     fetchPendingData();
   }, [fetchPendingData]);
@@ -333,6 +360,13 @@ export default function AdminDashboard({ user, onLogout }) {
       setStudentDetail(null);
     }
   }, [selectedStudent, fetchStudentDetail]);
+
+  // Fetch export data when modal opens
+  useEffect(() => {
+    if (showExportModal) {
+      fetchExportData();
+    }
+  }, [showExportModal, fetchExportData]);
 
   // ============ HANDLERS ============
   
@@ -430,62 +464,70 @@ export default function AdminDashboard({ user, onLogout }) {
 
   // ============ EXPORT FUNCTIONS ============
   
-  const generateReportData = () => {
-    const sortedStudents = [...students].sort((a, b) => 
-      (a.name || '').localeCompare(b.name || '')
-    );
-
-    return sortedStudents.map((student, index) => ({
-      rank: index + 1,
-      name: student.name || student.username,
-      attendance: student.attendance_count || 0,
-      newGathas: student.new_gathas || 0,
-      total: (student.attendance_count || 0) + (student.new_gathas || 0)
-    }));
-  };
-
   const generateTextReport = () => {
-    const reportData = generateReportData();
-    const dateRangeText = `${formatDate(dateRange.start)} to ${formatDate(dateRange.end)}`;
+    if (!exportData) return '';
+    
+    const { students: reportStudents, summary, topPerformers } = exportData;
     
     let report = `📊 JAIN PATHSHALA REPORT\n`;
     report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    report += `📅 Period: ${dateRangeText}\n`;
-    report += `👥 Total Students: ${students.length}\n`;
-    report += `📈 Total Attendance: ${totalAttendanceCount}\n`;
-    report += `✨ Total New Gathas: ${totalNewGathaCount}\n`;
+    report += `📅 Period: ${formatDate(dateRange.start)} to ${formatDate(dateRange.end)}\n`;
+    report += `👥 Total Students: ${summary.totalStudents}\n`;
+    report += `✅ Active Students: ${summary.activeStudents}\n`;
+    report += `📈 Total Attendance: ${summary.totalAttendance}\n`;
+    report += `✨ Total New Gathas: ${summary.totalNewGathas}\n`;
+    report += `🔄 Total Revisions: ${summary.totalRevisionGathas}\n`;
     report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-    report += `STUDENT-WISE DETAILS:\n`;
+    
+    report += `🏆 TOP PERFORMERS\n`;
+    report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    report += `\n📅 By Attendance:\n`;
+    topPerformers.byAttendance.slice(0, 5).forEach((s, i) => {
+      report += `  ${i + 1}. ${s.name} - ${s.attendanceCount} days\n`;
+    });
+    
+    report += `\n✨ By New Gathas:\n`;
+    topPerformers.byGatha.slice(0, 5).forEach((s, i) => {
+      report += `  ${i + 1}. ${s.name} - ${s.newGathas} gathas\n`;
+    });
+    
+    report += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    report += `STUDENT-WISE DETAILS (A-Z):\n`;
     report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-    reportData.forEach((student, idx) => {
+    reportStudents.forEach((student, idx) => {
       report += `${idx + 1}. ${student.name}\n`;
-      report += `   📅 Attendance: ${student.attendance} days\n`;
+      report += `   📅 Attendance: ${student.attendanceCount} days\n`;
       report += `   ✨ New Gathas: ${student.newGathas}\n`;
-      report += `   ⭐ Total Score: ${student.total}\n\n`;
+      report += `   🔄 Revisions: ${student.revisionGathas}\n`;
+      report += `   ⭐ Total Score: ${student.totalScore}\n\n`;
     });
 
     report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    report += `Generated on: ${new Date().toLocaleString('en-IN')}\n`;
+    report += `Generated: ${new Date().toLocaleString('en-IN')}\n`;
     report += `Jai Jinendra! 🙏\n`;
 
     return report;
   };
 
   const generateCSVReport = () => {
-    const reportData = generateReportData();
-    const dateRangeText = `${formatDate(dateRange.start)} to ${formatDate(dateRange.end)}`;
+    if (!exportData) return '';
     
-    let csv = `Jain Pathshala Report - ${dateRangeText}\n\n`;
-    csv += `S.No,Name,Attendance (Days),New Gathas,Total Score\n`;
+    const { students: reportStudents, summary } = exportData;
+    
+    let csv = `Jain Pathshala Report - ${formatDate(dateRange.start)} to ${formatDate(dateRange.end)}\n\n`;
+    csv += `S.No,Name,Username,Attendance (Days),New Gathas,Revision Gathas,Total Gathas,Total Score\n`;
 
-    reportData.forEach((student) => {
-      csv += `${student.rank},"${student.name}",${student.attendance},${student.newGathas},${student.total}\n`;
+    reportStudents.forEach((student, index) => {
+      csv += `${index + 1},"${student.name}","${student.username}",${student.attendanceCount},${student.newGathas},${student.revisionGathas},${student.totalGathas},${student.totalScore}\n`;
     });
 
-    csv += `\nTotal Students,${students.length}\n`;
-    csv += `Total Attendance,${totalAttendanceCount}\n`;
-    csv += `Total New Gathas,${totalNewGathaCount}\n`;
+    csv += `\n\nSUMMARY\n`;
+    csv += `Total Students,${summary.totalStudents}\n`;
+    csv += `Active Students,${summary.activeStudents}\n`;
+    csv += `Total Attendance,${summary.totalAttendance}\n`;
+    csv += `Total New Gathas,${summary.totalNewGathas}\n`;
+    csv += `Total Revision Gathas,${summary.totalRevisionGathas}\n`;
 
     return csv;
   };
@@ -557,6 +599,39 @@ export default function AdminDashboard({ user, onLogout }) {
     }, 500);
   };
 
+  // Download directly from API
+  const downloadFromAPI = async (format) => {
+    setIsExporting(true);
+    const token = localStorage.getItem('jainPathshalaToken');
+    
+    try {
+      const res = await fetch(
+        `${API_BASE}/admin/export-report?startDate=${dateRange.start}&endDate=${dateRange.end}&format=${format}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `pathshala-report-${dateRange.start}-to-${dateRange.end}.${format === 'csv' ? 'csv' : 'txt'}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        setSuccessMessage(`✅ Report downloaded!`);
+        setTimeout(() => setSuccessMessage(''), 3000);
+      }
+    } catch (err) {
+      console.error('Download error:', err);
+      setError('Failed to download report');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // ============ COMPUTED VALUES ============
   
   const totalPending = pendingData.attendance.length + pendingData.gatha.length;
@@ -608,8 +683,6 @@ export default function AdminDashboard({ user, onLogout }) {
   const renderExportModal = () => {
     if (!showExportModal) return null;
 
-    const reportData = generateReportData();
-
     return (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
         <div className="bg-white w-full max-h-[90vh] rounded-t-3xl sm:rounded-2xl sm:max-w-md overflow-hidden animate-slide-up">
@@ -634,108 +707,144 @@ export default function AdminDashboard({ user, onLogout }) {
             </div>
           </div>
 
-          {/* Summary Stats */}
-          <div className="p-4 bg-gray-50 border-b">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-indigo-600">{students.length}</p>
-                <p className="text-xs text-gray-500">Students</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-green-600">{totalAttendanceCount}</p>
-                <p className="text-xs text-gray-500">Attendance</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-purple-600">{totalNewGathaCount}</p>
-                <p className="text-xs text-gray-500">New Gathas</p>
-              </div>
+          {exportLoading ? (
+            <div className="p-8 text-center">
+              <RefreshCw className="w-10 h-10 animate-spin text-indigo-500 mx-auto" />
+              <p className="mt-4 text-gray-600">Loading report data...</p>
             </div>
-          </div>
+          ) : exportData ? (
+            <>
+              {/* Summary Stats */}
+              <div className="p-4 bg-gray-50 border-b">
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-indigo-600">{exportData.summary.totalStudents}</p>
+                    <p className="text-xs text-gray-500">Students</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-blue-600">{exportData.summary.activeStudents}</p>
+                    <p className="text-xs text-gray-500">Active</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-green-600">{exportData.summary.totalAttendance}</p>
+                    <p className="text-xs text-gray-500">📅 Days</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-purple-600">{exportData.summary.totalNewGathas}</p>
+                    <p className="text-xs text-gray-500">✨ Gathas</p>
+                  </div>
+                </div>
+              </div>
 
-          {/* Preview Table */}
-          <div className="max-h-60 overflow-y-auto p-4">
-            <p className="text-xs font-bold text-gray-600 mb-2">📋 Preview (Alphabetical)</p>
-            <div className="bg-gray-50 rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-indigo-100">
-                  <tr>
-                    <th className="py-2 px-3 text-left text-xs font-bold text-indigo-700">#</th>
-                    <th className="py-2 px-3 text-left text-xs font-bold text-indigo-700">Name</th>
-                    <th className="py-2 px-3 text-center text-xs font-bold text-indigo-700">📅</th>
-                    <th className="py-2 px-3 text-center text-xs font-bold text-indigo-700">✨</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportData.slice(0, 10).map((student, idx) => (
-                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="py-2 px-3 text-xs text-gray-500">{student.rank}</td>
-                      <td className="py-2 px-3 text-xs font-medium text-gray-800 truncate max-w-[120px]">
-                        {student.name}
-                      </td>
-                      <td className="py-2 px-3 text-center text-xs font-bold text-green-600">
-                        {student.attendance}
-                      </td>
-                      <td className="py-2 px-3 text-center text-xs font-bold text-purple-600">
-                        {student.newGathas}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {reportData.length > 10 && (
-                <p className="text-center text-xs text-gray-400 py-2">
-                  +{reportData.length - 10} more students...
-                </p>
-              )}
-            </div>
-          </div>
+              {/* Preview Table */}
+              <div className="max-h-60 overflow-y-auto p-4">
+                <p className="text-xs font-bold text-gray-600 mb-2">📋 Preview (Alphabetical)</p>
+                <div className="bg-gray-50 rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-indigo-100">
+                      <tr>
+                        <th className="py-2 px-2 text-left text-xs font-bold text-indigo-700">#</th>
+                        <th className="py-2 px-2 text-left text-xs font-bold text-indigo-700">Name</th>
+                        <th className="py-2 px-2 text-center text-xs font-bold text-indigo-700">📅</th>
+                        <th className="py-2 px-2 text-center text-xs font-bold text-indigo-700">✨</th>
+                        <th className="py-2 px-2 text-center text-xs font-bold text-indigo-700">⭐</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {exportData.students.slice(0, 10).map((student, idx) => (
+                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="py-2 px-2 text-xs text-gray-500">{idx + 1}</td>
+                          <td className="py-2 px-2 text-xs font-medium text-gray-800 truncate max-w-[100px]">
+                            {student.name}
+                          </td>
+                          <td className="py-2 px-2 text-center text-xs font-bold text-green-600">
+                            {student.attendanceCount}
+                          </td>
+                          <td className="py-2 px-2 text-center text-xs font-bold text-purple-600">
+                            {student.newGathas}
+                          </td>
+                          <td className="py-2 px-2 text-center text-xs font-bold text-orange-600">
+                            {student.totalScore}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {exportData.students.length > 10 && (
+                    <p className="text-center text-xs text-gray-400 py-2">
+                      +{exportData.students.length - 10} more students...
+                    </p>
+                  )}
+                </div>
+              </div>
 
-          {/* Export Buttons */}
-          <div className="p-4 space-y-3 border-t bg-white">
-            <div className="grid grid-cols-2 gap-3">
+              {/* Export Buttons */}
+              <div className="p-4 space-y-3 border-t bg-white">
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => downloadReport('txt')}
+                    disabled={isExporting}
+                    className="flex items-center justify-center gap-2 bg-indigo-500 text-white py-3 rounded-xl font-bold text-sm active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {isExporting ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    Text File
+                  </button>
+                  <button
+                    onClick={() => downloadReport('csv')}
+                    disabled={isExporting}
+                    className="flex items-center justify-center gap-2 bg-green-500 text-white py-3 rounded-xl font-bold text-sm active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {isExporting ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    CSV/Excel
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => copyToClipboard(generateTextReport())}
+                  className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-700 py-3 rounded-xl font-bold text-sm active:scale-[0.98]"
+                >
+                  {exportCopied ? (
+                    <>
+                      <CheckCheck className="w-4 h-4 text-green-500" />
+                      <span className="text-green-600">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      Copy to Clipboard
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={shareReport}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-bold text-sm active:scale-[0.98]"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share Report
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="p-8 text-center text-gray-500">
+              <AlertTriangle className="w-10 h-10 mx-auto text-yellow-500 mb-2" />
+              <p>Failed to load report data</p>
               <button
-                onClick={() => downloadReport('txt')}
-                disabled={isExporting}
-                className="flex items-center justify-center gap-2 bg-indigo-500 text-white py-3 rounded-xl font-bold text-sm active:scale-[0.98]"
+                onClick={fetchExportData}
+                className="mt-4 px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm"
               >
-                <Download className="w-4 h-4" />
-                Text File
-              </button>
-              <button
-                onClick={() => downloadReport('csv')}
-                disabled={isExporting}
-                className="flex items-center justify-center gap-2 bg-green-500 text-white py-3 rounded-xl font-bold text-sm active:scale-[0.98]"
-              >
-                <Download className="w-4 h-4" />
-                CSV/Excel
+                Retry
               </button>
             </div>
-
-            <button
-              onClick={() => copyToClipboard(generateTextReport())}
-              className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-700 py-3 rounded-xl font-bold text-sm active:scale-[0.98]"
-            >
-              {exportCopied ? (
-                <>
-                  <CheckCheck className="w-4 h-4 text-green-500" />
-                  <span className="text-green-600">Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  Copy to Clipboard
-                </>
-              )}
-            </button>
-
-            <button
-              onClick={shareReport}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-bold text-sm active:scale-[0.98]"
-            >
-              <Share2 className="w-4 h-4" />
-              Share Report
-            </button>
-          </div>
+          )}
         </div>
       </div>
     );
@@ -759,7 +868,7 @@ export default function AdminDashboard({ user, onLogout }) {
       </div>
       
       {/* Quick Presets - Scrollable on mobile */}
-      <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+      <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
         {[
           { key: 'today', label: 'Today' },
           { key: 'week', label: 'Week' },
@@ -978,6 +1087,9 @@ export default function AdminDashboard({ user, onLogout }) {
         </div>
       </div>
 
+      {/* Date Picker with Export */}
+      {renderDatePicker()}
+
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white rounded-xl p-3 border-2 border-blue-200 shadow-sm">
@@ -1014,7 +1126,7 @@ export default function AdminDashboard({ user, onLogout }) {
             </span>
           </div>
           <p className="text-2xl font-bold text-gray-800">{totalNewGathaCount}</p>
-          <p className="text-xs text-gray-500">New Gathas</p>
+          <p className="text-xs text-gray-500">New Gathas (Range)</p>
         </div>
 
         <button
@@ -1034,15 +1146,6 @@ export default function AdminDashboard({ user, onLogout }) {
           <p className="text-xs text-gray-500">Pending →</p>
         </button>
       </div>
-
-      {/* Export Button */}
-      <button
-        onClick={() => setShowExportModal(true)}
-        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-xl font-bold text-sm active:scale-[0.98] shadow-lg"
-      >
-        <Download className="w-5 h-5" />
-        Export Report
-      </button>
 
       {/* Top Performers */}
       <div className="bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-sm">
@@ -1595,7 +1698,7 @@ export default function AdminDashboard({ user, onLogout }) {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                                className={`relative flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl text-xs font-bold transition-all ${
+                className={`relative flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl text-xs font-bold transition-all ${
                   activeTab === tab.key
                     ? 'bg-indigo-500 text-white'
                     : 'text-gray-500'
@@ -1615,21 +1718,30 @@ export default function AdminDashboard({ user, onLogout }) {
       </div>
 
       {/* CSS for animations */}
-      <style jsx>{`
-        @keyframes slide-up {
-          from {
-            transform: translateY(100%);
-            opacity: 0;
+      <style>
+        {`
+          @keyframes slide-up {
+            from {
+              transform: translateY(100%);
+              opacity: 0;
+            }
+            to {
+              transform: translateY(0);
+              opacity: 1;
+            }
           }
-          to {
-            transform: translateY(0);
-            opacity: 1;
+          .animate-slide-up {
+            animation: slide-up 0.3s ease-out;
           }
-        }
-        .animate-slide-up {
-          animation: slide-up 0.3s ease-out;
-        }
-      `}</style>
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+          .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+        `}
+      </style>
     </div>
   );
 }
