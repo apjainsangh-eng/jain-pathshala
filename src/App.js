@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AdminDashboard from './AdminDashboard';
 import StudentDashboard from './StudentDashboard';
+import KidsDashboard from './KidsDashboard';  // ADD THIS IMPORT
 import { BookOpen } from 'lucide-react';
 
 const API_BASE = 'https://pathshala-backend.vercel.app/api';
@@ -88,15 +89,21 @@ export default function App() {
     setLoginForm({ username: '', password: '' });
   };
 
-  // Show dashboard based on role
+  // Show dashboard based on role AND isKid flag
   if (isLoggedIn && currentUser) {
     if (currentUser.role === 'admin') {
       return <AdminDashboard user={currentUser} onLogout={handleLogout} />;
     }
+    
+    // CHECK IF USER IS A KID - Route to appropriate dashboard
+    if (currentUser.isKid) {
+      return <KidsDashboard user={currentUser} onLogout={handleLogout} />;
+    }
+    
     return <StudentDashboard user={currentUser} onLogout={handleLogout} />;
   }
 
-  // Login Screen
+  // Login Screen (NO CHANGES TO THIS PART)
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
