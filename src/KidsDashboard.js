@@ -530,12 +530,14 @@ const KidsLeaderboardSection = ({ currentUserId, currentUserName }) => {
           const data = await res.json();
           
           const filteredAttendance = (data.attendanceLeaders || [])
-            .filter(leader => KIDS_LIST.includes(leader.username?.toLowerCase()) || KIDS_LIST.includes(leader.name?.toLowerCase()))
-            .map((leader, index) => ({ ...leader, rank: index + 1 }));
-          
-          const filteredGatha = (data.gathaLeaders || [])
-            .filter(leader => KIDS_LIST.includes(leader.username?.toLowerCase()) || KIDS_LIST.includes(leader.name?.toLowerCase()))
-            .map((leader, index) => ({ ...leader, rank: index + 1 }));
+  .filter(leader => KIDS_LIST.includes(leader.username?.toLowerCase()) || KIDS_LIST.includes(leader.name?.toLowerCase()))
+  // 👉 ADD .sort() HERE (before .map)
+  .map((leader, index) => ({ ...leader, rank: index + 1 }));
+
+const filteredGatha = (data.gathaLeaders || [])
+  .filter(leader => KIDS_LIST.includes(leader.username?.toLowerCase()) || KIDS_LIST.includes(leader.name?.toLowerCase()))
+  // 👉 ADD .sort() HERE (before .map)
+  .map((leader, index) => ({ ...leader, rank: index + 1 }));
           
           setLeaderboardData({
             attendanceLeaders: filteredAttendance,
