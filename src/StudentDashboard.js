@@ -1607,7 +1607,15 @@ export default function StudentDashboard({ user, onLogout }) {
   const [gathaEntries, setGathaEntries] = useState([]);
   const [pendingStatus, setPendingStatus] = useState({ attendance: [], gatha: [] });
   // ADD THIS LINE HERE - Online status
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  // Either remove this line:
+const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+// Or add this somewhere in your JSX to use it:
+{!isOnline && (
+  <div className="bg-red-100 border border-red-300 rounded-xl p-3 mb-4 text-center">
+    <p className="text-red-700 text-sm font-medium">You are offline. Some features may not work.</p>
+  </div>
+)}
 
   // Stats (Monthly focused)
   const [monthlyAttendance, setMonthlyAttendance] = useState(0);
