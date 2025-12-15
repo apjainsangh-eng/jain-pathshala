@@ -90,13 +90,6 @@ const HELPFUL_TIPS = [
   { icon: Clock, tipText: "Pending tab shows items waiting for teacher approval", color: "orange" },
 ];
 
-const TIP_ICON_COLORS = {
-  blue: 'text-blue-500',
-  purple: 'text-purple-500',
-  yellow: 'text-yellow-500',
-  orange: 'text-orange-500',
-};
-
 // ============================================
 // HELPER UTILITIES
 // ============================================
