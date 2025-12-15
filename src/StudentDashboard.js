@@ -1013,23 +1013,6 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData }) 
     </div>
   );
 };
-
-// Add this state
-const [isOnline, setIsOnline] = useState(navigator.onLine);
-
-// Add this useEffect to track online status
-useEffect(() => {
-  const handleOnline = () => setIsOnline(true);
-  const handleOffline = () => setIsOnline(false);
-
-  window.addEventListener('online', handleOnline);
-  window.addEventListener('offline', handleOffline);
-
-  return () => {
-    window.removeEventListener('online', handleOnline);
-    window.removeEventListener('offline', handleOffline);
-  };
-}, []);
               
 // ============================================
 // HISTORY PAGE COMPONENT
@@ -1615,6 +1598,8 @@ export default function StudentDashboard({ user, onLogout }) {
   const [attendanceHistory, setAttendanceHistory] = useState([]);
   const [gathaEntries, setGathaEntries] = useState([]);
   const [pendingStatus, setPendingStatus] = useState({ attendance: [], gatha: [] });
+  // ADD THIS LINE HERE - Online status
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   // Stats (Monthly focused)
   const [monthlyAttendance, setMonthlyAttendance] = useState(0);
@@ -1851,6 +1836,20 @@ export default function StudentDashboard({ user, onLogout }) {
     }
   }, []);
 
+  // Add this useEffect to track online status - ADD THIS BLOCK
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+  
   // Initial load
 // Replace your existing data loading useEffect with this:
 useEffect(() => {
