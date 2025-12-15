@@ -2209,7 +2209,7 @@ export default function KidsDashboard({ user, onLogout }) {
               <BookOpen className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="font-bold text-gray-800 text-sm">Jain Pathshala 📚</h1>
+              <h1 className="font-bold text-gray-800 text-sm">શ્રી સોમચિંતામણી વાસુપૂજ્યસ્વામી જૈન પાઠશાળા 📚</h1>
               <p className="text-xs text-gray-500">Hi, {user?.name || user?.username}! 👋</p>
             </div>
           </div>
