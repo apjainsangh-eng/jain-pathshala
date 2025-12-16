@@ -2232,9 +2232,9 @@ export default function KidsDashboard({ user, onLogout }) {
         <div className="grid grid-cols-4 gap-2 mb-4">
           {[
             { key: PAGES.HOME, label: 'Home', emoji: '🏠' },
-            { key: PAGES.STATS, label: 'Stars', badge: unlockedBadgesCount, emoji: '⭐' },
-            { key: PAGES.HISTORY, label: 'Days', emoji: '📅' },
-            { key: PAGES.PENDING, label: 'Wait', badge: totalPendingCount, badgeColor: 'red', emoji: '⏳' },
+            { key: PAGES.STATS, label: 'Stats', badge: unlockedBadgesCount, emoji: '⭐' },
+            { key: PAGES.HISTORY, label: 'Attendance', emoji: '📅' },
+            { key: PAGES.PENDING, label: 'Pending', badge: totalPendingCount, badgeColor: 'red', emoji: '⏳' },
           ].map((tab) => (
             <button
               key={tab.key}
