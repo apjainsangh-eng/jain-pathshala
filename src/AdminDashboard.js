@@ -2005,97 +2005,91 @@ export default function AdminDashboard({ user, onLogout }) {
                                       </div>
                                     )}
                                     
-                                    {/* New Gathas */}
-                                    {newGathasForDay.length > 0 && (
-                                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-2">
-                                        <p className="text-xs font-bold text-purple-700 mb-1.5">✨ New Gathas Learned</p>
-                                        <div className="space-y-1.5">
-                                          {newGathasForDay.map((g, gIdx) => (
-                                            <div key={gIdx} className="bg-white rounded-lg p-2 border border-purple-100">
-                                              <p className="text-xs font-bold text-gray-800 truncate">
-                                                📖 {g.sutra_name || 'Unknown Sutra'}
-                                              </p>
-                                              <div className="flex items-center justify-between mt-1">
-                                                <p className="text-xs text-gray-600">
-                                                  Gatha: <span className="font-bold text-purple-600">{g.gatha_number || g.from_gatha || '-'}</span>
-                                                  {g.to_gatha && g.to_gatha !== g.from_gatha && (
-                                                    <span className="font-bold text-purple-600"> - {g.to_gatha}</span>
-                                                  )}
+                                      {/* New Gathas */}
+                                      {newGathasForDay.length > 0 && (
+                                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-2">
+                                          <p className="text-xs font-bold text-purple-700 mb-1.5">✨ New Gathas Learned</p>
+                                          <div className="space-y-1.5">
+                                            {newGathasForDay.map((g, gIdx) => (
+                                              <div key={gIdx} className="bg-white rounded-lg p-2 border border-purple-100">
+                                                <p className="text-xs font-bold text-gray-800 truncate">
+                                                  📖 {g.sutra_name || 'Unknown Sutra'}
                                                 </p>
-                                                <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-                                                  {g.total_gatha || 1} गाथा
-                                                </span>
+                                                <div className="flex items-center justify-between mt-1">
+                                                  <p className="text-xs text-gray-600">
+                                                    Gatha: <span className="font-bold text-purple-600">{g.which_gatha || '-'}</span>
+                                                  </p>
+                                                  <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                                                    {g.total_gatha || 1} Gatha
+                                                  </span>
+                                                </div>
                                               </div>
-                                            </div>
-                                          ))}
+                                            ))}
+                                          </div>
                                         </div>
-                                      </div>
-                                    )}
-                                    
-                                    {/* Revision Gathas */}
-                                    {revisionGathasForDay.length > 0 && (
-                                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
-                                        <p className="text-xs font-bold text-blue-700 mb-1.5">🔄 Revision Practice</p>
-                                        <div className="space-y-1.5">
-                                          {revisionGathasForDay.map((g, gIdx) => (
-                                            <div key={gIdx} className="bg-white rounded-lg p-2 border border-blue-100">
-                                              <p className="text-xs font-bold text-gray-800 truncate">
-                                                📖 {g.sutra_name || 'Unknown Sutra'}
-                                              </p>
-                                              <div className="flex items-center justify-between mt-1">
-                                                <p className="text-xs text-gray-600">
-                                                  Gatha: <span className="font-bold text-blue-600">{g.gatha_number || g.from_gatha || '-'}</span>
-                                                  {g.to_gatha && g.to_gatha !== g.from_gatha && (
-                                                    <span className="font-bold text-blue-600"> - {g.to_gatha}</span>
-                                                  )}
+                                      )}
+                                      
+                                      {/* Revision Gathas */}
+                                      {revisionGathasForDay.length > 0 && (
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                                          <p className="text-xs font-bold text-blue-700 mb-1.5">🔄 Revision Practice</p>
+                                          <div className="space-y-1.5">
+                                            {revisionGathasForDay.map((g, gIdx) => (
+                                              <div key={gIdx} className="bg-white rounded-lg p-2 border border-blue-100">
+                                                <p className="text-xs font-bold text-gray-800 truncate">
+                                                  📖 {g.sutra_name || 'Unknown Sutra'}
                                                 </p>
-                                                <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-                                                  {g.total_gatha || 1} गाथा
-                                                </span>
+                                                <div className="flex items-center justify-between mt-1">
+                                                  <p className="text-xs text-gray-600">
+                                                    Gatha: <span className="font-bold text-blue-600">{g.which_gatha || '-'}</span>
+                                                  </p>
+                                                  <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                                                    {g.total_gatha || 1} Gatha
+                                                  </span>
+                                                </div>
                                               </div>
-                                            </div>
-                                          ))}
+                                            ))}
+                                          </div>
                                         </div>
-                                      </div>
-                                    )}
-                                    
-                                    {/* No Activity */}
-                                    {dayGroup.gathas.length === 0 && !dayGroup.attendance && (
-                                      <p className="text-xs text-gray-500 text-center py-2">No activity recorded</p>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {(!studentDetail.recentActivity || studentDetail.recentActivity.length === 0) && (
-                        <div className="text-center py-4 text-gray-500">
-                          <p className="text-sm">No activity in selected range</p>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-
-                    <p className="text-center text-gray-500 py-4 text-sm">No data available</p>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {filteredStudents.length === 0 && (
-        <div className="bg-white rounded-xl p-8 border-2 border-gray-200 text-center">
-          <Users className="w-12 h-12 mx-auto text-gray-300 mb-2" />
-          <p className="text-gray-500">No students found</p>
-        </div>
-      )}
-    </div>
-  );
+                                      )}
+                                                                          
+                                                                          {/* No Activity */}
+                                                                          {dayGroup.gathas.length === 0 && !dayGroup.attendance && (
+                                                                            <p className="text-xs text-gray-500 text-center py-2">No activity recorded</p>
+                                                                          )}
+                                                                        </div>
+                                                                      )}
+                                                                    </div>
+                                                                  );
+                                                                })}
+                                                              </div>
+                                                            )}
+                                      
+                                                            {(!studentDetail.recentActivity || studentDetail.recentActivity.length === 0) && (
+                                                              <div className="text-center py-4 text-gray-500">
+                                                                <p className="text-sm">No activity in selected range</p>
+                                                              </div>
+                                                            )}
+                                                          </>
+                                                        ) : (
+                                      
+                                                          <p className="text-center text-gray-500 py-4 text-sm">No data available</p>
+                                                        )}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                      
+                                            {filteredStudents.length === 0 && (
+                                              <div className="bg-white rounded-xl p-8 border-2 border-gray-200 text-center">
+                                                <Users className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+                                                <p className="text-gray-500">No students found</p>
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
 
   // ============ RENDER ANALYTICS ============
   const renderAnalytics = () => (
