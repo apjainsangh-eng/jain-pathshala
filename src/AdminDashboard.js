@@ -1842,9 +1842,9 @@ export default function AdminDashboard({ user, onLogout }) {
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
         {[
           { key: 'name', label: 'A-Z' },
-          { key: 'attendance', label: 'Attendance' },
-          { key: 'gatha', label: 'Gatha' },
-          { key: 'total', label: 'Score' },
+          { key: 'attendance', label: '📅 Attendance' },
+          { key: 'gatha', label: '✨ Gatha' },
+          { key: 'total', label: '⭐ Score' },
         ].map((option) => (
           <button
             key={option.key}
