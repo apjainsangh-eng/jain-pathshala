@@ -677,502 +677,441 @@ export default function AdminDashboard({ user, onLogout }) {
     return csv;
   };
 
-  // ============ GENERATE ATTRACTIVE PDF ============
-  const generatePDFReport = () => {
-    if (!exportData) return;
+ // ============ GENERATE ATTRACTIVE PDF (FIXED) ============
+const generatePDFReport = () => {
+  if (!exportData) return;
+  
+  setIsExporting(true);
+  
+  try {
+    const { students: reportStudents, summary, topPerformers } = exportData;
     
-    setIsExporting(true);
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     
-    try {
-      const { students: reportStudents, summary, topPerformers } = exportData;
-      
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      
-      // ===== COLOR PALETTE (Pathshala Theme) =====
-      const colors = {
-        primary: [99, 102, 241],
-        secondary: [168, 85, 247],
-        accent: [236, 72, 153],
-        success: [34, 197, 94],
-        warning: [249, 115, 22],
-        gold: [234, 179, 8],
-        dark: [31, 41, 55],
-        light: [248, 250, 252],
-        white: [255, 255, 255],
-      };
+    // ===== COLOR PALETTE (Pathshala Theme) =====
+    const colors = {
+      primary: [99, 102, 241],
+      secondary: [168, 85, 247],
+      accent: [236, 72, 153],
+      success: [34, 197, 94],
+      warning: [249, 115, 22],
+      gold: [234, 179, 8],
+      dark: [31, 41, 55],
+      light: [248, 250, 252],
+      white: [255, 255, 255],
+    };
 
-      // ===== HEADER SECTION =====
-      doc.setFillColor(...colors.primary);
-      doc.rect(0, 0, pageWidth, 45, 'F');
-      
-      doc.setFillColor(...colors.secondary);
-      doc.rect(0, 45, pageWidth, 6, 'F');
-      
-      doc.setFillColor(...colors.accent);
-      doc.rect(0, 51, pageWidth, 2, 'F');
-      
-      doc.setFillColor(255, 255, 255, 0.1);
-      doc.circle(185, 12, 30, 'F');
-      doc.circle(25, 40, 18, 'F');
-      doc.circle(195, 45, 15, 'F');
-      
-      doc.setFillColor(...colors.gold);
-      doc.circle(pageWidth / 2, 12, 8, 'F');
-      doc.setTextColor(...colors.primary);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text('☸', pageWidth / 2, 15, { align: 'center' });
-      
-      doc.setTextColor(...colors.white);
-      doc.setFontSize(26);
-      doc.setFont('helvetica', 'bold');
-      doc.text('JAIN PATHSHALA', pageWidth / 2, 30, { align: 'center' });
-      
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'normal');
-      doc.text('✨ Progress Report ✨', pageWidth / 2, 40, { align: 'center' });
-      
-      doc.setFillColor(...colors.gold);
-      const dateText = `📅 ${formatDate(dateRange.start)} - ${formatDate(dateRange.end)}`;
-      const dateTextWidth = doc.getTextWidth(dateText) + 20;
-      doc.roundedRect((pageWidth - dateTextWidth) / 2, 56, dateTextWidth, 10, 3, 3, 'F');
-      doc.setTextColor(...colors.dark);
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.text(dateText, pageWidth / 2, 62.5, { align: 'center' });
+    // ===== HEADER SECTION =====
+    // Main header background
+    doc.setFillColor(...colors.primary);
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    // Accent stripe
+    doc.setFillColor(...colors.secondary);
+    doc.rect(0, 40, pageWidth, 4, 'F');
+    
+    // Sub accent stripe
+    doc.setFillColor(...colors.accent);
+    doc.rect(0, 44, pageWidth, 2, 'F');
+    
+    // Decorative circles
+    doc.setFillColor(255, 255, 255);
+    doc.setGState(new doc.GState({ opacity: 0.1 }));
+    doc.circle(180, 10, 25, 'F');
+    doc.circle(30, 35, 15, 'F');
+    doc.setGState(new doc.GState({ opacity: 1 }));
+    
+    // Main Title
+    doc.setTextColor(...colors.white);
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('JAIN PATHSHALA', pageWidth / 2, 20, { align: 'center' });
+    
+    // Subtitle
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Progress Report', pageWidth / 2, 32, { align: 'center' });
+    
+    // Date Range Badge
+    doc.setFillColor(...colors.gold);
+    const dateText = `${formatDate(dateRange.start)} - ${formatDate(dateRange.end)}`;
+    const dateTextWidth = doc.getTextWidth(dateText) + 16;
+    doc.roundedRect((pageWidth - dateTextWidth) / 2, 50, dateTextWidth, 10, 3, 3, 'F');
+    doc.setTextColor(...colors.dark);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text(dateText, pageWidth / 2, 56.5, { align: 'center' });
 
-      let yPos = 75;
+    let yPos = 70;
 
-      // ===== SUMMARY SECTION =====
-      doc.setTextColor(...colors.primary);
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('📊 SUMMARY OVERVIEW', 14, yPos);
+    // ===== SUMMARY SECTION =====
+    doc.setTextColor(...colors.primary);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SUMMARY OVERVIEW', 14, yPos);
+    
+    // Underline
+    doc.setDrawColor(...colors.primary);
+    doc.setLineWidth(1);
+    doc.line(14, yPos + 2, 70, yPos + 2);
+    
+    yPos += 12;
+
+    // Summary Cards
+    const cardWidth = 43;
+    const cardHeight = 28;
+    const cardGap = 4;
+    const cardStartX = 14;
+
+    const summaryCards = [
+      { 
+        value: summary.totalStudents, 
+        label: 'Total Students', 
+        bgColor: [239, 246, 255], 
+        borderColor: colors.primary,
+        textColor: colors.primary 
+      },
+      { 
+        value: summary.activeStudents, 
+        label: 'Active', 
+        bgColor: [240, 253, 244], 
+        borderColor: colors.success,
+        textColor: colors.success 
+      },
+      { 
+        value: summary.totalAttendance, 
+        label: 'Attendance', 
+        bgColor: [254, 249, 195], 
+        borderColor: colors.warning,
+        textColor: colors.warning 
+      },
+      { 
+        value: summary.totalNewGathas, 
+        label: 'New Gathas', 
+        bgColor: [243, 232, 255], 
+        borderColor: colors.secondary,
+        textColor: colors.secondary 
+      },
+    ];
+
+    summaryCards.forEach((card, index) => {
+      const x = cardStartX + (cardWidth + cardGap) * index;
       
-      doc.setDrawColor(...colors.primary);
-      doc.setLineWidth(1);
-      doc.line(14, yPos + 3, 75, yPos + 3);
+      // Card background
+      doc.setFillColor(...card.bgColor);
+      doc.roundedRect(x, yPos, cardWidth, cardHeight, 3, 3, 'F');
       
-      yPos += 12;
-
-      const cardWidth = 43;
-      const cardHeight = 30;
-      const cardGap = 4;
-      const cardStartX = 14;
-
-      const summaryCards = [
-        { 
-          value: summary.totalStudents, 
-          label: 'Total Students', 
-          icon: '👥',
-          bgColor: [239, 246, 255], 
-          borderColor: colors.primary,
-          textColor: colors.primary 
-        },
-        { 
-          value: summary.activeStudents, 
-          label: 'Active', 
-          icon: '✅',
-          bgColor: [240, 253, 244], 
-          borderColor: colors.success,
-          textColor: colors.success 
-        },
-        { 
-          value: summary.totalAttendance, 
-          label: 'Attendance Days', 
-          icon: '📅',
-          bgColor: [254, 249, 195], 
-          borderColor: colors.warning,
-          textColor: colors.warning 
-        },
-        { 
-          value: summary.totalNewGathas, 
-          label: 'New Gathas', 
-          icon: '✨',
-          bgColor: [243, 232, 255], 
-          borderColor: colors.secondary,
-          textColor: colors.secondary 
-        },
-      ];
-
-      summaryCards.forEach((card, index) => {
-        const x = cardStartX + (cardWidth + cardGap) * index;
-        
-        doc.setFillColor(...card.bgColor);
-        doc.roundedRect(x, yPos, cardWidth, cardHeight, 4, 4, 'F');
-        
-        doc.setDrawColor(...card.borderColor);
-        doc.setLineWidth(0.8);
-        doc.roundedRect(x, yPos, cardWidth, cardHeight, 4, 4, 'S');
-        
-        doc.setFontSize(14);
-        doc.text(card.icon, x + cardWidth / 2, yPos + 10, { align: 'center' });
-        
-        doc.setTextColor(...card.textColor);
-        doc.setFontSize(18);
-        doc.setFont('helvetica', 'bold');
-        doc.text(String(card.value), x + cardWidth / 2, yPos + 20, { align: 'center' });
-        
-        doc.setTextColor(100, 100, 100);
-        doc.setFontSize(6);
-        doc.setFont('helvetica', 'normal');
-        doc.text(card.label, x + cardWidth / 2, yPos + 26, { align: 'center' });
-      });
-
-      yPos += cardHeight + 15;
-
-      // ===== TOP PERFORMERS SECTION =====
-      doc.setTextColor(...colors.dark);
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('🏆 TOP PERFORMERS', 14, yPos);
-      
-      doc.setDrawColor(...colors.gold);
-      doc.setLineWidth(1);
-      doc.line(14, yPos + 3, 65, yPos + 3);
-      
-      yPos += 10;
-
-      const perfCardWidth = 88;
-      const perfCardHeight = 42;
-
-      // Top Attendance Card
-      doc.setFillColor(255, 251, 235);
-      doc.roundedRect(14, yPos, perfCardWidth, perfCardHeight, 5, 5, 'F');
-      doc.setDrawColor(...colors.warning);
+      // Card border
+      doc.setDrawColor(...card.borderColor);
       doc.setLineWidth(0.8);
-      doc.roundedRect(14, yPos, perfCardWidth, perfCardHeight, 5, 5, 'S');
+      doc.roundedRect(x, yPos, cardWidth, cardHeight, 3, 3, 'S');
       
+      // Value
+      doc.setTextColor(...card.textColor);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text(String(card.value), x + cardWidth / 2, yPos + 14, { align: 'center' });
+      
+      // Label
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.text(card.label, x + cardWidth / 2, yPos + 22, { align: 'center' });
+    });
+
+    yPos += cardHeight + 15;
+
+    // ===== TOP PERFORMERS SECTION =====
+    doc.setTextColor(...colors.dark);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOP PERFORMERS', 14, yPos);
+    
+    doc.setDrawColor(...colors.gold);
+    doc.setLineWidth(1);
+    doc.line(14, yPos + 2, 58, yPos + 2);
+    
+    yPos += 10;
+
+    const perfCardWidth = 88;
+    const perfCardHeight = 38;
+
+    // Top Attendance Card
+    doc.setFillColor(255, 251, 235);
+    doc.roundedRect(14, yPos, perfCardWidth, perfCardHeight, 4, 4, 'F');
+    doc.setDrawColor(...colors.warning);
+    doc.setLineWidth(0.8);
+    doc.roundedRect(14, yPos, perfCardWidth, perfCardHeight, 4, 4, 'S');
+    
+    // Header stripe
+    doc.setFillColor(...colors.warning);
+    doc.roundedRect(14, yPos, perfCardWidth, 10, 4, 4, 'F');
+    doc.rect(14, yPos + 6, perfCardWidth, 4, 'F');
+    
+    doc.setTextColor(...colors.white);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOP ATTENDANCE', 14 + perfCardWidth / 2, yPos + 7, { align: 'center' });
+    
+    // Medal positions
+    const medalLabels = ['1st', '2nd', '3rd'];
+    
+    topPerformers.byAttendance.slice(0, 3).forEach((s, i) => {
+      const rowY = yPos + 16 + (i * 8);
+      
+      // Position badge
+      doc.setFillColor(i === 0 ? [254, 240, 138] : i === 1 ? [229, 231, 235] : [253, 186, 116]);
+      doc.circle(20, rowY, 3, 'F');
+      
+      // Position number
+      doc.setTextColor(...colors.dark);
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'bold');
+      doc.text(String(i + 1), 20, rowY + 1.5, { align: 'center' });
+      
+      // Name
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      const displayName = s.name.length > 14 ? s.name.substring(0, 14) + '...' : s.name;
+      doc.text(displayName, 26, rowY + 1);
+      
+      // Count badge
       doc.setFillColor(...colors.warning);
-      doc.roundedRect(14, yPos, perfCardWidth, 12, 5, 5, 'F');
-      doc.rect(14, yPos + 7, perfCardWidth, 5, 'F');
-      
+      doc.roundedRect(72, rowY - 3, 22, 6, 2, 2, 'F');
       doc.setTextColor(...colors.white);
-      doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
-      doc.text('📅 TOP ATTENDANCE', 14 + perfCardWidth / 2, yPos + 8, { align: 'center' });
-      
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      const medals = ['🥇', '🥈', '🥉'];
-      const medalBgColors = [[254, 240, 138], [229, 231, 235], [253, 186, 116]];
-      
-      topPerformers.byAttendance.slice(0, 3).forEach((s, i) => {
-        const rowY = yPos + 18 + (i * 9);
-        
-        doc.setFillColor(...medalBgColors[i]);
-        doc.circle(22, rowY, 4, 'F');
-        
-        doc.setFontSize(7);
-        doc.text(medals[i], 22, rowY + 2, { align: 'center' });
-        
-        doc.setTextColor(...colors.dark);
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        const displayName = s.name.length > 12 ? s.name.substring(0, 12) + '...' : s.name;
-        doc.text(displayName, 30, rowY + 1);
-        
-        doc.setFillColor(...colors.warning);
-        doc.roundedRect(75, rowY - 3, 20, 7, 2, 2, 'F');
-        doc.setTextColor(...colors.white);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7);
-        doc.text(`${s.attendanceCount} days`, 85, rowY + 1.5, { align: 'center' });
-      });
+      doc.setFontSize(7);
+      doc.text(s.attendanceCount + ' days', 83, rowY + 1, { align: 'center' });
+    });
 
-      // Top Gathas Card
-      doc.setFillColor(250, 245, 255);
-      doc.roundedRect(108, yPos, perfCardWidth, perfCardHeight, 5, 5, 'F');
-      doc.setDrawColor(...colors.secondary);
-      doc.setLineWidth(0.8);
-      doc.roundedRect(108, yPos, perfCardWidth, perfCardHeight, 5, 5, 'S');
+    // Top Gathas Card
+    doc.setFillColor(250, 245, 255);
+    doc.roundedRect(108, yPos, perfCardWidth, perfCardHeight, 4, 4, 'F');
+    doc.setDrawColor(...colors.secondary);
+    doc.setLineWidth(0.8);
+    doc.roundedRect(108, yPos, perfCardWidth, perfCardHeight, 4, 4, 'S');
+    
+    // Header stripe
+    doc.setFillColor(...colors.secondary);
+    doc.roundedRect(108, yPos, perfCardWidth, 10, 4, 4, 'F');
+    doc.rect(108, yPos + 6, perfCardWidth, 4, 'F');
+    
+    doc.setTextColor(...colors.white);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOP NEW GATHAS', 108 + perfCardWidth / 2, yPos + 7, { align: 'center' });
+    
+    topPerformers.byGatha.slice(0, 3).forEach((s, i) => {
+      const rowY = yPos + 16 + (i * 8);
       
-      doc.setFillColor(...colors.secondary);
-      doc.roundedRect(108, yPos, perfCardWidth, 12, 5, 5, 'F');
-      doc.rect(108, yPos + 7, perfCardWidth, 5, 'F');
+      // Position badge
+      doc.setFillColor(i === 0 ? [254, 240, 138] : i === 1 ? [229, 231, 235] : [253, 186, 116]);
+      doc.circle(114, rowY, 3, 'F');
       
-      doc.setTextColor(...colors.white);
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.text('✨ TOP NEW GATHAS', 108 + perfCardWidth / 2, yPos + 8, { align: 'center' });
-      
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      
-      topPerformers.byGatha.slice(0, 3).forEach((s, i) => {
-        const rowY = yPos + 18 + (i * 9);
-        
-        doc.setFillColor(...medalBgColors[i]);
-        doc.circle(116, rowY, 4, 'F');
-        
-        doc.setFontSize(7);
-        doc.text(medals[i], 116, rowY + 2, { align: 'center' });
-        
-        doc.setTextColor(...colors.dark);
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        const displayName = s.name.length > 12 ? s.name.substring(0, 12) + '...' : s.name;
-        doc.text(displayName, 124, rowY + 1);
-        
-        doc.setFillColor(...colors.secondary);
-        doc.roundedRect(169, rowY - 3, 20, 7, 2, 2, 'F');
-        doc.setTextColor(...colors.white);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7);
-        doc.text(`${s.newGathas} new`, 179, rowY + 1.5, { align: 'center' });
-      });
-
-      yPos += perfCardHeight + 12;
-
-      // ===== STUDENT TABLE SECTION =====
+      // Position number
       doc.setTextColor(...colors.dark);
-      doc.setFontSize(14);
+      doc.setFontSize(6);
       doc.setFont('helvetica', 'bold');
-      doc.text('📋 STUDENT-WISE REPORT (A-Z)', 14, yPos);
+      doc.text(String(i + 1), 114, rowY + 1.5, { align: 'center' });
       
-      doc.setDrawColor(...colors.primary);
-      doc.setLineWidth(1);
-      doc.line(14, yPos + 3, 90, yPos + 3);
+      // Name
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      const displayName = s.name.length > 14 ? s.name.substring(0, 14) + '...' : s.name;
+      doc.text(displayName, 120, rowY + 1);
       
-      yPos += 8;
+      // Count badge
+      doc.setFillColor(...colors.secondary);
+      doc.roundedRect(166, rowY - 3, 22, 6, 2, 2, 'F');
+      doc.setTextColor(...colors.white);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.text(s.newGathas + ' new', 177, rowY + 1, { align: 'center' });
+    });
 
-      const tableData = reportStudents.map((student, index) => [
-        index + 1,
-        student.name,
-        student.attendanceCount,
-        student.newGathas,
-        student.revisionGathas,
-        student.attendanceCount + student.newGathas
-      ]);
+    yPos += perfCardHeight + 12;
 
-      doc.autoTable({
-        startY: yPos,
-        head: [['#', 'Student Name', '📅 Attend.', '✨ New', '🔄 Revision', '⭐ Score']],
-        body: tableData,
-        theme: 'grid',
-        styles: {
-          font: 'helvetica',
-          fontSize: 8,
-          cellPadding: 3,
-          lineColor: [200, 200, 200],
-          lineWidth: 0.1,
-        },
-        headStyles: {
-          fillColor: colors.primary,
-          textColor: colors.white,
-          fontStyle: 'bold',
-          fontSize: 8,
-          halign: 'center',
-        },
-        bodyStyles: {
-          halign: 'center',
-          valign: 'middle',
-        },
-        columnStyles: {
-          0: { cellWidth: 12, halign: 'center', fontStyle: 'bold' },
-          1: { cellWidth: 50, halign: 'left' },
-          2: { cellWidth: 22, halign: 'center' },
-          3: { cellWidth: 22, halign: 'center' },
-          4: { cellWidth: 22, halign: 'center' },
-          5: { cellWidth: 22, halign: 'center' },
-        },
-        alternateRowStyles: {
-          fillColor: [248, 250, 252],
-        },
-        margin: { left: 14, right: 14 },
-        didParseCell: function(data) {
-          if (data.section === 'body') {
-            if (data.column.index === 2 && data.cell.raw > 0) {
-              data.cell.styles.textColor = colors.success;
-              data.cell.styles.fontStyle = 'bold';
+    // ===== STUDENT TABLE SECTION =====
+    doc.setTextColor(...colors.dark);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('STUDENT-WISE REPORT (A-Z)', 14, yPos);
+    
+    doc.setDrawColor(...colors.primary);
+    doc.setLineWidth(1);
+    doc.line(14, yPos + 2, 82, yPos + 2);
+    
+    yPos += 8;
+
+    // Prepare table data without special characters
+    const tableData = reportStudents.map((student, index) => [
+      index + 1,
+      student.name,
+      student.attendanceCount,
+      student.newGathas,
+      student.revisionGathas,
+      student.attendanceCount + student.newGathas
+    ]);
+
+    doc.autoTable({
+      startY: yPos,
+      head: [['#', 'Student Name', 'Attend.', 'New', 'Revision', 'Score']],
+      body: tableData,
+      theme: 'grid',
+      styles: {
+        font: 'helvetica',
+        fontSize: 8,
+        cellPadding: 3,
+        lineColor: [200, 200, 200],
+        lineWidth: 0.1,
+      },
+      headStyles: {
+        fillColor: colors.primary,
+        textColor: colors.white,
+        fontStyle: 'bold',
+        fontSize: 8,
+        halign: 'center',
+      },
+      bodyStyles: {
+        halign: 'center',
+        valign: 'middle',
+      },
+      columnStyles: {
+        0: { cellWidth: 12, halign: 'center', fontStyle: 'bold' },
+        1: { cellWidth: 55, halign: 'left' },
+        2: { cellWidth: 20, halign: 'center' },
+        3: { cellWidth: 20, halign: 'center' },
+        4: { cellWidth: 20, halign: 'center' },
+        5: { cellWidth: 20, halign: 'center' },
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252],
+      },
+      margin: { left: 14, right: 14 },
+      didParseCell: function(data) {
+        if (data.section === 'body') {
+          // Attendance column - Green
+          if (data.column.index === 2 && data.cell.raw > 0) {
+            data.cell.styles.textColor = colors.success;
+            data.cell.styles.fontStyle = 'bold';
+          }
+          // New Gathas column - Purple
+          if (data.column.index === 3 && data.cell.raw > 0) {
+            data.cell.styles.textColor = colors.secondary;
+            data.cell.styles.fontStyle = 'bold';
+          }
+          // Revision column - Blue
+          if (data.column.index === 4 && data.cell.raw > 0) {
+            data.cell.styles.textColor = [59, 130, 246];
+            data.cell.styles.fontStyle = 'bold';
+          }
+          // Score column - Orange/Gold
+          if (data.column.index === 5) {
+            data.cell.styles.textColor = colors.warning;
+            data.cell.styles.fontStyle = 'bold';
+            if (data.cell.raw >= 20) {
+              data.cell.styles.fillColor = [254, 249, 195];
             }
-            if (data.column.index === 3 && data.cell.raw > 0) {
-              data.cell.styles.textColor = colors.secondary;
-              data.cell.styles.fontStyle = 'bold';
-            }
-            if (data.column.index === 4 && data.cell.raw > 0) {
-              data.cell.styles.textColor = [59, 130, 246];
-              data.cell.styles.fontStyle = 'bold';
-            }
-            if (data.column.index === 5) {
-              data.cell.styles.textColor = colors.warning;
-              data.cell.styles.fontStyle = 'bold';
-              if (data.cell.raw >= 20) {
-                data.cell.styles.fillColor = [254, 249, 195];
-              }
-              if (data.cell.raw >= 30) {
-                data.cell.styles.fillColor = [254, 240, 138];
-              }
-            }
-            if (data.cell.raw === 0) {
-              data.cell.styles.textColor = [180, 180, 180];
+            if (data.cell.raw >= 30) {
+              data.cell.styles.fillColor = [254, 240, 138];
             }
           }
-        },
-        didDrawPage: function(data) {
-          const pageCount = doc.internal.getNumberOfPages();
-          const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
-          
-          doc.setFillColor(...colors.primary);
-          doc.rect(0, pageHeight - 14, pageWidth, 14, 'F');
-          
-          doc.setFillColor(...colors.secondary);
-          doc.rect(0, pageHeight - 14, pageWidth, 2, 'F');
-          
-          doc.setTextColor(...colors.white);
-          doc.setFontSize(7);
-          doc.setFont('helvetica', 'normal');
-          doc.text(
-            `Generated: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`, 
-            14, 
-            pageHeight - 5
-          );
-          doc.text(
-            `Page ${currentPage} of ${pageCount}`, 
-            pageWidth / 2, 
-            pageHeight - 5, 
-            { align: 'center' }
-          );
-          doc.setFont('helvetica', 'bold');
-          doc.text(
-            '🙏 Jai Jinendra!', 
-            pageWidth - 14, 
-            pageHeight - 5, 
-            { align: 'right' }
-          );
-        },
-      });
-
-      const finalY = doc.lastAutoTable.finalY + 8;
-      
-      if (finalY < pageHeight - 45) {
-        doc.setFillColor(248, 250, 252);
-        doc.roundedRect(14, finalY, pageWidth - 28, 22, 4, 4, 'F');
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.5);
-        doc.roundedRect(14, finalY, pageWidth - 28, 22, 4, 4, 'S');
+          // Zero values - Gray
+          if (data.cell.raw === 0) {
+            data.cell.styles.textColor = [180, 180, 180];
+          }
+        }
+      },
+      didDrawPage: function(data) {
+        const pageCount = doc.internal.getNumberOfPages();
+        const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
         
-        doc.setTextColor(...colors.dark);
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'bold');
-        doc.text('📌 LEGEND:', 18, finalY + 7);
+        // Footer background
+        doc.setFillColor(...colors.primary);
+        doc.rect(0, pageHeight - 12, pageWidth, 12, 'F');
         
+        // Accent line
+        doc.setFillColor(...colors.secondary);
+        doc.rect(0, pageHeight - 12, pageWidth, 1.5, 'F');
+        
+        // Footer text
+        doc.setTextColor(...colors.white);
+        doc.setFontSize(7);
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
         
-        const legendItems = [
-          { color: colors.success, text: '📅 Attendance = Days Present' },
-          { color: colors.secondary, text: '✨ New = Newly Learned Gathas' },
-          { color: [59, 130, 246], text: '🔄 Revision = Practice/Review' },
-          { color: colors.warning, text: '⭐ Score = Attendance + New Gathas' },
-        ];
-        
-        legendItems.forEach((item, i) => {
-          const x = 18 + (i * 46);
-          const y = finalY + 15;
-          
-          doc.setFillColor(...item.color);
-          doc.circle(x, y, 1.5, 'F');
-          
-          doc.setTextColor(80, 80, 80);
-          doc.text(item.text, x + 4, y + 1);
+        const generatedDate = new Date().toLocaleString('en-IN', { 
+          timeZone: 'Asia/Kolkata',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
         });
         
-        doc.setFillColor(254, 249, 195);
-        doc.roundedRect(14, finalY + 24, pageWidth - 28, 10, 3, 3, 'F');
-        doc.setTextColor(...colors.dark);
-        doc.setFontSize(7);
-        doc.setFont('helvetica', 'italic');
-        doc.text(
-          '💡 Note: Total Score = Attendance Days + New Gathas (Revision is tracked separately for practice)',
-          pageWidth / 2,
-          finalY + 30,
-          { align: 'center' }
-        );
-      }
+        doc.text('Generated: ' + generatedDate, 14, pageHeight - 4);
+        doc.text('Page ' + currentPage + ' of ' + pageCount, pageWidth / 2, pageHeight - 4, { align: 'center' });
+        doc.setFont('helvetica', 'bold');
+        doc.text('Jai Jinendra!', pageWidth - 14, pageHeight - 4, { align: 'right' });
+      },
+    });
 
-      const fileName = `Jain-Pathshala-Report-${dateRange.start}-to-${dateRange.end}.pdf`;
-      doc.save(fileName);
-      
-      setSuccessMessage('✅ PDF Report downloaded successfully!');
-      setTimeout(() => setSuccessMessage(''), 3000);
-      
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      setError('Failed to generate PDF. Please try again.');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const copyToClipboard = async (text) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setExportCopied(true);
-      setTimeout(() => setExportCopied(false), 2000);
-    } catch (err) {
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      setExportCopied(true);
-      setTimeout(() => setExportCopied(false), 2000);
-    }
-  };
-
-  const shareReport = async () => {
-    const report = generateTextReport();
+    // ===== LEGEND SECTION (after table) =====
+    const finalY = doc.lastAutoTable.finalY + 8;
     
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Jain Pathshala Report',
-          text: report,
-        });
-      } catch (err) {
-        copyToClipboard(report);
-      }
-    } else {
-      copyToClipboard(report);
-    }
-  };
-
-  const downloadReport = (type) => {
-    setIsExporting(true);
-    
-    setTimeout(() => {
-      let content, filename, mimeType;
+    if (finalY < pageHeight - 40) {
+      // Legend box
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(14, finalY, pageWidth - 28, 18, 3, 3, 'F');
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(14, finalY, pageWidth - 28, 18, 3, 3, 'S');
       
-      if (type === 'csv') {
-        content = generateCSVReport();
-        filename = `pathshala-report-${dateRange.start}-to-${dateRange.end}.csv`;
-        mimeType = 'text/csv';
-      } else {
-        content = generateTextReport();
-        filename = `pathshala-report-${dateRange.start}-to-${dateRange.end}.txt`;
-        mimeType = 'text/plain';
-      }
+      doc.setTextColor(...colors.dark);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text('LEGEND:', 18, finalY + 6);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      
+      // Legend items
+      const legendItems = [
+        { color: colors.success, text: 'Attend. = Days Present' },
+        { color: colors.secondary, text: 'New = New Gathas' },
+        { color: [59, 130, 246], text: 'Revision = Practice' },
+        { color: colors.warning, text: 'Score = Attend. + New' },
+      ];
+      
+      legendItems.forEach((item, i) => {
+        const x = 18 + (i * 45);
+        const y = finalY + 13;
+        
+        // Colored dot
+        doc.setFillColor(...item.color);
+        doc.circle(x, y, 1.5, 'F');
+        
+        // Text
+        doc.setTextColor(80, 80, 80);
+        doc.text(item.text, x + 4, y + 1);
+      });
+    }
 
-      const blob = new Blob([content], { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      setIsExporting(false);
-      setSuccessMessage(`✅ Report downloaded!`);
-      setTimeout(() => setSuccessMessage(''), 3000);
-    }, 500);
-  };
-
+    // Save the PDF
+    const fileName = 'Jain-Pathshala-Report-' + dateRange.start + '-to-' + dateRange.end + '.pdf';
+    doc.save(fileName);
+    
+    setSuccessMessage('PDF Report downloaded successfully!');
+    setTimeout(() => setSuccessMessage(''), 3000);
+    
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    setError('Failed to generate PDF. Please try again.');
+  } finally {
+    setIsExporting(false);
+  }
+};
   // ============ COMPUTED VALUES ============
   
   const totalPending = pendingData.attendance.length + pendingData.gatha.length;
