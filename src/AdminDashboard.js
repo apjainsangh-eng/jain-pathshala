@@ -190,6 +190,7 @@ export default function AdminDashboard({ user, onLogout }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [expandedStudent, setExpandedStudent] = useState(null);
+  const [expandedDay, setExpandedDay] = useState(null);
   const [studentFilter, setStudentFilter] = useState('all');
   const [approvalFilter, setApprovalFilter] = useState('all');
   const [detailLoading, setDetailLoading] = useState(false);
@@ -1873,9 +1874,11 @@ export default function AdminDashboard({ user, onLogout }) {
                   if (expandedStudent === student.id) {
                     setExpandedStudent(null);
                     setSelectedStudent(null);
+                    setExpandedDay(null);
                   } else {
                     setExpandedStudent(student.id);
                     setSelectedStudent(student.username);
+                    setExpandedDay(null);
                   }
                 }}
                 className="w-full p-3 text-left active:bg-gray-50"
@@ -1946,29 +1949,137 @@ export default function AdminDashboard({ user, onLogout }) {
                       </div>
 
                       {studentDetail.recentActivity && studentDetail.recentActivity.length > 0 && (
-                        <div className="space-y-2 max-h-60 overflow-y-auto">
-                          {groupActivitiesByDate(studentDetail.recentActivity).slice(0, 10).map((dayGroup, idx) => (
-                            <div key={idx} className="bg-white rounded-lg p-2 border border-gray-200">
-                              <p className="text-xs font-bold text-gray-700 mb-1">
-                                📅 {formatDate(dayGroup.date)}
-                              </p>
-                              <div className="space-y-1">
-                                {dayGroup.attendance && (
-                                  <p className="text-xs text-green-600">✅ Present</p>
+                        <div className="space-y-2 max-h-80 overflow-y-auto">
+                          <p className="text-xs font-bold text-gray-600 mb-2">📋 Activity Log (Click to expand)</p>
+                          {groupActivitiesByDate(studentDetail.recentActivity).slice(0, 15).map((dayGroup, idx) => {
+                            const dayKey = `${student.id}-${dayGroup.date}`;
+                            const isDayExpanded = expandedDay === dayKey;
+                            const newGathasForDay = dayGroup.gathas.filter(g => g.gatha_type === 'new');
+                            const revisionGathasForDay = dayGroup.gathas.filter(g => g.gatha_type === 'revision');
+                            
+                            return (
+                              <div key={idx} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                                {/* Clickable Day Header */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedDay(isDayExpanded ? null : dayKey);
+                                  }}
+                                  className="w-full p-2 text-left active:bg-gray-50 flex items-center justify-between"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-xs font-bold text-gray-700">
+                                      📅 {formatDate(dayGroup.date)}
+                                    </p>
+                                    {dayGroup.attendance && (
+                                      <span className="text-xs bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full">✅</span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {newGathasForDay.length > 0 && (
+                                      <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full font-bold">
+                                        ✨ {newGathasForDay.reduce((sum, g) => sum + (g.total_gatha || 0), 0)}
+                                      </span>
+                                    )}
+                                    {revisionGathasForDay.length > 0 && (
+                                      <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-bold">
+                                        🔄 {revisionGathasForDay.reduce((sum, g) => sum + (g.total_gatha || 0), 0)}
+                                      </span>
+                                    )}
+                                    {isDayExpanded ? (
+                                      <ChevronUp className="w-3 h-3 text-gray-400" />
+                                    ) : (
+                                      <ChevronDown className="w-3 h-3 text-gray-400" />
+                                    )}
+                                  </div>
+                                </button>
+                                
+                                {/* Expanded Day Details */}
+                                {isDayExpanded && (
+                                  <div className="border-t border-gray-100 p-2 bg-gradient-to-br from-gray-50 to-indigo-50 space-y-2">
+                                    {/* Attendance */}
+                                    {dayGroup.attendance && (
+                                      <div className="bg-green-50 border border-green-200 rounded-lg p-2">
+                                        <p className="text-xs font-bold text-green-700">✅ Attendance Marked</p>
+                                        <p className="text-xs text-green-600 mt-0.5">Present on this day</p>
+                                      </div>
+                                    )}
+                                    
+                                    {/* New Gathas */}
+                                    {newGathasForDay.length > 0 && (
+                                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-2">
+                                        <p className="text-xs font-bold text-purple-700 mb-1.5">✨ New Gathas Learned</p>
+                                        <div className="space-y-1.5">
+                                          {newGathasForDay.map((g, gIdx) => (
+                                            <div key={gIdx} className="bg-white rounded-lg p-2 border border-purple-100">
+                                              <p className="text-xs font-bold text-gray-800 truncate">
+                                                📖 {g.sutra_name || 'Unknown Sutra'}
+                                              </p>
+                                              <div className="flex items-center justify-between mt-1">
+                                                <p className="text-xs text-gray-600">
+                                                  Gatha: <span className="font-bold text-purple-600">{g.gatha_number || g.from_gatha || '-'}</span>
+                                                  {g.to_gatha && g.to_gatha !== g.from_gatha && (
+                                                    <span className="font-bold text-purple-600"> - {g.to_gatha}</span>
+                                                  )}
+                                                </p>
+                                                <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                                                  {g.total_gatha || 1} गाथा
+                                                </span>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Revision Gathas */}
+                                    {revisionGathasForDay.length > 0 && (
+                                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                                        <p className="text-xs font-bold text-blue-700 mb-1.5">🔄 Revision Practice</p>
+                                        <div className="space-y-1.5">
+                                          {revisionGathasForDay.map((g, gIdx) => (
+                                            <div key={gIdx} className="bg-white rounded-lg p-2 border border-blue-100">
+                                              <p className="text-xs font-bold text-gray-800 truncate">
+                                                📖 {g.sutra_name || 'Unknown Sutra'}
+                                              </p>
+                                              <div className="flex items-center justify-between mt-1">
+                                                <p className="text-xs text-gray-600">
+                                                  Gatha: <span className="font-bold text-blue-600">{g.gatha_number || g.from_gatha || '-'}</span>
+                                                  {g.to_gatha && g.to_gatha !== g.from_gatha && (
+                                                    <span className="font-bold text-blue-600"> - {g.to_gatha}</span>
+                                                  )}
+                                                </p>
+                                                <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                                                  {g.total_gatha || 1} गाथा
+                                                </span>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {/* No Activity */}
+                                    {dayGroup.gathas.length === 0 && !dayGroup.attendance && (
+                                      <p className="text-xs text-gray-500 text-center py-2">No activity recorded</p>
+                                    )}
+                                  </div>
                                 )}
-                                {dayGroup.gathas.map((g, gIdx) => (
-                                  <p key={gIdx} className="text-xs text-purple-600">
-                                    {g.gatha_type === 'new' ? '✨' : '🔄'} {g.total_gatha} gathas
-                                  </p>
-                                ))}
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {(!studentDetail.recentActivity || studentDetail.recentActivity.length === 0) && (
+                        <div className="text-center py-4 text-gray-500">
+                          <p className="text-sm">No activity in selected range</p>
                         </div>
                       )}
                     </>
                   ) : (
-                    <p className="text-center text-gray-500 py-4 text-sm">No data</p>
+
+                    <p className="text-center text-gray-500 py-4 text-sm">No data available</p>
                   )}
                 </div>
               )}
@@ -1986,7 +2097,7 @@ export default function AdminDashboard({ user, onLogout }) {
     </div>
   );
 
-   // ============ RENDER ANALYTICS (continued) ============
+  // ============ RENDER ANALYTICS ============
   const renderAnalytics = () => (
     <div className="space-y-4">
       {renderDatePicker()}
