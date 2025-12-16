@@ -54,7 +54,7 @@ const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.ve
 const DEFAULT_DATE_OPTIONS = { day: 'numeric', month: 'long', year: 'numeric' };
 
 // Kids list for reference
-const KIDS_LIST = ['aditi', 'ariha', 'ashvi', 'dhanvi', 'moxa', 'satva', 'venya', 'virti', 'vivan'];
+const KIDS_LIST = ['aditi', 'ariha', 'ashvi', 'dhanvi', 'moxa', 'satva', 'venya', 'virti', 'vivan','prakhar'];
 
 // Page Navigation
 const PAGES = {
