@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import {
@@ -32,6 +32,10 @@ import {
   Copy,
   CheckCheck,
   Filter,
+  Bell,
+  BellRing,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.vercel.app/api';
@@ -182,6 +186,18 @@ export default function AdminDashboard({ user, onLogout }) {
   const [successMessage, setSuccessMessage] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
   
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [refreshInterval, setRefreshInterval] = useState(30); // seconds
+  const [lastRefreshed, setLastRefreshed] = useState(new Date());
+  const [newPendingAlert, setNewPendingAlert] = useState(false);
+  const [countdown, setCountdown] = useState(30);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const previousPendingCount = useRef(0);
+  const refreshTimerRef = useRef(null);
+  const countdownRef = useRef(null);
+  const isFirstLoad = useRef(true);
+  
   // Students & Analytics state
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -215,6 +231,63 @@ export default function AdminDashboard({ user, onLogout }) {
   const [exportData, setExportData] = useState(null);
   const [exportLoading, setExportLoading] = useState(false);
 
+  // ============ NOTIFICATION HELPERS ============
+  
+  const playNotificationSound = useCallback(() => {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = 800;
+      oscillator.type = 'sine';
+      gainNode.gain.value = 0.3;
+      
+      oscillator.start();
+      setTimeout(() => {
+        oscillator.stop();
+        audioContext.close();
+      }, 200);
+    } catch (e) {
+      console.log('Audio not supported');
+    }
+  }, []);
+
+  const showBrowserNotification = useCallback((count) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('Jain Pathshala', {
+        body: `${count} new pending request${count > 1 ? 's' : ''}!`,
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        tag: 'pending-notification',
+      });
+    }
+  }, []);
+
+  const requestNotificationPermission = useCallback(async () => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      await Notification.requestPermission();
+    }
+  }, []);
+
+  // ============ ONLINE/OFFLINE DETECTION ============
+  
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   // ============ EFFECTS ============
   
   useEffect(() => {
@@ -240,11 +313,27 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   }, [datePreset, selectedMonth, selectedYear, customStartDate, customEndDate]);
 
-  // Fetch pending data
-  const fetchPendingData = useCallback(async () => {
+  // Request notification permission on mount
+  useEffect(() => {
+    requestNotificationPermission();
+  }, [requestNotificationPermission]);
+
+  // Clear new pending alert when viewing approvals tab
+  useEffect(() => {
+    if (activeTab === 'approvals') {
+      setNewPendingAlert(false);
+    }
+  }, [activeTab]);
+
+  // ============ FETCH FUNCTIONS ============
+
+  // Fetch pending data with new item detection
+  const fetchPendingData = useCallback(async (isAutoRefresh = false) => {
     const token = localStorage.getItem('jainPathshalaToken');
-    setIsLoading(true);
-    setError('');
+    
+    if (!isAutoRefresh) {
+      setIsLoading(true);
+    }
 
     try {
       const [pendingRes, statsRes] = await Promise.all([
@@ -263,15 +352,37 @@ export default function AdminDashboard({ user, onLogout }) {
       const pending = await pendingRes.json();
       const statsData = await statsRes.json();
 
+      const newTotalPending = pending.attendance.length + pending.gatha.length;
+      
+      // Check if there are new pending items (skip on first load)
+      if (!isFirstLoad.current && isAutoRefresh && newTotalPending > previousPendingCount.current) {
+        const newCount = newTotalPending - previousPendingCount.current;
+        setNewPendingAlert(true);
+        playNotificationSound();
+        showBrowserNotification(newCount);
+        
+        // Vibrate on mobile if supported
+        if ('vibrate' in navigator) {
+          navigator.vibrate([200, 100, 200]);
+        }
+      }
+      
+      isFirstLoad.current = false;
+      previousPendingCount.current = newTotalPending;
       setPendingData(pending);
       setStats(statsData);
+      setLastRefreshed(new Date());
+      setCountdown(refreshInterval);
+      setError('');
     } catch (err) {
       console.error('Fetch error:', err);
-      setError('Failed to load data. Please refresh.');
+      if (!isAutoRefresh) {
+        setError('Failed to load data. Please refresh.');
+      }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [refreshInterval, playNotificationSound, showBrowserNotification]);
 
   // Fetch students with stats
   const fetchStudents = useCallback(async () => {
@@ -347,15 +458,45 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   }, [dateRange]);
 
+  // ============ AUTO-REFRESH EFFECT ============
+  
   useEffect(() => {
-    fetchPendingData();
-  }, [fetchPendingData]);
+    // Clear existing timers
+    if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
+    if (countdownRef.current) clearInterval(countdownRef.current);
 
+    // Initial fetch
+    fetchPendingData(false);
+
+    if (autoRefresh && isOnline) {
+      // Set up interval for auto-refresh
+      refreshTimerRef.current = setInterval(() => {
+        fetchPendingData(true);
+      }, refreshInterval * 1000);
+
+      // Countdown timer
+      setCountdown(refreshInterval);
+      countdownRef.current = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) return refreshInterval;
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, [autoRefresh, refreshInterval, isOnline, fetchPendingData]);
+
+  // Fetch students and top students when date range changes
   useEffect(() => {
     fetchStudents();
     fetchTopStudents();
   }, [fetchStudents, fetchTopStudents]);
 
+  // Fetch student detail when selected
   useEffect(() => {
     if (selectedStudent) {
       fetchStudentDetail(selectedStudent);
@@ -395,7 +536,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
       setSuccessMessage('✅ Entry approved!');
       setTimeout(() => setSuccessMessage(''), 3000);
-      fetchPendingData();
+      fetchPendingData(false);
       fetchStudents();
     } catch (err) {
       setError(err.message);
@@ -430,7 +571,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
       setSuccessMessage('❌ Entry rejected!');
       setTimeout(() => setSuccessMessage(''), 3000);
-      fetchPendingData();
+      fetchPendingData(false);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -456,7 +597,7 @@ export default function AdminDashboard({ user, onLogout }) {
       const data = await res.json();
       setSuccessMessage(`✅ Approved ${data.approved.attendance} attendance + ${data.approved.gatha} gatha!`);
       setTimeout(() => setSuccessMessage(''), 5000);
-      fetchPendingData();
+      fetchPendingData(false);
       fetchStudents();
     } catch (err) {
       setError(err.message);
@@ -551,37 +692,32 @@ export default function AdminDashboard({ user, onLogout }) {
       
       // ===== COLOR PALETTE (Pathshala Theme) =====
       const colors = {
-        primary: [99, 102, 241],      // Indigo
-        secondary: [168, 85, 247],    // Purple
-        accent: [236, 72, 153],       // Pink
-        success: [34, 197, 94],       // Green
-        warning: [249, 115, 22],      // Orange
-        gold: [234, 179, 8],          // Gold
-        dark: [31, 41, 55],           // Dark gray
-        light: [248, 250, 252],       // Light gray
+        primary: [99, 102, 241],
+        secondary: [168, 85, 247],
+        accent: [236, 72, 153],
+        success: [34, 197, 94],
+        warning: [249, 115, 22],
+        gold: [234, 179, 8],
+        dark: [31, 41, 55],
+        light: [248, 250, 252],
         white: [255, 255, 255],
       };
 
       // ===== HEADER SECTION =====
-      // Gradient-like header background
       doc.setFillColor(...colors.primary);
       doc.rect(0, 0, pageWidth, 45, 'F');
       
-      // Decorative wave/accent bar
       doc.setFillColor(...colors.secondary);
       doc.rect(0, 45, pageWidth, 6, 'F');
       
-      // Decorative accent line
       doc.setFillColor(...colors.accent);
       doc.rect(0, 51, pageWidth, 2, 'F');
       
-      // Decorative circles for visual appeal
       doc.setFillColor(255, 255, 255, 0.1);
       doc.circle(185, 12, 30, 'F');
       doc.circle(25, 40, 18, 'F');
       doc.circle(195, 45, 15, 'F');
       
-      // Om/Jain symbol placeholder (decorative)
       doc.setFillColor(...colors.gold);
       doc.circle(pageWidth / 2, 12, 8, 'F');
       doc.setTextColor(...colors.primary);
@@ -589,18 +725,15 @@ export default function AdminDashboard({ user, onLogout }) {
       doc.setFont('helvetica', 'bold');
       doc.text('☸', pageWidth / 2, 15, { align: 'center' });
       
-      // Main Title
       doc.setTextColor(...colors.white);
       doc.setFontSize(26);
       doc.setFont('helvetica', 'bold');
       doc.text('JAIN PATHSHALA', pageWidth / 2, 30, { align: 'center' });
       
-      // Subtitle
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
       doc.text('✨ Progress Report ✨', pageWidth / 2, 40, { align: 'center' });
       
-      // Date Range Badge
       doc.setFillColor(...colors.gold);
       const dateText = `📅 ${formatDate(dateRange.start)} - ${formatDate(dateRange.end)}`;
       const dateTextWidth = doc.getTextWidth(dateText) + 20;
@@ -618,14 +751,12 @@ export default function AdminDashboard({ user, onLogout }) {
       doc.setFont('helvetica', 'bold');
       doc.text('📊 SUMMARY OVERVIEW', 14, yPos);
       
-      // Decorative line
       doc.setDrawColor(...colors.primary);
       doc.setLineWidth(1);
       doc.line(14, yPos + 3, 75, yPos + 3);
       
       yPos += 12;
 
-      // Summary Cards (4 boxes)
       const cardWidth = 43;
       const cardHeight = 30;
       const cardGap = 4;
@@ -669,26 +800,21 @@ export default function AdminDashboard({ user, onLogout }) {
       summaryCards.forEach((card, index) => {
         const x = cardStartX + (cardWidth + cardGap) * index;
         
-        // Card background with rounded corners
         doc.setFillColor(...card.bgColor);
         doc.roundedRect(x, yPos, cardWidth, cardHeight, 4, 4, 'F');
         
-        // Card border
         doc.setDrawColor(...card.borderColor);
         doc.setLineWidth(0.8);
         doc.roundedRect(x, yPos, cardWidth, cardHeight, 4, 4, 'S');
         
-        // Icon
         doc.setFontSize(14);
         doc.text(card.icon, x + cardWidth / 2, yPos + 10, { align: 'center' });
         
-        // Value
         doc.setTextColor(...card.textColor);
         doc.setFontSize(18);
         doc.setFont('helvetica', 'bold');
         doc.text(String(card.value), x + cardWidth / 2, yPos + 20, { align: 'center' });
         
-        // Label
         doc.setTextColor(100, 100, 100);
         doc.setFontSize(6);
         doc.setFont('helvetica', 'normal');
@@ -709,7 +835,6 @@ export default function AdminDashboard({ user, onLogout }) {
       
       yPos += 10;
 
-      // Top Performers Cards (2 side by side)
       const perfCardWidth = 88;
       const perfCardHeight = 42;
 
@@ -720,7 +845,6 @@ export default function AdminDashboard({ user, onLogout }) {
       doc.setLineWidth(0.8);
       doc.roundedRect(14, yPos, perfCardWidth, perfCardHeight, 5, 5, 'S');
       
-      // Header stripe
       doc.setFillColor(...colors.warning);
       doc.roundedRect(14, yPos, perfCardWidth, 12, 5, 5, 'F');
       doc.rect(14, yPos + 7, perfCardWidth, 5, 'F');
@@ -730,7 +854,6 @@ export default function AdminDashboard({ user, onLogout }) {
       doc.setFont('helvetica', 'bold');
       doc.text('📅 TOP ATTENDANCE', 14 + perfCardWidth / 2, yPos + 8, { align: 'center' });
       
-      // Medal winners
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       const medals = ['🥇', '🥈', '🥉'];
@@ -739,22 +862,18 @@ export default function AdminDashboard({ user, onLogout }) {
       topPerformers.byAttendance.slice(0, 3).forEach((s, i) => {
         const rowY = yPos + 18 + (i * 9);
         
-        // Medal background circle
         doc.setFillColor(...medalBgColors[i]);
         doc.circle(22, rowY, 4, 'F');
         
-        // Medal emoji
         doc.setFontSize(7);
         doc.text(medals[i], 22, rowY + 2, { align: 'center' });
         
-        // Name
         doc.setTextColor(...colors.dark);
         doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
         const displayName = s.name.length > 12 ? s.name.substring(0, 12) + '...' : s.name;
         doc.text(displayName, 30, rowY + 1);
         
-        // Count badge
         doc.setFillColor(...colors.warning);
         doc.roundedRect(75, rowY - 3, 20, 7, 2, 2, 'F');
         doc.setTextColor(...colors.white);
@@ -770,7 +889,6 @@ export default function AdminDashboard({ user, onLogout }) {
       doc.setLineWidth(0.8);
       doc.roundedRect(108, yPos, perfCardWidth, perfCardHeight, 5, 5, 'S');
       
-      // Header stripe
       doc.setFillColor(...colors.secondary);
       doc.roundedRect(108, yPos, perfCardWidth, 12, 5, 5, 'F');
       doc.rect(108, yPos + 7, perfCardWidth, 5, 'F');
@@ -786,22 +904,18 @@ export default function AdminDashboard({ user, onLogout }) {
       topPerformers.byGatha.slice(0, 3).forEach((s, i) => {
         const rowY = yPos + 18 + (i * 9);
         
-        // Medal background circle
         doc.setFillColor(...medalBgColors[i]);
         doc.circle(116, rowY, 4, 'F');
         
-        // Medal emoji
         doc.setFontSize(7);
         doc.text(medals[i], 116, rowY + 2, { align: 'center' });
         
-        // Name
         doc.setTextColor(...colors.dark);
         doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
         const displayName = s.name.length > 12 ? s.name.substring(0, 12) + '...' : s.name;
         doc.text(displayName, 124, rowY + 1);
         
-        // Count badge
         doc.setFillColor(...colors.secondary);
         doc.roundedRect(169, rowY - 3, 20, 7, 2, 2, 'F');
         doc.setTextColor(...colors.white);
@@ -824,14 +938,13 @@ export default function AdminDashboard({ user, onLogout }) {
       
       yPos += 8;
 
-      // Table data - FIXED: Total Score = Attendance + New Gathas only
       const tableData = reportStudents.map((student, index) => [
         index + 1,
         student.name,
         student.attendanceCount,
         student.newGathas,
         student.revisionGathas,
-        student.attendanceCount + student.newGathas // FIXED: Only attendance + new gathas
+        student.attendanceCount + student.newGathas
       ]);
 
       doc.autoTable({
@@ -871,22 +984,18 @@ export default function AdminDashboard({ user, onLogout }) {
         margin: { left: 14, right: 14 },
         didParseCell: function(data) {
           if (data.section === 'body') {
-            // Attendance column - Green
             if (data.column.index === 2 && data.cell.raw > 0) {
               data.cell.styles.textColor = colors.success;
               data.cell.styles.fontStyle = 'bold';
             }
-            // New Gathas column - Purple
             if (data.column.index === 3 && data.cell.raw > 0) {
               data.cell.styles.textColor = colors.secondary;
               data.cell.styles.fontStyle = 'bold';
             }
-            // Revision column - Blue
             if (data.column.index === 4 && data.cell.raw > 0) {
               data.cell.styles.textColor = [59, 130, 246];
               data.cell.styles.fontStyle = 'bold';
             }
-            // Score column - Orange/Gold with highlight for top scorers
             if (data.column.index === 5) {
               data.cell.styles.textColor = colors.warning;
               data.cell.styles.fontStyle = 'bold';
@@ -897,26 +1006,21 @@ export default function AdminDashboard({ user, onLogout }) {
                 data.cell.styles.fillColor = [254, 240, 138];
               }
             }
-            // Zero values - Gray
             if (data.cell.raw === 0) {
               data.cell.styles.textColor = [180, 180, 180];
             }
           }
         },
         didDrawPage: function(data) {
-          // Footer on each page
           const pageCount = doc.internal.getNumberOfPages();
           const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
           
-          // Footer decorative bar
           doc.setFillColor(...colors.primary);
           doc.rect(0, pageHeight - 14, pageWidth, 14, 'F');
           
-          // Accent line
           doc.setFillColor(...colors.secondary);
           doc.rect(0, pageHeight - 14, pageWidth, 2, 'F');
           
-          // Footer text
           doc.setTextColor(...colors.white);
           doc.setFontSize(7);
           doc.setFont('helvetica', 'normal');
@@ -941,11 +1045,9 @@ export default function AdminDashboard({ user, onLogout }) {
         },
       });
 
-      // ===== LEGEND SECTION (after table) =====
       const finalY = doc.lastAutoTable.finalY + 8;
       
       if (finalY < pageHeight - 45) {
-        // Legend box
         doc.setFillColor(248, 250, 252);
         doc.roundedRect(14, finalY, pageWidth - 28, 22, 4, 4, 'F');
         doc.setDrawColor(200, 200, 200);
@@ -960,7 +1062,6 @@ export default function AdminDashboard({ user, onLogout }) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
         
-        // Legend items with colored dots
         const legendItems = [
           { color: colors.success, text: '📅 Attendance = Days Present' },
           { color: colors.secondary, text: '✨ New = Newly Learned Gathas' },
@@ -972,16 +1073,13 @@ export default function AdminDashboard({ user, onLogout }) {
           const x = 18 + (i * 46);
           const y = finalY + 15;
           
-          // Colored dot
           doc.setFillColor(...item.color);
           doc.circle(x, y, 1.5, 'F');
           
-          // Text
           doc.setTextColor(80, 80, 80);
           doc.text(item.text, x + 4, y + 1);
         });
         
-        // Note about score calculation
         doc.setFillColor(254, 249, 195);
         doc.roundedRect(14, finalY + 24, pageWidth - 28, 10, 3, 3, 'F');
         doc.setTextColor(...colors.dark);
@@ -995,7 +1093,6 @@ export default function AdminDashboard({ user, onLogout }) {
         );
       }
 
-      // Save the PDF
       const fileName = `Jain-Pathshala-Report-${dateRange.start}-to-${dateRange.end}.pdf`;
       doc.save(fileName);
       
@@ -1016,7 +1113,6 @@ export default function AdminDashboard({ user, onLogout }) {
       setExportCopied(true);
       setTimeout(() => setExportCopied(false), 2000);
     } catch (err) {
-      // Fallback for older browsers
       const textArea = document.createElement('textarea');
       textArea.value = text;
       document.body.appendChild(textArea);
@@ -1123,6 +1219,123 @@ export default function AdminDashboard({ user, onLogout }) {
   const attendanceRate = students.length > 0 
     ? Math.round((stats?.today_attendance || 0) / students.length * 100)
     : 0;
+
+  // ============ RENDER AUTO-REFRESH CONTROLS ============
+  const renderAutoRefreshControls = () => (
+    <div className="bg-white rounded-xl p-3 border-2 border-indigo-200 shadow-sm mb-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+            autoRefresh && isOnline ? 'bg-green-100' : 'bg-gray-100'
+          }`}>
+            {autoRefresh && isOnline ? (
+              <RefreshCw className="w-4 h-4 text-green-600 animate-spin" style={{ animationDuration: '3s' }} />
+            ) : (
+              <RefreshCw className="w-4 h-4 text-gray-400" />
+            )}
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-bold text-gray-700">Auto-Refresh</p>
+              {!isOnline && (
+                <span className="flex items-center gap-0.5 bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">
+                  <WifiOff className="w-3 h-3" />
+                  Offline
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] text-gray-500">
+              {!isOnline ? 'No connection' : autoRefresh ? `Next in ${countdown}s` : 'Disabled'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Refresh Interval Selector */}
+          {autoRefresh && isOnline && (
+            <select
+              value={refreshInterval}
+              onChange={(e) => {
+                setRefreshInterval(Number(e.target.value));
+                setCountdown(Number(e.target.value));
+              }}
+              className="text-xs bg-gray-100 border-0 rounded-lg px-2 py-1.5 font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            >
+              <option value={15}>15s</option>
+              <option value={30}>30s</option>
+              <option value={60}>1m</option>
+              <option value={120}>2m</option>
+              <option value={300}>5m</option>
+            </select>
+          )}
+
+          {/* Toggle Button */}
+          <button
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            disabled={!isOnline}
+            className={`relative w-12 h-6 rounded-full transition-colors ${
+              autoRefresh && isOnline ? 'bg-green-500' : 'bg-gray-300'
+            } ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+              autoRefresh && isOnline ? 'translate-x-7' : 'translate-x-1'
+            }`} />
+          </button>
+
+          {/* Manual Refresh */}
+          <button
+            onClick={() => fetchPendingData(false)}
+            disabled={isLoading || !isOnline}
+            className={`p-2 bg-indigo-100 text-indigo-700 rounded-xl active:scale-[0.98] ${
+              !isOnline ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      {autoRefresh && isOnline && (
+        <div className="mt-2 h-1 bg-gray-200 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-1000"
+            style={{ width: `${(countdown / refreshInterval) * 100}%` }}
+          />
+        </div>
+      )}
+
+      {/* Last Refreshed */}
+      <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {isOnline ? (
+            <Wifi className="w-3 h-3 text-green-500" />
+          ) : (
+            <WifiOff className="w-3 h-3 text-red-500" />
+          )}
+          <p className="text-[10px] text-gray-400">
+            Last updated: {lastRefreshed.toLocaleTimeString('en-IN', { 
+              hour: '2-digit', 
+              minute: '2-digit',
+              second: '2-digit'
+            })}
+          </p>
+        </div>
+        {newPendingAlert && (
+          <button
+            onClick={() => {
+              setActiveTab('approvals');
+              setNewPendingAlert(false);
+            }}
+            className="flex items-center gap-1 bg-red-100 text-red-600 px-2 py-0.5 rounded-full animate-pulse"
+          >
+            <BellRing className="w-3 h-3" />
+            <span className="text-[10px] font-bold">New requests!</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
 
   // ============ RENDER EXPORT MODAL ============
   const renderExportModal = () => {
@@ -1504,9 +1717,31 @@ export default function AdminDashboard({ user, onLogout }) {
     </div>
   );
 
-  // ============ RENDER OVERVIEW ============
+    // ============ RENDER OVERVIEW ============
   const renderOverview = () => (
     <div className="space-y-4">
+      {/* Auto-Refresh Controls */}
+      {renderAutoRefreshControls()}
+
+      {/* New Pending Alert Banner */}
+      {newPendingAlert && (
+        <button
+          onClick={() => {
+            setActiveTab('approvals');
+            setNewPendingAlert(false);
+          }}
+          className="w-full bg-gradient-to-r from-red-500 to-orange-500 text-white p-3 rounded-xl flex items-center justify-between animate-pulse"
+        >
+          <div className="flex items-center gap-2">
+            <BellRing className="w-5 h-5" />
+            <span className="font-bold text-sm">New pending requests!</span>
+          </div>
+          <span className="bg-white text-red-500 px-2 py-1 rounded-lg text-xs font-bold">
+            View Now →
+          </span>
+        </button>
+      )}
+
       {/* Today's Summary Card */}
       <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl p-4 text-white shadow-lg">
         <div className="flex items-center justify-between mb-3">
@@ -1672,15 +1907,19 @@ export default function AdminDashboard({ user, onLogout }) {
   // ============ RENDER APPROVALS ============
   const renderApprovals = () => (
     <div className="space-y-4">
+      {/* Auto-Refresh Controls */}
+      {renderAutoRefreshControls()}
+
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-gray-800">Pending Approvals</h3>
-        <button
-          onClick={fetchPendingData}
-          disabled={isLoading}
-          className="p-2 bg-indigo-100 text-indigo-700 rounded-xl active:scale-[0.98]"
-        >
-          <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          {autoRefresh && isOnline && (
+            <div className="flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-[10px] font-bold">LIVE</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {totalPending > 0 && (
@@ -1959,7 +2198,6 @@ export default function AdminDashboard({ user, onLogout }) {
                             
                             return (
                               <div key={idx} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                                {/* Clickable Day Header */}
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1994,10 +2232,8 @@ export default function AdminDashboard({ user, onLogout }) {
                                   </div>
                                 </button>
                                 
-                                {/* Expanded Day Details */}
                                 {isDayExpanded && (
                                   <div className="border-t border-gray-100 p-2 bg-gradient-to-br from-gray-50 to-indigo-50 space-y-2">
-                                    {/* Attendance */}
                                     {dayGroup.attendance && (
                                       <div className="bg-green-50 border border-green-200 rounded-lg p-2">
                                         <p className="text-xs font-bold text-green-700">✅ Attendance Marked</p>
@@ -2005,91 +2241,87 @@ export default function AdminDashboard({ user, onLogout }) {
                                       </div>
                                     )}
                                     
-                                      {/* New Gathas */}
-                                      {newGathasForDay.length > 0 && (
-                                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-2">
-                                          <p className="text-xs font-bold text-purple-700 mb-1.5">✨ New Gathas Learned</p>
-                                          <div className="space-y-1.5">
-                                            {newGathasForDay.map((g, gIdx) => (
-                                              <div key={gIdx} className="bg-white rounded-lg p-2 border border-purple-100">
-                                                <p className="text-xs font-bold text-gray-800 truncate">
-                                                  📖 {g.sutra_name || 'Unknown Sutra'}
+                                    {newGathasForDay.length > 0 && (
+                                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-2">
+                                        <p className="text-xs font-bold text-purple-700 mb-1.5">✨ New Gathas Learned</p>
+                                        <div className="space-y-1.5">
+                                          {newGathasForDay.map((g, gIdx) => (
+                                            <div key={gIdx} className="bg-white rounded-lg p-2 border border-purple-100">
+                                              <p className="text-xs font-bold text-gray-800 truncate">
+                                                📖 {g.sutra_name || 'Unknown Sutra'}
+                                              </p>
+                                              <div className="flex items-center justify-between mt-1">
+                                                <p className="text-xs text-gray-600">
+                                                  Gatha: <span className="font-bold text-purple-600">{g.which_gatha || '-'}</span>
                                                 </p>
-                                                <div className="flex items-center justify-between mt-1">
-                                                  <p className="text-xs text-gray-600">
-                                                    Gatha: <span className="font-bold text-purple-600">{g.which_gatha || '-'}</span>
-                                                  </p>
-                                                  <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-                                                    {g.total_gatha || 1} Gatha
-                                                  </span>
-                                                </div>
+                                                <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                                                  {g.total_gatha || 1} Gatha
+                                                </span>
                                               </div>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
-                                      
-                                      {/* Revision Gathas */}
-                                      {revisionGathasForDay.length > 0 && (
-                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
-                                          <p className="text-xs font-bold text-blue-700 mb-1.5">🔄 Revision Practice</p>
-                                          <div className="space-y-1.5">
-                                            {revisionGathasForDay.map((g, gIdx) => (
-                                              <div key={gIdx} className="bg-white rounded-lg p-2 border border-blue-100">
-                                                <p className="text-xs font-bold text-gray-800 truncate">
-                                                  📖 {g.sutra_name || 'Unknown Sutra'}
-                                                </p>
-                                                <div className="flex items-center justify-between mt-1">
-                                                  <p className="text-xs text-gray-600">
-                                                    Gatha: <span className="font-bold text-blue-600">{g.which_gatha || '-'}</span>
-                                                  </p>
-                                                  <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-                                                    {g.total_gatha || 1} Gatha
-                                                  </span>
-                                                </div>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
-                                                                          
-                                                                          {/* No Activity */}
-                                                                          {dayGroup.gathas.length === 0 && !dayGroup.attendance && (
-                                                                            <p className="text-xs text-gray-500 text-center py-2">No activity recorded</p>
-                                                                          )}
-                                                                        </div>
-                                                                      )}
-                                                                    </div>
-                                                                  );
-                                                                })}
-                                                              </div>
-                                                            )}
-                                      
-                                                            {(!studentDetail.recentActivity || studentDetail.recentActivity.length === 0) && (
-                                                              <div className="text-center py-4 text-gray-500">
-                                                                <p className="text-sm">No activity in selected range</p>
-                                                              </div>
-                                                            )}
-                                                          </>
-                                                        ) : (
-                                      
-                                                          <p className="text-center text-gray-500 py-4 text-sm">No data available</p>
-                                                        )}
-                                                      </div>
-                                                    )}
-                                                  </div>
-                                                );
-                                              })}
                                             </div>
-                                      
-                                            {filteredStudents.length === 0 && (
-                                              <div className="bg-white rounded-xl p-8 border-2 border-gray-200 text-center">
-                                                <Users className="w-12 h-12 mx-auto text-gray-300 mb-2" />
-                                                <p className="text-gray-500">No students found</p>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {revisionGathasForDay.length > 0 && (
+                                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                                        <p className="text-xs font-bold text-blue-700 mb-1.5">🔄 Revision Practice</p>
+                                        <div className="space-y-1.5">
+                                          {revisionGathasForDay.map((g, gIdx) => (
+                                            <div key={gIdx} className="bg-white rounded-lg p-2 border border-blue-100">
+                                              <p className="text-xs font-bold text-gray-800 truncate">
+                                                📖 {g.sutra_name || 'Unknown Sutra'}
+                                              </p>
+                                              <div className="flex items-center justify-between mt-1">
+                                                <p className="text-xs text-gray-600">
+                                                  Gatha: <span className="font-bold text-blue-600">{g.which_gatha || '-'}</span>
+                                                </p>
+                                                <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                                                  {g.total_gatha || 1} Gatha
+                                                </span>
                                               </div>
-                                            )}
-                                          </div>
-                                        );
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {dayGroup.gathas.length === 0 && !dayGroup.attendance && (
+                                      <p className="text-xs text-gray-500 text-center py-2">No activity recorded</p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {(!studentDetail.recentActivity || studentDetail.recentActivity.length === 0) && (
+                        <div className="text-center py-4 text-gray-500">
+                          <p className="text-sm">No activity in selected range</p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-center text-gray-500 py-4 text-sm">No data available</p>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {filteredStudents.length === 0 && (
+        <div className="bg-white rounded-xl p-8 border-2 border-gray-200 text-center">
+          <Users className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+          <p className="text-gray-500">No students found</p>
+        </div>
+      )}
+    </div>
+  );
 
   // ============ RENDER ANALYTICS ============
   const renderAnalytics = () => (
@@ -2291,7 +2523,7 @@ export default function AdminDashboard({ user, onLogout }) {
               { key: 'overview', icon: BarChart3, label: 'Home' },
               { key: 'students', icon: Users, label: 'Students' },
               { key: 'analytics', icon: TrendingUp, label: 'Stats' },
-              { key: 'approvals', icon: Clock, label: 'Pending', badge: totalPending },
+              { key: 'approvals', icon: Clock, label: 'Pending', badge: totalPending, alert: newPendingAlert },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -2300,14 +2532,19 @@ export default function AdminDashboard({ user, onLogout }) {
                   activeTab === tab.key
                     ? 'bg-indigo-500 text-white'
                     : 'text-gray-500'
-                }`}
+                } ${tab.alert ? 'animate-pulse' : ''}`}
               >
                 <tab.icon className="w-5 h-5" />
                 <span className="text-[10px]">{tab.label}</span>
                 {tab.badge > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  <span className={`absolute -top-1 -right-1 w-5 h-5 text-white text-[10px] font-bold rounded-full flex items-center justify-center ${
+                    tab.alert ? 'bg-red-500 animate-bounce' : 'bg-red-500'
+                  }`}>
                     {tab.badge > 9 ? '9+' : tab.badge}
                   </span>
+                )}
+                {tab.alert && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full animate-ping opacity-75" />
                 )}
               </button>
             ))}
