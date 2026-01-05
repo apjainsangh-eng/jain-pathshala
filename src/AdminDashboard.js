@@ -2482,6 +2482,7 @@ const toggleMemberSelection = (username) => {
                 </div>
               </div>
             </div>
+                     {renderFamilyGroupsSection()}
           ))}
 
           {filteredUsers.length === 0 && (
@@ -2492,8 +2493,6 @@ const toggleMemberSelection = (username) => {
           )}
         </div>
       )}
-         {renderFamilyGroupsSection()}
-    {renderAddGroupModal()}
     </div>
   );
 
