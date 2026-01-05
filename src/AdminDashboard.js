@@ -34,6 +34,15 @@ import {
   BellRing,
   Wifi,
   WifiOff,
+  UserPlus,
+  Edit3,
+  Trash2,
+  Eye,
+  EyeOff,
+  Save,
+  Plus,
+  Key,
+  UserCog,
 } from 'lucide-react';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.vercel.app/api';
@@ -228,6 +237,35 @@ export default function AdminDashboard({ user, onLogout }) {
   const [isExporting, setIsExporting] = useState(false);
   const [exportData, setExportData] = useState(null);
   const [exportLoading, setExportLoading] = useState(false);
+
+  // ============ NEW: USER MANAGEMENT STATE ============
+  const [allUsers, setAllUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [showPasswords, setShowPasswords] = useState({});
+  const [newUser, setNewUser] = useState({
+    username: '',
+    password: '',
+    name: '',
+    role: 'student'
+  });
+  const [userFormError, setUserFormError] = useState('');
+
+  // ============ NEW: ADD ENTRY STATE (Attendance/Gatha) ============
+  const [showAddEntryModal, setShowAddEntryModal] = useState(false);
+  const [addEntryType, setAddEntryType] = useState('attendance');
+  const [addEntryData, setAddEntryData] = useState({
+    studentUsername: '',
+    date: formatLocalDateString(new Date()),
+    sutraName: '',
+    whichGatha: '',
+    totalGatha: 1,
+    gathaType: 'new'
+  });
+  const [addEntryLoading, setAddEntryLoading] = useState(false);
 
   // ============ NOTIFICATION HELPERS ============
   
@@ -447,6 +485,28 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   }, [dateRange]);
 
+  // ============ NEW: FETCH ALL USERS ============
+  const fetchAllUsers = useCallback(async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    setUsersLoading(true);
+    try {
+      const res = await fetch(API_BASE + '/admin/users', {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAllUsers(data);
+      } else {
+        throw new Error('Failed to fetch users');
+      }
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setError('Failed to load users');
+    } finally {
+      setUsersLoading(false);
+    }
+  }, []);
+
   // ============ AUTO-REFRESH EFFECT ============
   
   useEffect(() => {
@@ -493,6 +553,13 @@ export default function AdminDashboard({ user, onLogout }) {
       fetchExportData();
     }
   }, [showExportModal, fetchExportData]);
+
+  // Fetch users when users tab is active
+  useEffect(() => {
+    if (activeTab === 'users') {
+      fetchAllUsers();
+    }
+  }, [activeTab, fetchAllUsers]);
 
   // ============ HANDLERS ============
   
@@ -585,6 +652,232 @@ export default function AdminDashboard({ user, onLogout }) {
       setError(err.message);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  // ============ NEW: USER MANAGEMENT HANDLERS ============
+
+  const validateUserForm = (userData, isEdit = false) => {
+    if (!userData.username || userData.username.trim().length < 3) {
+      return 'Username must be at least 3 characters';
+    }
+    if (!isEdit && (!userData.password || userData.password.length < 4)) {
+      return 'Password must be at least 4 characters';
+    }
+    if (!userData.name || userData.name.trim().length < 2) {
+      return 'Name must be at least 2 characters';
+    }
+
+    // Check for duplicate username with different password requirement
+    const existingUsersWithSameUsername = allUsers.filter(
+      u => u.username.toLowerCase() === userData.username.toLowerCase() && 
+      (!isEdit || u.id !== editingUser?.id)
+    );
+
+    if (existingUsersWithSameUsername.length > 0) {
+      // Check if any existing user has the same password
+      const samePassword = existingUsersWithSameUsername.find(
+        u => u.password === userData.password
+      );
+      if (samePassword) {
+        return 'A user with this username and password already exists. Please use a unique password.';
+      }
+    }
+
+    return null;
+  };
+
+  const handleAddUser = async () => {
+    const validationError = validateUserForm(newUser);
+    if (validationError) {
+      setUserFormError(validationError);
+      return;
+    }
+
+    const token = localStorage.getItem('jainPathshalaToken');
+    setActionLoading('add-user');
+    setUserFormError('');
+
+    try {
+      const res = await fetch(API_BASE + '/admin/users', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newUser),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to add user');
+      }
+
+      setSuccessMessage('User added successfully!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      setShowAddUserModal(false);
+      setNewUser({ username: '', password: '', name: '', role: 'student' });
+      fetchAllUsers();
+      fetchStudents();
+    } catch (err) {
+      setUserFormError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+
+    const validationError = validateUserForm(editingUser, true);
+    if (validationError) {
+      setUserFormError(validationError);
+      return;
+    }
+
+    const token = localStorage.getItem('jainPathshalaToken');
+    setActionLoading('update-user');
+    setUserFormError('');
+
+    try {
+      const res = await fetch(API_BASE + '/admin/users/' + editingUser.id, {
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: editingUser.username,
+          password: editingUser.password,
+          name: editingUser.name,
+          role: editingUser.role,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update user');
+      }
+
+      setSuccessMessage('User updated successfully!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      setShowEditUserModal(false);
+      setEditingUser(null);
+      fetchAllUsers();
+      fetchStudents();
+    } catch (err) {
+      setUserFormError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteUser = async (userId, username) => {
+    if (!window.confirm('Are you sure you want to delete user "' + username + '"? This action cannot be undone.')) {
+      return;
+    }
+
+    const token = localStorage.getItem('jainPathshalaToken');
+    setActionLoading('delete-user-' + userId);
+
+    try {
+      const res = await fetch(API_BASE + '/admin/users/' + userId, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer ' + token },
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete user');
+      }
+
+      setSuccessMessage('User deleted successfully!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      fetchAllUsers();
+      fetchStudents();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const togglePasswordVisibility = (userId) => {
+    setShowPasswords(prev => ({
+      ...prev,
+      [userId]: !prev[userId]
+    }));
+  };
+
+  // ============ NEW: ADD ENTRY HANDLERS (Attendance/Gatha) ============
+
+  const handleAddEntry = async () => {
+    if (!addEntryData.studentUsername) {
+      setError('Please select a student');
+      return;
+    }
+
+    const token = localStorage.getItem('jainPathshalaToken');
+    setAddEntryLoading(true);
+    setError('');
+
+    try {
+      let endpoint, body;
+
+      if (addEntryType === 'attendance') {
+        endpoint = '/admin/attendance/add';
+        body = {
+          username: addEntryData.studentUsername,
+          date: addEntryData.date,
+        };
+      } else {
+        if (!addEntryData.sutraName || !addEntryData.totalGatha) {
+          setError('Please fill all required fields');
+          setAddEntryLoading(false);
+          return;
+        }
+        endpoint = '/admin/gatha/add';
+        body = {
+          username: addEntryData.studentUsername,
+          date: addEntryData.date,
+          sutraName: addEntryData.sutraName,
+          whichGatha: addEntryData.whichGatha,
+          totalGatha: parseInt(addEntryData.totalGatha),
+          type: addEntryData.gathaType,
+        };
+      }
+
+      const res = await fetch(API_BASE + endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to add entry');
+      }
+
+      setSuccessMessage(addEntryType === 'attendance' ? 'Attendance added!' : 'Gatha added!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      setShowAddEntryModal(false);
+      setAddEntryData({
+        studentUsername: '',
+        date: formatLocalDateString(new Date()),
+        sutraName: '',
+        whichGatha: '',
+        totalGatha: 1,
+        gathaType: 'new'
+      });
+      fetchStudents();
+      fetchPendingData(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAddEntryLoading(false);
     }
   };
 
@@ -750,7 +1043,6 @@ export default function AdminDashboard({ user, onLogout }) {
         white: [255, 255, 255],
       };
 
-      // Header
       doc.setFillColor(...colors.primary);
       doc.rect(0, 0, pageWidth, 40, 'F');
       
@@ -780,7 +1072,6 @@ export default function AdminDashboard({ user, onLogout }) {
 
       let yPos = 70;
 
-      // Summary Section
       doc.setTextColor(...colors.primary);
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
@@ -827,104 +1118,6 @@ export default function AdminDashboard({ user, onLogout }) {
 
       yPos += cardHeight + 15;
 
-      // Top Performers
-      doc.setTextColor(...colors.dark);
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('TOP PERFORMERS', 14, yPos);
-      
-      doc.setDrawColor(...colors.gold);
-      doc.setLineWidth(1);
-      doc.line(14, yPos + 2, 58, yPos + 2);
-      
-      yPos += 10;
-
-      const perfCardWidth = 88;
-      const perfCardHeight = 38;
-
-      // Top Attendance Card
-      doc.setFillColor(255, 251, 235);
-      doc.roundedRect(14, yPos, perfCardWidth, perfCardHeight, 4, 4, 'F');
-      doc.setDrawColor(...colors.warning);
-      doc.setLineWidth(0.8);
-      doc.roundedRect(14, yPos, perfCardWidth, perfCardHeight, 4, 4, 'S');
-      
-      doc.setFillColor(...colors.warning);
-      doc.roundedRect(14, yPos, perfCardWidth, 10, 4, 4, 'F');
-      doc.rect(14, yPos + 6, perfCardWidth, 4, 'F');
-      
-      doc.setTextColor(...colors.white);
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.text('TOP ATTENDANCE', 14 + perfCardWidth / 2, yPos + 7, { align: 'center' });
-      
-      topPerformers.byAttendance.slice(0, 3).forEach((s, i) => {
-        const rowY = yPos + 16 + (i * 8);
-        
-        doc.setFillColor(i === 0 ? [254, 240, 138] : i === 1 ? [229, 231, 235] : [253, 186, 116]);
-        doc.circle(20, rowY, 3, 'F');
-        
-        doc.setTextColor(...colors.dark);
-        doc.setFontSize(6);
-        doc.setFont('helvetica', 'bold');
-        doc.text(String(i + 1), 20, rowY + 1.5, { align: 'center' });
-        
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        const displayName = s.name.length > 14 ? s.name.substring(0, 14) + '...' : s.name;
-        doc.text(displayName, 26, rowY + 1);
-        
-        doc.setFillColor(...colors.warning);
-        doc.roundedRect(72, rowY - 3, 22, 6, 2, 2, 'F');
-        doc.setTextColor(...colors.white);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7);
-        doc.text(s.attendanceCount + ' days', 83, rowY + 1, { align: 'center' });
-      });
-
-      // Top Gathas Card
-      doc.setFillColor(250, 245, 255);
-      doc.roundedRect(108, yPos, perfCardWidth, perfCardHeight, 4, 4, 'F');
-      doc.setDrawColor(...colors.secondary);
-      doc.setLineWidth(0.8);
-      doc.roundedRect(108, yPos, perfCardWidth, perfCardHeight, 4, 4, 'S');
-      
-      doc.setFillColor(...colors.secondary);
-      doc.roundedRect(108, yPos, perfCardWidth, 10, 4, 4, 'F');
-      doc.rect(108, yPos + 6, perfCardWidth, 4, 'F');
-      
-      doc.setTextColor(...colors.white);
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.text('TOP NEW GATHAS', 108 + perfCardWidth / 2, yPos + 7, { align: 'center' });
-      
-      topPerformers.byGatha.slice(0, 3).forEach((s, i) => {
-        const rowY = yPos + 16 + (i * 8);
-        
-        doc.setFillColor(i === 0 ? [254, 240, 138] : i === 1 ? [229, 231, 235] : [253, 186, 116]);
-        doc.circle(114, rowY, 3, 'F');
-        
-        doc.setTextColor(...colors.dark);
-        doc.setFontSize(6);
-        doc.setFont('helvetica', 'bold');
-        doc.text(String(i + 1), 114, rowY + 1.5, { align: 'center' });
-        
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        const displayName = s.name.length > 14 ? s.name.substring(0, 14) + '...' : s.name;
-        doc.text(displayName, 120, rowY + 1);
-        
-        doc.setFillColor(...colors.secondary);
-        doc.roundedRect(166, rowY - 3, 22, 6, 2, 2, 'F');
-        doc.setTextColor(...colors.white);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7);
-        doc.text(s.newGathas + ' new', 177, rowY + 1, { align: 'center' });
-      });
-
-      yPos += perfCardHeight + 12;
-
-      // Student Table
       doc.setTextColor(...colors.dark);
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
@@ -980,44 +1173,12 @@ export default function AdminDashboard({ user, onLogout }) {
           fillColor: [248, 250, 252],
         },
         margin: { left: 14, right: 14 },
-        didParseCell: function(data) {
-          if (data.section === 'body') {
-            if (data.column.index === 2 && data.cell.raw > 0) {
-              data.cell.styles.textColor = colors.success;
-              data.cell.styles.fontStyle = 'bold';
-            }
-            if (data.column.index === 3 && data.cell.raw > 0) {
-              data.cell.styles.textColor = colors.secondary;
-              data.cell.styles.fontStyle = 'bold';
-            }
-            if (data.column.index === 4 && data.cell.raw > 0) {
-              data.cell.styles.textColor = [59, 130, 246];
-              data.cell.styles.fontStyle = 'bold';
-            }
-            if (data.column.index === 5) {
-              data.cell.styles.textColor = colors.warning;
-              data.cell.styles.fontStyle = 'bold';
-              if (data.cell.raw >= 20) {
-                data.cell.styles.fillColor = [254, 249, 195];
-              }
-              if (data.cell.raw >= 30) {
-                data.cell.styles.fillColor = [254, 240, 138];
-              }
-            }
-            if (data.cell.raw === 0) {
-              data.cell.styles.textColor = [180, 180, 180];
-            }
-          }
-        },
         didDrawPage: function(data) {
           const pageCount = doc.internal.getNumberOfPages();
           const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
           
           doc.setFillColor(...colors.primary);
           doc.rect(0, pageHeight - 12, pageWidth, 12, 'F');
-          
-          doc.setFillColor(...colors.secondary);
-          doc.rect(0, pageHeight - 12, pageWidth, 1.5, 'F');
           
           doc.setTextColor(...colors.white);
           doc.setFontSize(7);
@@ -1038,42 +1199,6 @@ export default function AdminDashboard({ user, onLogout }) {
           doc.text('Jai Jinendra!', pageWidth - 14, pageHeight - 4, { align: 'right' });
         },
       });
-
-      const finalY = doc.lastAutoTable.finalY + 8;
-      
-      if (finalY < pageHeight - 40) {
-        doc.setFillColor(248, 250, 252);
-        doc.roundedRect(14, finalY, pageWidth - 28, 18, 3, 3, 'F');
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.5);
-        doc.roundedRect(14, finalY, pageWidth - 28, 18, 3, 3, 'S');
-        
-        doc.setTextColor(...colors.dark);
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'bold');
-        doc.text('LEGEND:', 18, finalY + 6);
-        
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
-        
-        const legendItems = [
-          { color: colors.success, text: 'Attend. = Days Present' },
-          { color: colors.secondary, text: 'New = New Gathas' },
-          { color: [59, 130, 246], text: 'Revision = Practice' },
-          { color: colors.warning, text: 'Score = Attend. + New' },
-        ];
-        
-        legendItems.forEach((item, i) => {
-          const x = 18 + (i * 45);
-          const y = finalY + 13;
-          
-          doc.setFillColor(...item.color);
-          doc.circle(x, y, 1.5, 'F');
-          
-          doc.setTextColor(80, 80, 80);
-          doc.text(item.text, x + 4, y + 1);
-        });
-      }
 
       const fileName = 'Jain-Pathshala-Report-' + dateRange.start + '-to-' + dateRange.end + '.pdf';
       doc.save(fileName);
@@ -1136,7 +1261,13 @@ export default function AdminDashboard({ user, onLogout }) {
     ? Math.round((stats?.today_attendance || 0) / students.length * 100)
     : 0;
 
-  // ============ RENDER AUTO-REFRESH CONTROLS ============
+  // Filter users for display
+  const filteredUsers = allUsers.filter(u =>
+    u.name?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+    u.username?.toLowerCase().includes(userSearchQuery.toLowerCase())
+  );
+
+    // ============ RENDER AUTO-REFRESH CONTROLS ============
   const renderAutoRefreshControls = () => (
     <div className="bg-white rounded-xl p-3 border-2 border-indigo-200 shadow-sm mb-3">
       <div className="flex items-center justify-between">
@@ -1247,178 +1378,6 @@ export default function AdminDashboard({ user, onLogout }) {
       </div>
     </div>
   );
-
-  // ============ RENDER EXPORT MODAL ============
-  const renderExportModal = () => {
-    if (!showExportModal) return null;
-
-    return (
-      <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
-        <div className="bg-white w-full max-h-[90vh] rounded-t-3xl sm:rounded-2xl sm:max-w-md overflow-hidden animate-slide-up">
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-500 p-4 text-white">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <FileText className="w-6 h-6" />
-                <div>
-                  <h3 className="font-bold text-lg">Export Report</h3>
-                  <p className="text-xs opacity-80">
-                    {formatDateShort(dateRange.start)} - {formatDateShort(dateRange.end)}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowExportModal(false)}
-                className="p-2 hover:bg-white/20 rounded-full"
-              >
-                <CloseIcon className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          {exportLoading ? (
-            <div className="p-8 text-center">
-              <RefreshCw className="w-10 h-10 animate-spin text-indigo-500 mx-auto" />
-              <p className="mt-4 text-gray-600">Loading report data...</p>
-            </div>
-          ) : exportData ? (
-            <>
-              <div className="p-4 bg-gray-50 border-b">
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="text-center">
-                    <p className="text-xl font-bold text-indigo-600">{exportData.summary.totalStudents}</p>
-                    <p className="text-xs text-gray-500">Students</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xl font-bold text-blue-600">{exportData.summary.activeStudents}</p>
-                    <p className="text-xs text-gray-500">Active</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xl font-bold text-green-600">{exportData.summary.totalAttendance}</p>
-                    <p className="text-xs text-gray-500">Days</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xl font-bold text-purple-600">{exportData.summary.totalNewGathas}</p>
-                    <p className="text-xs text-gray-500">Gathas</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="max-h-60 overflow-y-auto p-4">
-                <p className="text-xs font-bold text-gray-600 mb-2">Preview (Alphabetical)</p>
-                <div className="bg-gray-50 rounded-xl overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-indigo-100">
-                      <tr>
-                        <th className="py-2 px-2 text-left text-xs font-bold text-indigo-700">#</th>
-                        <th className="py-2 px-2 text-left text-xs font-bold text-indigo-700">Name</th>
-                        <th className="py-2 px-2 text-center text-xs font-bold text-indigo-700">Att</th>
-                        <th className="py-2 px-2 text-center text-xs font-bold text-indigo-700">New</th>
-                        <th className="py-2 px-2 text-center text-xs font-bold text-indigo-700">Score</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {exportData.students.slice(0, 10).map((student, idx) => (
-                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="py-2 px-2 text-xs text-gray-500">{idx + 1}</td>
-                          <td className="py-2 px-2 text-xs font-medium text-gray-800 truncate max-w-[100px]">
-                            {student.name}
-                          </td>
-                          <td className="py-2 px-2 text-center text-xs font-bold text-green-600">
-                            {student.attendanceCount}
-                          </td>
-                          <td className="py-2 px-2 text-center text-xs font-bold text-purple-600">
-                            {student.newGathas}
-                          </td>
-                          <td className="py-2 px-2 text-center text-xs font-bold text-orange-600">
-                            {student.attendanceCount + student.newGathas}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {exportData.students.length > 10 && (
-                    <p className="text-center text-xs text-gray-400 py-2">
-                      +{exportData.students.length - 10} more students...
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="p-4 space-y-3 border-t bg-white">
-                <button
-                  onClick={generatePDFReport}
-                  disabled={isExporting}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-500 text-white py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] disabled:opacity-50 shadow-lg"
-                >
-                  {isExporting ? (
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <FileText className="w-5 h-5" />
-                  )}
-                  Download PDF Report
-                </button>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => downloadReport('txt')}
-                    disabled={isExporting}
-                    className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-bold text-xs active:scale-[0.98] disabled:opacity-50"
-                  >
-                    <Download className="w-4 h-4" />
-                    Text File
-                  </button>
-                  <button
-                    onClick={() => downloadReport('csv')}
-                    disabled={isExporting}
-                    className="flex items-center justify-center gap-2 bg-green-100 text-green-700 py-2.5 rounded-xl font-bold text-xs active:scale-[0.98] disabled:opacity-50"
-                  >
-                    <Download className="w-4 h-4" />
-                    CSV/Excel
-                  </button>
-                </div>
-
-                <button
-                  onClick={() => copyToClipboard(generateTextReport())}
-                  className="w-full flex items-center justify-center gap-2 bg-gray-50 text-gray-600 py-2.5 rounded-xl font-bold text-xs active:scale-[0.98] border border-gray-200"
-                >
-                  {exportCopied ? (
-                    <>
-                      <CheckCheck className="w-4 h-4 text-green-500" />
-                      <span className="text-green-600">Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      Copy to Clipboard
-                    </>
-                  )}
-                </button>
-
-                <button
-                  onClick={shareReport}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2.5 rounded-xl font-bold text-xs active:scale-[0.98]"
-                >
-                  <Share2 className="w-4 h-4" />
-                  Share Report
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="p-8 text-center text-gray-500">
-              <AlertTriangle className="w-10 h-10 mx-auto text-yellow-500 mb-2" />
-              <p>Failed to load report data</p>
-              <button
-                onClick={fetchExportData}
-                className="mt-4 px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
 
   // ============ RENDER DATE PICKER ============
   const renderDatePicker = () => (
@@ -1617,6 +1576,643 @@ export default function AdminDashboard({ user, onLogout }) {
     </div>
   );
 
+  // ============ RENDER EXPORT MODAL ============
+  const renderExportModal = () => {
+    if (!showExportModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+        <div className="bg-white w-full max-h-[90vh] rounded-t-3xl sm:rounded-2xl sm:max-w-md overflow-hidden animate-slide-up">
+          <div className="bg-gradient-to-r from-indigo-500 to-purple-500 p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FileText className="w-6 h-6" />
+                <div>
+                  <h3 className="font-bold text-lg">Export Report</h3>
+                  <p className="text-xs opacity-80">
+                    {formatDateShort(dateRange.start)} - {formatDateShort(dateRange.end)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="p-2 hover:bg-white/20 rounded-full"
+              >
+                <CloseIcon className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {exportLoading ? (
+            <div className="p-8 text-center">
+              <RefreshCw className="w-10 h-10 animate-spin text-indigo-500 mx-auto" />
+              <p className="mt-4 text-gray-600">Loading report data...</p>
+            </div>
+          ) : exportData ? (
+            <>
+              <div className="p-4 bg-gray-50 border-b">
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-indigo-600">{exportData.summary.totalStudents}</p>
+                    <p className="text-xs text-gray-500">Students</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-blue-600">{exportData.summary.activeStudents}</p>
+                    <p className="text-xs text-gray-500">Active</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-green-600">{exportData.summary.totalAttendance}</p>
+                    <p className="text-xs text-gray-500">Days</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-purple-600">{exportData.summary.totalNewGathas}</p>
+                    <p className="text-xs text-gray-500">Gathas</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 space-y-3 border-t bg-white">
+                <button
+                  onClick={generatePDFReport}
+                  disabled={isExporting}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-500 text-white py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] disabled:opacity-50 shadow-lg"
+                >
+                  {isExporting ? (
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <FileText className="w-5 h-5" />
+                  )}
+                  Download PDF Report
+                </button>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => downloadReport('txt')}
+                    disabled={isExporting}
+                    className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-bold text-xs active:scale-[0.98] disabled:opacity-50"
+                  >
+                    <Download className="w-4 h-4" />
+                    Text File
+                  </button>
+                  <button
+                    onClick={() => downloadReport('csv')}
+                    disabled={isExporting}
+                    className="flex items-center justify-center gap-2 bg-green-100 text-green-700 py-2.5 rounded-xl font-bold text-xs active:scale-[0.98] disabled:opacity-50"
+                  >
+                    <Download className="w-4 h-4" />
+                    CSV/Excel
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => copyToClipboard(generateTextReport())}
+                  className="w-full flex items-center justify-center gap-2 bg-gray-50 text-gray-600 py-2.5 rounded-xl font-bold text-xs active:scale-[0.98] border border-gray-200"
+                >
+                  {exportCopied ? (
+                    <>
+                      <CheckCheck className="w-4 h-4 text-green-500" />
+                      <span className="text-green-600">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      Copy to Clipboard
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={shareReport}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2.5 rounded-xl font-bold text-xs active:scale-[0.98]"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share Report
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="p-8 text-center text-gray-500">
+              <AlertTriangle className="w-10 h-10 mx-auto text-yellow-500 mb-2" />
+              <p>Failed to load report data</p>
+              <button
+                onClick={fetchExportData}
+                className="mt-4 px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ============ RENDER ADD USER MODAL ============
+  const renderAddUserModal = () => {
+    if (!showAddUserModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+        <div className="bg-white w-full max-h-[90vh] rounded-t-3xl sm:rounded-2xl sm:max-w-md overflow-hidden animate-slide-up">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <UserPlus className="w-6 h-6" />
+                <h3 className="font-bold text-lg">Add New User</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAddUserModal(false);
+                  setNewUser({ username: '', password: '', name: '', role: 'student' });
+                  setUserFormError('');
+                }}
+                className="p-2 hover:bg-white/20 rounded-full"
+              >
+                <CloseIcon className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 space-y-4">
+            {userFormError && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-lg">
+                <p className="text-sm text-red-700">{userFormError}</p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Full Name *</label>
+              <input
+                type="text"
+                value={newUser.name}
+                onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                placeholder="Enter full name"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Username *</label>
+              <input
+                type="text"
+                value={newUser.username}
+                onChange={(e) => setNewUser({ ...newUser, username: e.target.value.toLowerCase().replace(/\s/g, '') })}
+                placeholder="Enter username"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-400"
+              />
+              <p className="text-xs text-gray-500 mt-1">No spaces, lowercase only</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Password *</label>
+              <input
+                type="text"
+                value={newUser.password}
+                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                placeholder="Enter password"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-400"
+              />
+              <p className="text-xs text-gray-500 mt-1">Minimum 4 characters. Must be unique if username exists.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Role</label>
+              <select
+                value={newUser.role}
+                onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-400"
+              >
+                <option value="student">Student</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+
+            <button
+              onClick={handleAddUser}
+              disabled={actionLoading === 'add-user'}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3.5 rounded-xl font-bold active:scale-[0.98] disabled:opacity-50"
+            >
+              {actionLoading === 'add-user' ? (
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              ) : (
+                <UserPlus className="w-5 h-5" />
+              )}
+              Add User
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============ RENDER EDIT USER MODAL ============
+  const renderEditUserModal = () => {
+    if (!showEditUserModal || !editingUser) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+        <div className="bg-white w-full max-h-[90vh] rounded-t-3xl sm:rounded-2xl sm:max-w-md overflow-hidden animate-slide-up">
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Edit3 className="w-6 h-6" />
+                <h3 className="font-bold text-lg">Edit User</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEditUserModal(false);
+                  setEditingUser(null);
+                  setUserFormError('');
+                }}
+                className="p-2 hover:bg-white/20 rounded-full"
+              >
+                <CloseIcon className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 space-y-4">
+            {userFormError && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-lg">
+                <p className="text-sm text-red-700">{userFormError}</p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Full Name *</label>
+              <input
+                type="text"
+                value={editingUser.name}
+                onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Username *</label>
+              <input
+                type="text"
+                value={editingUser.username}
+                onChange={(e) => setEditingUser({ ...editingUser, username: e.target.value.toLowerCase().replace(/\s/g, '') })}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Password</label>
+              <input
+                type="text"
+                value={editingUser.password || ''}
+                onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })}
+                placeholder="Leave empty to keep current"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-400"
+              />
+              <p className="text-xs text-gray-500 mt-1">Leave empty to keep current password</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Role</label>
+              <select
+                value={editingUser.role}
+                onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-400"
+              >
+                <option value="student">Student</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+
+            <button
+              onClick={handleUpdateUser}
+              disabled={actionLoading === 'update-user'}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-3.5 rounded-xl font-bold active:scale-[0.98] disabled:opacity-50"
+            >
+              {actionLoading === 'update-user' ? (
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              ) : (
+                <Save className="w-5 h-5" />
+              )}
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============ RENDER ADD ENTRY MODAL ============
+  const renderAddEntryModal = () => {
+    if (!showAddEntryModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+        <div className="bg-white w-full max-h-[90vh] rounded-t-3xl sm:rounded-2xl sm:max-w-md overflow-hidden animate-slide-up">
+          <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Plus className="w-6 h-6" />
+                <h3 className="font-bold text-lg">Add Entry for Student</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAddEntryModal(false);
+                  setAddEntryData({
+                    studentUsername: '',
+                    date: formatLocalDateString(new Date()),
+                    sutraName: '',
+                    whichGatha: '',
+                    totalGatha: 1,
+                    gathaType: 'new'
+                  });
+                }}
+                className="p-2 hover:bg-white/20 rounded-full"
+              >
+                <CloseIcon className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 space-y-4">
+            {/* Entry Type Toggle */}
+            <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
+              <button
+                onClick={() => setAddEntryType('attendance')}
+                className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                  addEntryType === 'attendance' ? 'bg-white text-green-600 shadow' : 'text-gray-600'
+                }`}
+              >
+                <Calendar className="w-4 h-4" />
+                Attendance
+              </button>
+              <button
+                onClick={() => setAddEntryType('gatha')}
+                className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                  addEntryType === 'gatha' ? 'bg-white text-purple-600 shadow' : 'text-gray-600'
+                }`}
+              >
+                <BookOpen className="w-4 h-4" />
+                Gatha
+              </button>
+            </div>
+
+            {/* Select Student */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Select Student *</label>
+              <select
+                value={addEntryData.studentUsername}
+                onChange={(e) => setAddEntryData({ ...addEntryData, studentUsername: e.target.value })}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
+              >
+                <option value="">-- Select Student --</option>
+                {students.map((s) => (
+                  <option key={s.username} value={s.username}>
+                    {s.name} (@{s.username})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Date */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Date *</label>
+              <input
+                type="date"
+                value={addEntryData.date}
+                onChange={(e) => setAddEntryData({ ...addEntryData, date: e.target.value })}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
+              />
+            </div>
+
+            {/* Gatha specific fields */}
+            {addEntryType === 'gatha' && (
+              <>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Gatha Type</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setAddEntryData({ ...addEntryData, gathaType: 'new' })}
+                      className={`flex-1 py-2.5 rounded-lg text-sm font-bold ${
+                        addEntryData.gathaType === 'new' 
+                          ? 'bg-purple-500 text-white' 
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      New
+                    </button>
+                    <button
+                      onClick={() => setAddEntryData({ ...addEntryData, gathaType: 'revision' })}
+                      className={`flex-1 py-2.5 rounded-lg text-sm font-bold ${
+                        addEntryData.gathaType === 'revision' 
+                          ? 'bg-blue-500 text-white' 
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      Revision
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Sutra Name *</label>
+                  <input
+                    type="text"
+                    value={addEntryData.sutraName}
+                    onChange={(e) => setAddEntryData({ ...addEntryData, sutraName: e.target.value })}
+                    placeholder="e.g., Namokar Mantra"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Which Gatha (optional)</label>
+                  <input
+                    type="text"
+                    value={addEntryData.whichGatha}
+                    onChange={(e) => setAddEntryData({ ...addEntryData, whichGatha: e.target.value })}
+                    placeholder="e.g., 1-5 or specific numbers"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Total Gatha Count *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={addEntryData.totalGatha}
+                    onChange={(e) => setAddEntryData({ ...addEntryData, totalGatha: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
+                  />
+                </div>
+              </>
+            )}
+
+            <button
+              onClick={handleAddEntry}
+              disabled={addEntryLoading}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3.5 rounded-xl font-bold active:scale-[0.98] disabled:opacity-50"
+            >
+              {addEntryLoading ? (
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              ) : (
+                <Plus className="w-5 h-5" />
+              )}
+              {addEntryType === 'attendance' ? 'Add Attendance' : 'Add Gatha'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============ RENDER USER MANAGEMENT ============
+  const renderUserManagement = () => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <UserCog className="w-5 h-5 text-indigo-500" />
+          User Management
+        </h3>
+        <button
+          onClick={fetchAllUsers}
+          disabled={usersLoading}
+          className="p-2 bg-indigo-100 text-indigo-600 rounded-xl active:scale-[0.98]"
+        >
+          <RefreshCw className={`w-4 h-4 ${usersLoading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={() => setShowAddUserModal(true)}
+          className="flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-xl font-bold active:scale-[0.98] shadow-lg"
+        >
+          <UserPlus className="w-5 h-5" />
+          Add User
+        </button>
+        <button
+          onClick={() => setShowAddEntryModal(true)}
+          className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-bold active:scale-[0.98] shadow-lg"
+        >
+          <Plus className="w-5 h-5" />
+          Add Entry
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="bg-white rounded-xl p-3 border-2 border-indigo-200 shadow-sm">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={userSearchQuery}
+            onChange={(e) => setUserSearchQuery(e.target.value)}
+            placeholder="Search users..."
+            className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400 text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-white rounded-xl p-3 border-2 border-blue-200 text-center">
+          <p className="text-xl font-bold text-blue-600">{allUsers.length}</p>
+          <p className="text-xs text-gray-500">Total Users</p>
+        </div>
+        <div className="bg-white rounded-xl p-3 border-2 border-green-200 text-center">
+          <p className="text-xl font-bold text-green-600">{allUsers.filter(u => u.role === 'student').length}</p>
+          <p className="text-xs text-gray-500">Students</p>
+        </div>
+        <div className="bg-white rounded-xl p-3 border-2 border-purple-200 text-center">
+          <p className="text-xl font-bold text-purple-600">{allUsers.filter(u => u.role === 'admin').length}</p>
+          <p className="text-xs text-gray-500">Admins</p>
+        </div>
+      </div>
+
+      {/* Users List */}
+      {usersLoading ? (
+        <div className="bg-white rounded-xl p-8 border-2 border-indigo-200 text-center">
+          <RefreshCw className="w-10 h-10 animate-spin text-indigo-500 mx-auto" />
+          <p className="mt-4 text-gray-600">Loading users...</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filteredUsers.map((u) => (
+            <div key={u.id} className="bg-white rounded-xl border-2 border-indigo-200 p-3 shadow-sm">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-bold text-gray-800 text-sm truncate">{u.name}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                      u.role === 'admin' 
+                        ? 'bg-purple-100 text-purple-700' 
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {u.role}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span>@{u.username}</span>
+                    <span>•</span>
+                    <div className="flex items-center gap-1">
+                      <Key className="w-3 h-3" />
+                      {showPasswords[u.id] ? (
+                        <span className="font-mono bg-gray-100 px-1 rounded">{u.password}</span>
+                      ) : (
+                        <span>••••••</span>
+                      )}
+                      <button
+                        onClick={() => togglePasswordVisibility(u.id)}
+                        className="p-0.5 hover:bg-gray-100 rounded"
+                      >
+                        {showPasswords[u.id] ? (
+                          <EyeOff className="w-3 h-3" />
+                        ) : (
+                          <Eye className="w-3 h-3" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-1.5 ml-2">
+                  <button
+                    onClick={() => {
+                      setEditingUser({ ...u, password: '' });
+                      setShowEditUserModal(true);
+                    }}
+                    className="p-2 bg-blue-100 text-blue-600 rounded-lg active:scale-95"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteUser(u.id, u.username)}
+                    disabled={actionLoading === 'delete-user-' + u.id || u.role === 'admin'}
+                    className="p-2 bg-red-100 text-red-600 rounded-lg active:scale-95 disabled:opacity-50"
+                  >
+                    {actionLoading === 'delete-user-' + u.id ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {filteredUsers.length === 0 && (
+            <div className="bg-white rounded-xl p-8 border-2 border-gray-200 text-center">
+              <Users className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+              <p className="text-gray-500">No users found</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   // ============ RENDER OVERVIEW ============
   const renderOverview = () => (
     <div className="space-y-4">
@@ -1782,36 +2378,28 @@ export default function AdminDashboard({ user, onLogout }) {
         </button>
 
         <button
-          onClick={() => setActiveTab('analytics')}
-          className="flex items-center gap-3 bg-white rounded-xl p-3 border-2 border-green-200 shadow-sm active:scale-[0.98]"
+          onClick={() => setActiveTab('users')}
+          className="flex items-center gap-3 bg-white rounded-xl p-3 border-2 border-purple-200 shadow-sm active:scale-[0.98]"
         >
-          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-            <BarChart3 className="w-5 h-5 text-green-600" />
+          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+            <UserCog className="w-5 h-5 text-purple-600" />
           </div>
           <div className="text-left">
-            <p className="font-bold text-gray-800 text-sm">Analytics</p>
-            <p className="text-xs text-gray-500">Reports</p>
+            <p className="font-bold text-gray-800 text-sm">Manage Users</p>
+            <p className="text-xs text-gray-500">Add/Edit</p>
           </div>
         </button>
       </div>
     </div>
   );
 
-    // ============ RENDER APPROVALS ============
+  // ============ RENDER APPROVALS ============
   const renderApprovals = () => (
     <div className="space-y-4">
       {renderAutoRefreshControls()}
 
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-gray-800">Pending Approvals</h3>
-        <div className="flex items-center gap-2">
-          {autoRefresh && isOnline && (
-            <div className="flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-[10px] font-bold">LIVE</span>
-            </div>
-          )}
-        </div>
       </div>
 
       {totalPending > 0 && (
@@ -2080,119 +2668,21 @@ export default function AdminDashboard({ user, onLogout }) {
                       </div>
 
                       {studentDetail.recentActivity && studentDetail.recentActivity.length > 0 && (
-                        <div className="space-y-2 max-h-80 overflow-y-auto">
-                          <p className="text-xs font-bold text-gray-600 mb-2">Activity Log (Click to expand)</p>
-                          {groupActivitiesByDate(studentDetail.recentActivity).slice(0, 15).map((dayGroup, idx) => {
-                            const dayKey = student.id + '-' + dayGroup.date;
-                            const isDayExpanded = expandedDay === dayKey;
-                            const newGathasForDay = dayGroup.gathas.filter(g => g.gatha_type === 'new');
-                            const revisionGathasForDay = dayGroup.gathas.filter(g => g.gatha_type === 'revision');
-                            
-                            return (
-                              <div key={idx} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedDay(isDayExpanded ? null : dayKey);
-                                  }}
-                                  className="w-full p-2 text-left active:bg-gray-50 flex items-center justify-between"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <p className="text-xs font-bold text-gray-700">
-                                      {formatDate(dayGroup.date)}
-                                    </p>
-                                    {dayGroup.attendance && (
-                                      <span className="text-xs bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full">Present</span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {newGathasForDay.length > 0 && (
-                                      <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full font-bold">
-                                        {newGathasForDay.reduce((sum, g) => sum + (g.total_gatha || 0), 0)} new
-                                      </span>
-                                    )}
-                                    {revisionGathasForDay.length > 0 && (
-                                      <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-bold">
-                                        {revisionGathasForDay.reduce((sum, g) => sum + (g.total_gatha || 0), 0)} rev
-                                      </span>
-                                    )}
-                                    {isDayExpanded ? (
-                                      <ChevronUp className="w-3 h-3 text-gray-400" />
-                                    ) : (
-                                      <ChevronDown className="w-3 h-3 text-gray-400" />
-                                    )}
-                                  </div>
-                                </button>
-                                
-                                {isDayExpanded && (
-                                  <div className="border-t border-gray-100 p-2 bg-gradient-to-br from-gray-50 to-indigo-50 space-y-2">
-                                    {dayGroup.attendance && (
-                                      <div className="bg-green-50 border border-green-200 rounded-lg p-2">
-                                        <p className="text-xs font-bold text-green-700">Attendance Marked</p>
-                                        <p className="text-xs text-green-600 mt-0.5">Present on this day</p>
-                                      </div>
-                                    )}
-                                    
-                                    {newGathasForDay.length > 0 && (
-                                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-2">
-                                        <p className="text-xs font-bold text-purple-700 mb-1.5">New Gathas Learned</p>
-                                        <div className="space-y-1.5">
-                                          {newGathasForDay.map((g, gIdx) => (
-                                            <div key={gIdx} className="bg-white rounded-lg p-2 border border-purple-100">
-                                              <p className="text-xs font-bold text-gray-800 truncate">
-                                                {g.sutra_name || 'Unknown Sutra'}
-                                              </p>
-                                              <div className="flex items-center justify-between mt-1">
-                                                <p className="text-xs text-gray-600">
-                                                  Gatha: <span className="font-bold text-purple-600">{g.which_gatha || '-'}</span>
-                                                </p>
-                                                <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-                                                  {g.total_gatha || 1} Gatha
-                                                </span>
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                    
-                                    {revisionGathasForDay.length > 0 && (
-                                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
-                                        <p className="text-xs font-bold text-blue-700 mb-1.5">Revision Practice</p>
-                                        <div className="space-y-1.5">
-                                          {revisionGathasForDay.map((g, gIdx) => (
-                                            <div key={gIdx} className="bg-white rounded-lg p-2 border border-blue-100">
-                                              <p className="text-xs font-bold text-gray-800 truncate">
-                                                {g.sutra_name || 'Unknown Sutra'}
-                                              </p>
-                                              <div className="flex items-center justify-between mt-1">
-                                                <p className="text-xs text-gray-600">
-                                                  Gatha: <span className="font-bold text-blue-600">{g.which_gatha || '-'}</span>
-                                                </p>
-                                                <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-                                                  {g.total_gatha || 1} Gatha
-                                                </span>
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                    
-                                    {dayGroup.gathas.length === 0 && !dayGroup.attendance && (
-                                      <p className="text-xs text-gray-500 text-center py-2">No activity recorded</p>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {(!studentDetail.recentActivity || studentDetail.recentActivity.length === 0) && (
-                        <div className="text-center py-4 text-gray-500">
-                          <p className="text-sm">No activity in selected range</p>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          <p className="text-xs font-bold text-gray-600 mb-2">Recent Activity</p>
+                          {groupActivitiesByDate(studentDetail.recentActivity).slice(0, 10).map((dayGroup, idx) => (
+                            <div key={idx} className="bg-white rounded-lg p-2 border border-gray-200">
+                              <p className="text-xs font-bold text-gray-700">{formatDate(dayGroup.date)}</p>
+                              {dayGroup.attendance && (
+                                <span className="text-xs bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full mr-1">Present</span>
+                              )}
+                              {dayGroup.gathas.length > 0 && (
+                                <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">
+                                  {dayGroup.gathas.length} gatha(s)
+                                </span>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       )}
                     </>
@@ -2254,59 +2744,13 @@ export default function AdminDashboard({ user, onLogout }) {
         </div>
       </div>
 
-      <div className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl p-3 border-2 border-orange-200">
-        <p className="text-xs text-center text-orange-700 font-semibold">
-          Total Score = Attendance Days + New Gathas
-        </p>
-        <p className="text-xs text-center text-orange-500 mt-1">
-          (Revision gathas tracked separately, not added to score)
-        </p>
-      </div>
-
-      <div className="bg-white rounded-xl p-3 border-2 border-orange-200 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-800 mb-2">Top 5 - Total Score</h3>
-        <div className="space-y-1.5">
-          {filteredStudents
-            .map(s => ({
-              ...s,
-              totalScore: (s.attendance_count || 0) + (s.new_gathas || 0)
-            }))
-            .sort((a, b) => b.totalScore - a.totalScore)
-            .slice(0, 5)
-            .map((student, index) => {
-              const medals = ['🥇', '🥈', '🥉', '4', '5'];
-              return (
-                <div
-                  key={student.username}
-                  className="flex items-center justify-between p-2 rounded-lg bg-gradient-to-r from-orange-50 to-yellow-50"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{medals[index]}</span>
-                    <span className="font-semibold text-gray-800 text-sm">{student.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-green-600 font-bold">{student.attendance_count || 0}</span>
-                    <span className="text-xs text-purple-600 font-bold">{student.new_gathas || 0}</span>
-                    <span className="bg-orange-500 text-white px-2 py-0.5 rounded-full font-bold text-xs">
-                      {student.totalScore}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-        </div>
-      </div>
-
       <div className="bg-white rounded-xl p-3 border-2 border-green-200 shadow-sm">
         <h3 className="text-sm font-bold text-gray-800 mb-2">Top 5 - Attendance</h3>
         <div className="space-y-1.5">
           {topStudents.topAttendance?.slice(0, 5).map((student, index) => {
             const medals = ['🥇', '🥈', '🥉', '4', '5'];
             return (
-              <div
-                key={student.username}
-                className="flex items-center justify-between p-2 rounded-lg bg-gray-50"
-              >
+              <div key={student.username} className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">{medals[index]}</span>
                   <span className="font-semibold text-gray-800 text-sm">{student.name}</span>
@@ -2317,9 +2761,6 @@ export default function AdminDashboard({ user, onLogout }) {
               </div>
             );
           })}
-          {(!topStudents.topAttendance || topStudents.topAttendance.length === 0) && (
-            <p className="text-center text-gray-500 py-2 text-sm">No data</p>
-          )}
         </div>
       </div>
 
@@ -2329,10 +2770,7 @@ export default function AdminDashboard({ user, onLogout }) {
           {topStudents.topGatha?.slice(0, 5).map((student, index) => {
             const medals = ['🥇', '🥈', '🥉', '4', '5'];
             return (
-              <div
-                key={student.username}
-                className="flex items-center justify-between p-2 rounded-lg bg-gray-50"
-              >
+              <div key={student.username} className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">{medals[index]}</span>
                   <span className="font-semibold text-gray-800 text-sm">{student.name}</span>
@@ -2343,9 +2781,6 @@ export default function AdminDashboard({ user, onLogout }) {
               </div>
             );
           })}
-          {(!topStudents.topGatha || topStudents.topGatha.length === 0) && (
-            <p className="text-center text-gray-500 py-2 text-sm">No data</p>
-          )}
         </div>
       </div>
     </div>
@@ -2397,14 +2832,20 @@ export default function AdminDashboard({ user, onLogout }) {
         {activeTab === 'approvals' && renderApprovals()}
         {activeTab === 'students' && renderStudentsList()}
         {activeTab === 'analytics' && renderAnalytics()}
+        {activeTab === 'users' && renderUserManagement()}
 
         {renderExportModal()}
+        {renderAddUserModal()}
+        {renderEditUserModal()}
+        {renderAddEntryModal()}
 
+        {/* Bottom Navigation - 5 Tabs */}
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-indigo-200 p-2 shadow-2xl">
-          <div className="max-w-lg mx-auto grid grid-cols-4 gap-1">
+          <div className="max-w-lg mx-auto grid grid-cols-5 gap-1">
             {[
               { key: 'overview', icon: BarChart3, label: 'Home' },
               { key: 'students', icon: Users, label: 'Students' },
+              { key: 'users', icon: UserCog, label: 'Users' },
               { key: 'analytics', icon: TrendingUp, label: 'Stats' },
               { key: 'approvals', icon: Clock, label: 'Pending', badge: totalPending, alert: newPendingAlert },
             ].map((tab) => (
@@ -2425,9 +2866,6 @@ export default function AdminDashboard({ user, onLogout }) {
                   }`}>
                     {tab.badge > 9 ? '9+' : tab.badge}
                   </span>
-                )}
-                {tab.alert && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full animate-ping opacity-75" />
                 )}
               </button>
             ))}
