@@ -192,6 +192,13 @@ export default function AdminDashboard({ user, onLogout }) {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  const [familyGroups, setFamilyGroups] = useState([]);
+  const [familyGroupsLoading, setFamilyGroupsLoading] = useState(false);
+  const [showAddGroupModal, setShowAddGroupModal] = useState(false);
+  const [showEditGroupModal, setShowEditGroupModal] = useState(false);
+  const [editingGroup, setEditingGroup] = useState(null);
+  const [newGroup, setNewGroup] = useState({ groupName: '', members: [] });
+  const [selectedMembers, setSelectedMembers] = useState([]);
   
   // Auto-refresh state
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -485,6 +492,24 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   }, [dateRange]);
 
+  const fetchFamilyGroups = useCallback(async () => {
+  const token = localStorage.getItem('jainPathshalaToken');
+  setFamilyGroupsLoading(true);
+  try {
+    const res = await fetch(API_BASE + '/admin/family-groups', {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setFamilyGroups(data);
+    }
+  } catch (err) {
+    console.error('Error fetching family groups:', err);
+  } finally {
+    setFamilyGroupsLoading(false);
+  }
+}, []);
+  
   // ============ NEW: FETCH ALL USERS ============
   const fetchAllUsers = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
@@ -508,6 +533,12 @@ export default function AdminDashboard({ user, onLogout }) {
   }, []);
 
   // ============ AUTO-REFRESH EFFECT ============
+
+  useEffect(() => {
+  if (activeTab === 'users') {
+    fetchFamilyGroups();
+  }
+}, [activeTab, fetchFamilyGroups]);
   
   useEffect(() => {
     if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
@@ -562,6 +593,78 @@ export default function AdminDashboard({ user, onLogout }) {
   }, [activeTab, fetchAllUsers]);
 
   // ============ HANDLERS ============
+
+  const handleCreateGroup = async () => {
+  if (!newGroup.groupName || selectedMembers.length < 2) {
+    setError('Group name and at least 2 members required');
+    return;
+  }
+
+  const token = localStorage.getItem('jainPathshalaToken');
+  setActionLoading('create-group');
+
+  try {
+    const res = await fetch(API_BASE + '/admin/family-groups', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        groupName: newGroup.groupName,
+        members: selectedMembers
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to create group');
+    }
+
+    setSuccessMessage('Family group created!');
+    setTimeout(() => setSuccessMessage(''), 3000);
+    setShowAddGroupModal(false);
+    setNewGroup({ groupName: '', members: [] });
+    setSelectedMembers([]);
+    fetchFamilyGroups();
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setActionLoading(null);
+  }
+};
+
+const handleDeleteGroup = async (groupId) => {
+  if (!window.confirm('Delete this family group?')) return;
+
+  const token = localStorage.getItem('jainPathshalaToken');
+  setActionLoading('delete-group-' + groupId);
+
+  try {
+    const res = await fetch(API_BASE + '/admin/family-groups/' + groupId, {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer ' + token },
+    });
+
+    if (!res.ok) throw new Error('Failed to delete group');
+
+    setSuccessMessage('Group deleted!');
+    setTimeout(() => setSuccessMessage(''), 3000);
+    fetchFamilyGroups();
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setActionLoading(null);
+  }
+};
+
+const toggleMemberSelection = (username) => {
+  setSelectedMembers(prev => 
+    prev.includes(username) 
+      ? prev.filter(u => u !== username)
+      : [...prev, username]
+  );
+};
   
   const handleApprove = async (type, id) => {
     const token = localStorage.getItem('jainPathshalaToken');
@@ -2081,6 +2184,185 @@ export default function AdminDashboard({ user, onLogout }) {
           <RefreshCw className={`w-4 h-4 ${usersLoading ? 'animate-spin' : ''}`} />
         </button>
       </div>
+  const renderFamilyGroupsSection = () => (
+  <div className="mt-6 space-y-4">
+    <div className="flex items-center justify-between">
+      <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+        <Users className="w-5 h-5 text-purple-500" />
+        Family Groups
+      </h3>
+      <button
+        onClick={() => {
+          setSelectedMembers([]);
+          setNewGroup({ groupName: '', members: [] });
+          setShowAddGroupModal(true);
+        }}
+        className="flex items-center gap-1 bg-purple-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold active:scale-[0.98]"
+      >
+        <Plus className="w-4 h-4" />
+        Create Group
+      </button>
+    </div>
+
+    <div className="bg-purple-50 rounded-xl p-3 border-2 border-purple-200">
+      <p className="text-xs text-purple-700">
+        💡 Family groups allow members to mark attendance and add gatha for each other without logging out.
+      </p>
+    </div>
+
+    {familyGroupsLoading ? (
+      <div className="text-center py-4">
+        <RefreshCw className="w-6 h-6 animate-spin text-purple-500 mx-auto" />
+      </div>
+    ) : familyGroups.length === 0 ? (
+      <div className="bg-white rounded-xl p-6 border-2 border-gray-200 text-center">
+        <Users className="w-10 h-10 mx-auto text-gray-300 mb-2" />
+        <p className="text-gray-500 text-sm">No family groups created yet</p>
+      </div>
+    ) : (
+      <div className="space-y-3">
+        {familyGroups.map((group) => (
+          <div key={group.id} className="bg-white rounded-xl border-2 border-purple-200 p-3 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-bold text-gray-800">{group.groupName}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {group.members.length} members
+                </p>
+              </div>
+              <button
+                onClick={() => handleDeleteGroup(group.id)}
+                disabled={actionLoading === 'delete-group-' + group.id}
+                className="p-2 bg-red-100 text-red-600 rounded-lg active:scale-95"
+              >
+                {actionLoading === 'delete-group-' + group.id ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {group.members.map((member) => (
+                <span 
+                  key={member.username}
+                  className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium"
+                >
+                  {member.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+);
+
+      const renderAddGroupModal = () => {
+  if (!showAddGroupModal) return null;
+
+  // Get students not in any group
+  const studentsInGroups = familyGroups.flatMap(g => g.members.map(m => m.username));
+  const availableStudents = students.filter(s => !studentsInGroups.includes(s.username));
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+      <div className="bg-white w-full max-h-[90vh] rounded-t-3xl sm:rounded-2xl sm:max-w-md overflow-hidden animate-slide-up">
+        <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-4 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Users className="w-6 h-6" />
+              <h3 className="font-bold text-lg">Create Family Group</h3>
+            </div>
+            <button
+              onClick={() => {
+                setShowAddGroupModal(false);
+                setSelectedMembers([]);
+              }}
+              className="p-2 hover:bg-white/20 rounded-full"
+            >
+              <CloseIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">Group Name *</label>
+            <input
+              type="text"
+              value={newGroup.groupName}
+              onChange={(e) => setNewGroup({ ...newGroup, groupName: e.target.value })}
+              placeholder="e.g., Sharma Family"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              Select Members * ({selectedMembers.length} selected)
+            </label>
+            <p className="text-xs text-gray-500 mb-2">Select at least 2 members</p>
+            
+            <div className="max-h-48 overflow-y-auto border-2 border-gray-200 rounded-xl p-2 space-y-1">
+              {availableStudents.map((student) => (
+                <button
+                  key={student.username}
+                  onClick={() => toggleMemberSelection(student.username)}
+                  className={`w-full flex items-center justify-between p-2 rounded-lg text-left ${
+                    selectedMembers.includes(student.username)
+                      ? 'bg-purple-100 border-2 border-purple-400'
+                      : 'bg-gray-50 border-2 border-transparent'
+                  }`}
+                >
+                  <span className="text-sm font-medium text-gray-800">{student.name}</span>
+                  {selectedMembers.includes(student.username) && (
+                    <Check className="w-4 h-4 text-purple-600" />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {selectedMembers.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {selectedMembers.map(username => {
+                  const student = students.find(s => s.username === username);
+                  return (
+                    <span 
+                      key={username}
+                      className="bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1"
+                    >
+                      {student?.name || username}
+                      <button onClick={() => toggleMemberSelection(username)}>
+                        <CloseIcon className="w-3 h-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="p-4 border-t">
+          <button
+            onClick={handleCreateGroup}
+            disabled={actionLoading === 'create-group' || selectedMembers.length < 2}
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3.5 rounded-xl font-bold active:scale-[0.98] disabled:opacity-50"
+          >
+            {actionLoading === 'create-group' ? (
+              <RefreshCw className="w-5 h-5 animate-spin" />
+            ) : (
+              <Users className="w-5 h-5" />
+            )}
+            Create Group
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
       {/* Action Buttons */}
       <div className="grid grid-cols-2 gap-3">
