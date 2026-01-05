@@ -1694,7 +1694,7 @@ const NextBadges = ({ stats, onBadgeClick }) => {
 };
 
 // ============================================
-// MAIN STUDENT DASHBOARD COMPONENT
+// MAIN STUDENT DASHBOARD COMPONENT - CORRECTED
 // ============================================
 
 export default function StudentDashboard({ user, onLogout }) {
@@ -1702,6 +1702,7 @@ export default function StudentDashboard({ user, onLogout }) {
 
   // Group/Account Switching States
   const [groupMembers, setGroupMembers] = useState([]);
+  const [groupName, setGroupName] = useState(null);
   const [activeUser, setActiveUser] = useState(user);
   const [isLoadingSwitch, setIsLoadingSwitch] = useState(false);
 
@@ -1748,70 +1749,10 @@ export default function StudentDashboard({ user, onLogout }) {
   const greeting = getGreeting();
   const [dailyQuote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)]);
 
-  // Get active user ID for API calls
-  const activeUserId = activeUser?._id || activeUser?.id;
-  const loggedInUserId = user?._id || user?.id;
-  const isViewingOther = activeUserId !== loggedInUserId;
-
-  // Derived data
-  const todayAttendanceMarked = useMemo(
-    () => attendanceHistory.some((r) => formatLocalDateString(r.date) === todayIso),
-    [attendanceHistory, todayIso]
-  );
-
-  const todayPendingAttendance = useMemo(
-    () => pendingStatus.attendance?.find((p) => formatLocalDateString(p.date) === todayIso && p.status === 'pending'),
-    [pendingStatus.attendance, todayIso]
-  );
-
-  const todayAttendanceStatus = useMemo(() => {
-    if (todayAttendanceMarked) return 'approved';
-    if (todayPendingAttendance) return 'pending';
-    return 'not_marked';
-  }, [todayAttendanceMarked, todayPendingAttendance]);
-
-  const todaysApprovedGathas = useMemo(
-    () => gathaEntries.filter((e) => e.created_at && formatLocalDateString(e.created_at) === todayIso),
-    [gathaEntries, todayIso]
-  );
-
-  const todaysPendingGathas = useMemo(
-    () => pendingStatus.gatha?.filter((p) => formatLocalDateString(p.date) === todayIso && p.status === 'pending') || [],
-    [pendingStatus.gatha, todayIso]
-  );
-
-  const totalPendingCount = useMemo(() => {
-    const att = pendingStatus.attendance?.filter((p) => p.status === 'pending').length || 0;
-    const gatha = pendingStatus.gatha?.filter((p) => p.status === 'pending').length || 0;
-    return att + gatha;
-  }, [pendingStatus]);
-
-  // User stats for achievements
-  const userStats = useMemo(() => ({
-    monthlyAttendance,
-    monthlyNewGathas,
-    currentStreak,
-    maxStreak,
-    workingDays,
-  }), [monthlyAttendance, monthlyNewGathas, currentStreak, maxStreak, workingDays]);
-
-  // Calculate XP and level
-  const xpBreakdown = useMemo(
-    () => calculateTotalXP(userStats, MONTHLY_ACHIEVEMENTS),
-    [userStats]
-  );
-
-  const userLevel = useMemo(() => getUserLevel(xpBreakdown.total), [xpBreakdown.total]);
-
-  const unlockedBadgesCount = useMemo(
-    () => MONTHLY_ACHIEVEMENTS.filter((a) => calculateAchievementProgress(a, userStats).unlocked).length,
-    [userStats]
-  );
-
-  const motivationalMessage = useMemo(
-    () => getMotivationalMessage(currentStreak, monthlyAttendance, monthlyNewGathas),
-    [currentStreak, monthlyAttendance, monthlyNewGathas]
-  );
+  // Get active user info
+  const activeUsername = activeUser?.username || activeUser?.name;
+  const loggedInUsername = user?.username || user?.name;
+  const isViewingOther = activeUsername !== loggedInUsername;
 
   // Helpers
   const showSuccess = (msg) => {
@@ -1873,49 +1814,80 @@ export default function StudentDashboard({ user, onLogout }) {
   };
 
   // ============================================
-  // API CALLS - Modified to support user switching
+  // API CALLS - Using correct backend endpoints
   // ============================================
 
-  // Fetch group members
+  // Fetch family/group members - CORRECTED ENDPOINT
   const fetchGroupMembers = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
-      const res = await fetch(`${API_BASE}/student/group-members`, {
+      const res = await fetch(`${API_BASE}/family-members`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
-        const members = data.members || data.groupMembers || [];
-        setGroupMembers(members);
+        const members = data.familyMembers || [];
+        setGroupName(data.groupName || null);
         
-        // If current user is in the group, ensure they're included
-        if (members.length > 0 && !members.find(m => (m._id || m.id) === loggedInUserId)) {
-          setGroupMembers([user, ...members]);
+        if (members.length > 0) {
+          // Convert to format expected by UserSwitcher
+          const formattedMembers = members.map(m => ({
+            _id: m.username,
+            id: m.username,
+            username: m.username,
+            name: m.name || m.username,
+            isCurrent: m.isCurrent
+          }));
+          setGroupMembers(formattedMembers);
+        } else {
+          setGroupMembers([]);
         }
       }
     } catch (error) {
-      console.error('Error fetching group members:', error);
+      console.error('Error fetching family members:', error);
     }
-  }, [loggedInUserId, user]);
+  }, []);
 
-  const fetchPendingStatus = useCallback(async (userId = activeUserId) => {
+  // Fetch data for the current active user
+  const fetchUserData = useCallback(async (username) => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    
+    // If viewing logged-in user, use regular endpoints
+    if (username === loggedInUsername) {
+      return null; // Will use default fetch functions
+    }
+    
+    // For family members, use the family-member data endpoint
+    try {
+      const res = await fetch(`${API_BASE}/family-member/${username}/data`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (error) {
+      console.error('Error fetching family member data:', error);
+    }
+    return null;
+  }, [loggedInUsername]);
+
+  const fetchPendingStatus = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
-      const userParam = userId && userId !== loggedInUserId ? `?userId=${userId}` : '';
-      const res = await fetch(`${API_BASE}/student/pending${userParam}`, {
+      const res = await fetch(`${API_BASE}/student/pending`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) setPendingStatus(await res.json());
     } catch (error) {
       console.error('Error fetching pending:', error);
     }
-  }, [activeUserId, loggedInUserId]);
+  }, []);
 
-  const fetchAttendance = useCallback(async (userId = activeUserId) => {
+  const fetchAttendance = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
-      const userParam = userId && userId !== loggedInUserId ? `?userId=${userId}` : '';
-      const res = await fetch(`${API_BASE}/attendance${userParam}`, { 
+      const res = await fetch(`${API_BASE}/attendance`, { 
         headers: { Authorization: `Bearer ${token}` } 
       });
       if (res.ok) {
@@ -1936,13 +1908,12 @@ export default function StudentDashboard({ user, onLogout }) {
     } catch (error) {
       console.error('Error fetching attendance:', error);
     }
-  }, [activeUserId, loggedInUserId]);
+  }, []);
 
-  const fetchGathas = useCallback(async (userId = activeUserId) => {
+  const fetchGathas = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
-      const userParam = userId && userId !== loggedInUserId ? `?userId=${userId}` : '';
-      const res = await fetch(`${API_BASE}/gatha${userParam}`, { 
+      const res = await fetch(`${API_BASE}/gatha`, { 
         headers: { Authorization: `Bearer ${token}` } 
       });
       if (res.ok) {
@@ -1963,13 +1934,12 @@ export default function StudentDashboard({ user, onLogout }) {
     } catch (error) {
       console.error('Error fetching gathas:', error);
     }
-  }, [activeUserId, loggedInUserId]);
+  }, []);
 
-  const fetchMonthlyStats = useCallback(async (year, month, userId = activeUserId) => {
+  const fetchMonthlyStats = useCallback(async (year, month) => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
-      const userParam = userId && userId !== loggedInUserId ? `&userId=${userId}` : '';
-      const res = await fetch(`${API_BASE}/stats/comprehensive?year=${year}&month=${month}${userParam}`, {
+      const res = await fetch(`${API_BASE}/stats/comprehensive?year=${year}&month=${month}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -1984,30 +1954,78 @@ export default function StudentDashboard({ user, onLogout }) {
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
-  }, [activeUserId, loggedInUserId]);
+  }, []);
 
-  // Load all data for a specific user
-  const loadUserData = useCallback(async (userId) => {
+  // Load data for a switched user using the family-member endpoint
+  const loadUserData = useCallback(async (username) => {
     setIsLoadingSwitch(true);
-    const now = new Date();
-    await Promise.all([
-      fetchAttendance(userId),
-      fetchGathas(userId),
-      fetchPendingStatus(userId),
-      fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1, userId),
-    ]);
-    setIsLoadingSwitch(false);
-  }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
+    
+    try {
+      const data = await fetchUserData(username);
+      
+      if (data) {
+        // Update state with family member's data
+        setAttendanceHistory(data.recentAttendance || []);
+        setGathaEntries((data.recentGathas || []).map(normalizeEntry));
+        setPendingStatus({
+          attendance: [],
+          gatha: data.pendingGathas || []
+        });
+        
+        // Calculate stats from the data
+        const streakData = calculateStreak(data.recentAttendance || []);
+        setCurrentStreak(streakData.current);
+        setMaxStreak(streakData.max);
+        
+        // Monthly stats
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
+        
+        const monthlyAtt = (data.recentAttendance || []).filter((r) => {
+          const date = new Date(r.date);
+          return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+        }).length;
+        setMonthlyAttendance(monthlyAtt);
+        
+        const monthlyNew = (data.recentGathas || [])
+          .filter((e) => {
+            const date = new Date(e.created_at || e.date);
+            return date.getMonth() === currentMonth && date.getFullYear() === currentYear && e.type === 'new';
+          })
+          .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
+        setMonthlyNewGathas(monthlyNew);
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+      setGlobalError('Failed to load user data');
+    } finally {
+      setIsLoadingSwitch(false);
+    }
+  }, [fetchUserData]);
 
   // Handle user switch
   const handleUserSwitch = useCallback(async (newUser) => {
-    const newUserId = newUser._id || newUser.id;
-    if (newUserId === activeUserId) return;
+    const newUsername = newUser.username || newUser.name;
+    if (newUsername === activeUsername) return;
     
     setActiveUser(newUser);
-    await loadUserData(newUserId);
-    showSuccess(`Switched to ${newUser.name || newUser.username}'s dashboard`);
-  }, [activeUserId, loadUserData]);
+    
+    if (newUsername === loggedInUsername) {
+      // Switching back to self - reload own data
+      const now = new Date();
+      await Promise.all([
+        fetchAttendance(),
+        fetchGathas(),
+        fetchPendingStatus(),
+        fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1),
+      ]);
+      showSuccess('Switched back to your dashboard');
+    } else {
+      // Load family member's data
+      await loadUserData(newUsername);
+      showSuccess(`Switched to ${newUser.name || newUsername}'s dashboard`);
+    }
+  }, [activeUsername, loggedInUsername, loadUserData, fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
 
   // Track online status
   useEffect(() => {
@@ -2039,18 +2057,17 @@ export default function StudentDashboard({ user, onLogout }) {
     };
     loadData();
 
-    // Poll every 30 seconds - only if online
+    // Poll every 30 seconds
     const pollInterval = setInterval(() => {
-      if (navigator.onLine) {
+      if (navigator.onLine && !isViewingOther) {
         fetchPendingStatus();
         fetchAttendance();
         fetchGathas();
       }
     }, 30000);
 
-    // Refresh when tab becomes visible - only if online
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && navigator.onLine) {
+      if (document.visibilityState === 'visible' && navigator.onLine && !isViewingOther) {
         fetchPendingStatus();
         fetchAttendance();
         fetchGathas();
@@ -2062,7 +2079,7 @@ export default function StudentDashboard({ user, onLogout }) {
       clearInterval(pollInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats, fetchGroupMembers]);
+  }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats, fetchGroupMembers, isViewingOther]);
 
   // Reset active user when logged in user changes
   useEffect(() => {
@@ -2071,13 +2088,76 @@ export default function StudentDashboard({ user, onLogout }) {
 
   const handleStatsMonthChange = (year, month) => {
     setStatsMonth({ year, month });
-    fetchMonthlyStats(year, month);
+    if (!isViewingOther) {
+      fetchMonthlyStats(year, month);
+    }
   };
 
   // ============================================
-  // HANDLERS - Modified to support user switching
+  // HANDLERS - Using correct backend endpoints
   // ============================================
 
+  // Derived data
+  const todayAttendanceMarked = useMemo(
+    () => attendanceHistory.some((r) => formatLocalDateString(r.date) === todayIso),
+    [attendanceHistory, todayIso]
+  );
+
+  const todayPendingAttendance = useMemo(
+    () => pendingStatus.attendance?.find((p) => formatLocalDateString(p.date) === todayIso && p.status === 'pending'),
+    [pendingStatus.attendance, todayIso]
+  );
+
+  const todayAttendanceStatus = useMemo(() => {
+    if (todayAttendanceMarked) return 'approved';
+    if (todayPendingAttendance) return 'pending';
+    return 'not_marked';
+  }, [todayAttendanceMarked, todayPendingAttendance]);
+
+  const todaysApprovedGathas = useMemo(
+    () => gathaEntries.filter((e) => e.created_at && formatLocalDateString(e.created_at) === todayIso),
+    [gathaEntries, todayIso]
+  );
+
+  const todaysPendingGathas = useMemo(
+    () => pendingStatus.gatha?.filter((p) => formatLocalDateString(p.date) === todayIso && p.status === 'pending') || [],
+    [pendingStatus.gatha, todayIso]
+  );
+
+  const totalPendingCount = useMemo(() => {
+    const att = pendingStatus.attendance?.filter((p) => p.status === 'pending').length || 0;
+    const gatha = pendingStatus.gatha?.filter((p) => p.status === 'pending').length || 0;
+    return att + gatha;
+  }, [pendingStatus]);
+
+  // User stats for achievements
+  const userStats = useMemo(() => ({
+    monthlyAttendance,
+    monthlyNewGathas,
+    currentStreak,
+    maxStreak,
+    workingDays,
+  }), [monthlyAttendance, monthlyNewGathas, currentStreak, maxStreak, workingDays]);
+
+  // Calculate XP and level
+  const xpBreakdown = useMemo(
+    () => calculateTotalXP(userStats, MONTHLY_ACHIEVEMENTS),
+    [userStats]
+  );
+
+  const userLevel = useMemo(() => getUserLevel(xpBreakdown.total), [xpBreakdown.total]);
+
+  const unlockedBadgesCount = useMemo(
+    () => MONTHLY_ACHIEVEMENTS.filter((a) => calculateAchievementProgress(a, userStats).unlocked).length,
+    [userStats]
+  );
+
+  const motivationalMessage = useMemo(
+    () => getMotivationalMessage(currentStreak, monthlyAttendance, monthlyNewGathas),
+    [currentStreak, monthlyAttendance, monthlyNewGathas]
+  );
+
+  // Mark attendance - USES CORRECT ENDPOINT
   const markAttendance = async () => {
     if (todayAttendanceStatus !== 'not_marked') return;
 
@@ -2086,18 +2166,33 @@ export default function StudentDashboard({ user, onLogout }) {
     const token = localStorage.getItem('jainPathshalaToken');
 
     try {
-      const body = isViewingOther ? { userId: activeUserId } : {};
-      const res = await fetch(`${API_BASE}/attendance/mark`, {
+      // Use different endpoint based on whether viewing own or family member
+      const endpoint = isViewingOther 
+        ? `${API_BASE}/attendance/mark-for`
+        : `${API_BASE}/attendance/mark`;
+      
+      const body = isViewingOther 
+        ? { forUsername: activeUsername }
+        : {};
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       });
+      
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to mark attendance');
       
-      const forUser = isViewingOther ? ` for ${activeUser.name || activeUser.username}` : '';
-      showSuccess(`✅ Attendance submitted${forUser}! Waiting for approval.`);
-      await fetchPendingStatus();
+      showSuccess(data.message || '✅ Attendance submitted! Waiting for approval.');
+      
+      // Refresh data
+      if (isViewingOther) {
+        await loadUserData(activeUsername);
+      } else {
+        await fetchPendingStatus();
+        await fetchAttendance();
+      }
     } catch (error) {
       setGlobalError(error.message);
     } finally {
@@ -2105,18 +2200,28 @@ export default function StudentDashboard({ user, onLogout }) {
     }
   };
 
+  // Submit gatha - USES CORRECT ENDPOINT
   const submitGatha = async (formData) => {
     const token = localStorage.getItem('jainPathshalaToken');
     setIsSubmitting(true);
     setGlobalError('');
 
     try {
-      const url = editingGatha ? `${API_BASE}/gatha/pending/${editingGatha.id}` : `${API_BASE}/gatha`;
-
-      // Add userId if viewing another user
-      const bodyData = isViewingOther 
-        ? { ...formData, userId: activeUserId }
-        : formData;
+      let url, bodyData;
+      
+      if (editingGatha) {
+        // Editing existing pending gatha
+        url = `${API_BASE}/gatha/pending/${editingGatha.id}`;
+        bodyData = formData;
+      } else if (isViewingOther) {
+        // Adding gatha for family member
+        url = `${API_BASE}/gatha-for`;
+        bodyData = { ...formData, forUsername: activeUsername };
+      } else {
+        // Adding gatha for self
+        url = `${API_BASE}/gatha`;
+        bodyData = formData;
+      }
 
       const res = await fetch(url, {
         method: editingGatha ? 'PUT' : 'POST',
@@ -2129,11 +2234,17 @@ export default function StudentDashboard({ user, onLogout }) {
         throw new Error(errData.error || 'Failed to submit gatha');
       }
 
-      const forUser = isViewingOther ? ` for ${activeUser.name || activeUser.username}` : '';
-      showSuccess(editingGatha ? '✅ Gatha updated successfully!' : `✅ Gatha submitted${forUser}! Waiting for approval.`);
+      const data = await res.json();
+      showSuccess(data.message || (editingGatha ? '✅ Gatha updated!' : '✅ Gatha submitted!'));
       setShowGathaModal(false);
       setEditingGatha(null);
-      await Promise.all([fetchPendingStatus(), fetchGathas()]);
+      
+      // Refresh data
+      if (isViewingOther) {
+        await loadUserData(activeUsername);
+      } else {
+        await Promise.all([fetchPendingStatus(), fetchGathas()]);
+      }
     } catch (error) {
       setGlobalError(error.message);
     } finally {
@@ -2187,11 +2298,11 @@ export default function StudentDashboard({ user, onLogout }) {
         <div className="bg-blue-100 border-2 border-blue-300 rounded-2xl p-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center text-white font-bold">
-              {(activeUser?.name || activeUser?.username || 'U').charAt(0).toUpperCase()}
+              {(activeUser?.name || activeUsername || 'U').charAt(0).toUpperCase()}
             </div>
             <div>
               <p className="font-bold text-blue-800 text-sm">
-                Viewing: {activeUser?.name || activeUser?.username}
+                Viewing: {activeUser?.name || activeUsername}
               </p>
               <p className="text-xs text-blue-600">
                 Actions will be performed for this user
@@ -2211,11 +2322,11 @@ export default function StudentDashboard({ user, onLogout }) {
       {isLoadingSwitch && (
         <div className="bg-white rounded-2xl p-6 border-2 border-orange-200 text-center">
           <RefreshCw className="w-8 h-8 animate-spin text-orange-500 mx-auto mb-2" />
-          <p className="text-gray-600 text-sm">Loading {activeUser?.name}'s data...</p>
+          <p className="text-gray-600 text-sm">Loading {activeUser?.name || activeUsername}'s data...</p>
         </div>
       )}
 
-      {/* Welcome Card - CLICKABLE */}
+      {/* Welcome Card */}
       <button
         onClick={() => setShowLevelModal(true)}
         className="w-full text-left bg-gradient-to-br from-orange-400 via-amber-400 to-yellow-400 rounded-3xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden active:scale-[0.99] transition-transform"
@@ -2231,7 +2342,7 @@ export default function StudentDashboard({ user, onLogout }) {
                 <span className="text-orange-100 text-xs sm:text-sm font-medium">{greeting.text}</span>
               </div>
               <h1 className="text-xl sm:text-2xl font-bold truncate">
-                {activeUser?.name || activeUser?.username}
+                {activeUser?.name || activeUsername}
                 {isViewingOther && <span className="text-sm opacity-80 ml-2">(Viewing)</span>}
               </h1>
               <p className="text-orange-100 text-xs sm:text-sm mt-1">{motivationalMessage.text}</p>
@@ -2308,7 +2419,7 @@ export default function StudentDashboard({ user, onLogout }) {
             Today's Goals
             {isViewingOther && (
               <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                For {activeUser?.name?.split(' ')[0]}
+                For {(activeUser?.name || activeUsername)?.split(' ')[0]}
               </span>
             )}
           </h3>
@@ -2368,6 +2479,7 @@ export default function StudentDashboard({ user, onLogout }) {
           </button>
         </div>
 
+        {/* Today's Gathas List */}
         {(todaysApprovedGathas.length > 0 || todaysPendingGathas.length > 0) && (
           <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t-2 border-gray-100">
             <p className="text-xs sm:text-sm font-bold text-gray-700 mb-2 sm:mb-3 flex items-center gap-2">
@@ -2400,7 +2512,7 @@ export default function StudentDashboard({ user, onLogout }) {
                   </div>
                   <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                     <PendingBadge status={entry.status} size="small" />
-                    {entry.status === 'pending' && (
+                    {entry.status === 'pending' && !isViewingOther && (
                       <div className="flex gap-1">
                         <button
                           onClick={() => {
@@ -2456,7 +2568,7 @@ export default function StudentDashboard({ user, onLogout }) {
         <div className="flex items-center justify-between mb-2 sm:mb-3">
           <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
             <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
-            {isViewingOther ? `${activeUser?.name?.split(' ')[0]}'s Badges` : 'Your Badges'}
+            {isViewingOther ? `${(activeUser?.name || activeUsername)?.split(' ')[0]}'s Badges` : 'Your Badges'}
           </h3>
           <button
             onClick={() => setCurrentPage(PAGES.STATS)}
@@ -2489,32 +2601,28 @@ export default function StudentDashboard({ user, onLogout }) {
   // ==================== RENDER STATS PAGE ====================
   const renderStats = () => (
     <div className="space-y-4">
-      {/* Offline Banner */}
       {!isOnline && (
         <div className="bg-red-100 border border-red-300 rounded-xl p-3 text-center">
-          <p className="text-red-700 text-sm font-medium">📵 You are offline. Some features may not work.</p>
+          <p className="text-red-700 text-sm font-medium">📵 You are offline.</p>
         </div>
       )}
 
-      {/* Viewing Other User Banner */}
       {isViewingOther && (
         <div className="bg-blue-100 border-2 border-blue-300 rounded-2xl p-3 flex items-center gap-3">
           <UserCircle className="w-8 h-8 text-blue-600" />
           <div className="flex-1">
             <p className="font-bold text-blue-800 text-sm">
-              Viewing stats for: {activeUser?.name || activeUser?.username}
+              Viewing stats for: {activeUser?.name || activeUsername}
             </p>
           </div>
         </div>
       )}
       
-      {/* Student Achievement Page */}
       <StudentAchievementPage stats={userStats} onMonthChange={handleStatsMonthChange} workingDays={workingDays} />
       
-      {/* Leaderboard Section */}
       <LeaderboardSection 
-        currentUserId={activeUserId}
-        currentUserName={activeUser?.name || activeUser?.username}
+        currentUserId={activeUsername}
+        currentUserName={activeUser?.name || activeUsername}
       />
     </div>
   );
@@ -2528,7 +2636,6 @@ export default function StudentDashboard({ user, onLogout }) {
             <RefreshCw className="w-8 h-8 sm:w-10 sm:h-10 animate-spin text-orange-500" />
           </div>
           <p className="text-gray-600 font-medium text-base sm:text-lg">Loading your dashboard...</p>
-          <p className="text-gray-400 text-xs sm:text-sm mt-2">Please wait a moment</p>
         </div>
       );
     }
@@ -2539,12 +2646,12 @@ export default function StudentDashboard({ user, onLogout }) {
       case PAGES.STATS:
         return renderStats();
       case PAGES.HISTORY:
-        return <HistoryPage activeUserId={isViewingOther ? activeUserId : null} />;
+        return <HistoryPage activeUserId={isViewingOther ? activeUsername : null} />;
       case PAGES.PENDING:
         return (
           <PendingPage
             pendingStatus={pendingStatus}
-            onRefresh={() => fetchPendingStatus()}
+            onRefresh={fetchPendingStatus}
             onEdit={(item) => {
               setEditingGatha(item);
               setShowGathaModal(true);
@@ -2581,7 +2688,7 @@ export default function StudentDashboard({ user, onLogout }) {
               {isViewingOther && (
                 <p className="text-xs text-blue-600 flex items-center gap-1">
                   <UserCircle className="w-3 h-3" />
-                  Viewing: {activeUser?.name?.split(' ')[0]}
+                  Viewing: {(activeUser?.name || activeUsername)?.split(' ')[0]}
                 </p>
               )}
             </div>
@@ -2650,7 +2757,7 @@ export default function StudentDashboard({ user, onLogout }) {
         onSubmit={submitGatha}
         isSubmitting={isSubmitting}
         editData={editingGatha}
-        activeUserName={isViewingOther ? (activeUser?.name || activeUser?.username) : null}
+        activeUserName={isViewingOther ? (activeUser?.name || activeUsername) : null}
       />
 
       <ConfirmationModal
