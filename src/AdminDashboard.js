@@ -1361,7 +1361,7 @@ const toggleMemberSelection = (username) => {
   const totalNewGathaCount = students.reduce((sum, s) => sum + (s.new_gathas || 0), 0);
 
   const attendanceRate = students.length > 0 
-    ? Math.round((stats?.today_attendnce || 0) / students.length * 100)
+    ? Math.round((stats?.today_attendance || 0) / students.length * 100)
     : 0;
 
   // Filter users for display
