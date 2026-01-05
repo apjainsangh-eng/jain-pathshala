@@ -9,6 +9,7 @@ import {
   CalendarDays,
   Check,
   CheckCircle,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -32,6 +33,8 @@ import {
   X as CloseIcon,
   Zap,
   Sparkles,
+  UserCircle,
+  ChevronUp,
 } from 'lucide-react';
 
 // Import Achievement Components
@@ -64,17 +67,17 @@ const PAGES = {
 
 // Motivational Quotes
 const QUOTES = [
-  { text: "अहिंसा परमो धर्मः", meaning: "Non-violence is the supreme religion", emoji: "🙏", lang: "Sanskrit" },
-  { text: "क्षमा वीरस्य भूषणम्", meaning: "Forgiveness is the ornament of the brave", emoji: "💪", lang: "Sanskrit" },
-  { text: "जीवो जीवस्य जीवनम्", meaning: "Live and let live", emoji: "🌱", lang: "Sanskrit" },
-  { text: "परस्परोपग्रहो जीवानाम्", meaning: "Souls render service to one another", emoji: "🤝", lang: "Sanskrit" },
+  { text: "અહિંસા પરમો ધર્મઃ", meaning: "Non-violence is the supreme religion", emoji: "🙏", lang: "Sanskrit" },
+  { text: "ક્ષમા વીરસ્ય ભૂષણમ્", meaning: "Forgiveness is the ornament of the brave", emoji: "💪", lang: "Sanskrit" },
+  { text: "જીવો જીવસ્ય જીવનમ્", meaning: "Live and let live", emoji: "🌱", lang: "Sanskrit" },
+  { text: "પરસ્પરોપગ્રહો જીવાનામ્", meaning: "Souls render service to one another", emoji: "🤝", lang: "Sanskrit" },
   { text: "ધર્મ એ જ શ્રેષ્ઠ મિત્ર છે", meaning: "Dharma is the best friend", emoji: "🙏", lang: "Gujarati" },
   { text: "સત્ય બોલો, પ્રિય બોલો", meaning: "Speak truth, speak pleasantly", emoji: "💬", lang: "Gujarati" },
   { text: "જ્ઞાન જ શક્તિ છે", meaning: "Knowledge is power", emoji: "📚", lang: "Gujarati" },
   { text: "મહેનત નો કોઈ વિકલ્પ નથી", meaning: "There is no substitute for hard work", emoji: "⭐", lang: "Gujarati" },
 ];
 
-// Tips icon color classes (static mapping to avoid dynamic class issues)
+// Tips icon color classes
 const TIP_ICON_COLORS = {
   blue: 'text-blue-500',
   purple: 'text-purple-500',
@@ -122,30 +125,6 @@ export const formatDateIn = (input, options = DEFAULT_DATE_OPTIONS) => {
   return parsed.toLocaleDateString('en-IN', { ...DEFAULT_DATE_OPTIONS, ...options });
 };
 
-const getDateRangePreset = (preset) => {
-  const today = new Date();
-
-  switch (preset) {
-    case 'today':
-      return { start: formatLocalDateString(today), end: formatLocalDateString(today) };
-    case 'week':
-      const startOfWeek = new Date(today);
-      startOfWeek.setDate(today.getDate() - today.getDay());
-      return { start: formatLocalDateString(startOfWeek), end: formatLocalDateString(today) };
-    case 'month':
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      return { start: formatLocalDateString(startOfMonth), end: formatLocalDateString(endOfMonth) };
-    case 'year':
-      const startOfYear = new Date(today.getFullYear(), 0, 1);
-      return { start: formatLocalDateString(startOfYear), end: formatLocalDateString(today) };
-    case 'all':
-      return { start: '2020-01-01', end: '2099-12-31' };
-    default:
-      return getDateRangePreset('month');
-  }
-};
-
 const getGreeting = () => {
   const hour = new Date().getHours();
   if (hour < 5) return { text: 'Good Night', emoji: '🌙', period: 'night' };
@@ -162,6 +141,136 @@ const getMotivationalMessage = (streak, attendance, gathas) => {
   if (streak >= 3) return { text: "Nice streak! Don't break the chain! 💪", type: "streak" };
   if (attendance >= 10) return { text: "You're doing great! Stay consistent! 🎯", type: "attendance" };
   return { text: "Every journey begins with a single step! 🚀", type: "motivation" };
+};
+
+// ============================================
+// USER SWITCHER COMPONENT
+// ============================================
+
+const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoading }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  // Don't show if no group members or only one member (the user themselves)
+  if (!groupMembers || groupMembers.length <= 1) {
+    return null;
+  }
+
+  const activeUserData = groupMembers.find(m => m._id === activeUser?._id || m.id === activeUser?.id) || activeUser;
+  const isViewingOther = activeUser?._id !== loggedInUser?._id && activeUser?.id !== loggedInUser?.id;
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={isLoading}
+        className={`w-full flex items-center justify-between gap-2 p-3 rounded-2xl border-2 transition-all ${
+          isViewingOther 
+            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-300' 
+            : 'bg-white border-orange-200'
+        } shadow-sm active:scale-[0.99]`}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md flex-shrink-0 ${
+            isViewingOther 
+              ? 'bg-gradient-to-br from-blue-400 to-indigo-500' 
+              : 'bg-gradient-to-br from-orange-400 to-amber-500'
+          }`}>
+            {(activeUserData?.name || activeUserData?.username || 'U').charAt(0).toUpperCase()}
+          </div>
+          <div className="text-left min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="font-bold text-gray-800 text-sm truncate">
+                {activeUserData?.name || activeUserData?.username}
+              </p>
+              {isViewingOther && (
+                <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full animate-pulse flex-shrink-0">
+                  Viewing
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500">
+              {groupMembers.length} members in group • Tap to switch
+            </p>
+          </div>
+        </div>
+        <div className={`p-2 rounded-lg transition-colors flex-shrink-0 ${isOpen ? 'bg-orange-100' : 'bg-gray-100'}`}>
+          {isOpen ? (
+            <ChevronUp className="w-4 h-4 text-gray-600" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-gray-600" />
+          )}
+        </div>
+      </button>
+
+      {/* Dropdown */}
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setIsOpen(false)} 
+          />
+          <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border-2 border-orange-200 shadow-xl z-50 overflow-hidden animate-in slide-in-from-top-2 duration-200">
+            <div className="p-2 bg-orange-50 border-b border-orange-200">
+              <p className="text-xs font-bold text-orange-800 flex items-center gap-2">
+                <Users className="w-3 h-3" />
+                Switch Account
+              </p>
+            </div>
+            <div className="max-h-60 overflow-y-auto">
+              {groupMembers.map((member) => {
+                const memberId = member._id || member.id;
+                const activeId = activeUser?._id || activeUser?.id;
+                const loggedInId = loggedInUser?._id || loggedInUser?.id;
+                const isActive = memberId === activeId;
+                const isLoggedIn = memberId === loggedInId;
+                
+                return (
+                  <button
+                    key={memberId}
+                    onClick={() => {
+                      onSwitch(member);
+                      setIsOpen(false);
+                    }}
+                    disabled={isLoading}
+                    className={`w-full flex items-center gap-3 p-3 transition-all ${
+                      isActive 
+                        ? 'bg-orange-100' 
+                        : 'hover:bg-gray-50 active:bg-gray-100'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md flex-shrink-0 ${
+                      isActive 
+                        ? 'bg-gradient-to-br from-orange-400 to-amber-500' 
+                        : 'bg-gradient-to-br from-gray-400 to-gray-500'
+                    }`}>
+                      {(member.name || member.username || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 text-left min-w-0">
+                      <p className="font-bold text-gray-800 text-sm truncate">
+                        {member.name || member.username}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {member.username}
+                        {isLoggedIn && ' • (You)'}
+                      </p>
+                    </div>
+                    {isActive && (
+                      <CheckCircle className="w-5 h-5 text-orange-500 flex-shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="p-2 bg-gray-50 border-t border-gray-200">
+              <p className="text-xs text-gray-500 text-center">
+                💡 You can add gathas and mark attendance for any member
+              </p>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 };
 
 // ============================================
@@ -348,7 +457,7 @@ const HelpTooltip = ({ text }) => {
 };
 
 // ============================================
-// LEVEL DETAILS MODAL - FIXED FOR LARGE FONTS
+// LEVEL DETAILS MODAL
 // ============================================
 
 const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel, stats }) => {
@@ -375,7 +484,7 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
           className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in duration-200"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header - Fixed */}
+          {/* Header */}
           <div className="p-4 sm:p-5 text-white bg-gradient-to-r from-indigo-500 to-purple-600 rounded-t-3xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -540,7 +649,7 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
             </div>
           </div>
 
-          {/* Footer - Fixed at bottom */}
+          {/* Footer */}
           <div className="p-4 bg-gray-50 border-t rounded-b-3xl">
             <button
               onClick={onClose}
@@ -556,7 +665,7 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
 };
 
 // ============================================
-// LEADERBOARD COMPONENT - IMPROVED
+// LEADERBOARD COMPONENT
 // ============================================
 
 const LeaderboardSection = ({ currentUserId, currentUserName }) => {
@@ -565,19 +674,16 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch leaderboard data
   const fetchLeaderboard = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     setIsLoading(true);
     setError(null);
     
     try {
-      // Get current month date range
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       
-      // Try the leaderboard endpoint first
       let res = await fetch(
         `${API_BASE}/leaderboard?startDate=${formatLocalDateString(startOfMonth)}&endDate=${formatLocalDateString(endOfMonth)}`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -587,7 +693,6 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
         const data = await res.json();
         setLeaderboardData(data);
       } else {
-        // If leaderboard endpoint doesn't exist, try analytics endpoint
         res = await fetch(
           `${API_BASE}/analytics/leaderboard?startDate=${formatLocalDateString(startOfMonth)}&endDate=${formatLocalDateString(endOfMonth)}`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -595,45 +700,12 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
         
         if (res.ok) {
           const data = await res.json();
-          // Transform data if needed
           setLeaderboardData({
             attendanceLeaders: data.attendanceLeaders || data.topAttendance || [],
             gathaLeaders: data.gathaLeaders || data.topGathas || [],
           });
         } else {
-          // If both fail, try to get all students and calculate locally
-          const studentsRes = await fetch(`${API_BASE}/students/stats`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          
-          if (studentsRes.ok) {
-            const studentsData = await studentsRes.json();
-            const students = Array.isArray(studentsData) ? studentsData : studentsData.students || [];
-            
-            // Sort by attendance
-            const attendanceLeaders = [...students]
-              .sort((a, b) => (b.monthlyAttendance || b.attendance || 0) - (a.monthlyAttendance || a.attendance || 0))
-              .slice(0, 5)
-              .map((s, i) => ({
-                ...s,
-                rank: i + 1,
-                totalAttendance: s.monthlyAttendance || s.attendance || 0,
-              }));
-            
-            // Sort by gathas
-            const gathaLeaders = [...students]
-              .sort((a, b) => (b.monthlyNewGathas || b.newGathas || b.gathas || 0) - (a.monthlyNewGathas || a.newGathas || a.gathas || 0))
-              .slice(0, 5)
-              .map((s, i) => ({
-                ...s,
-                rank: i + 1,
-                totalGathas: s.monthlyNewGathas || s.newGathas || s.gathas || 0,
-              }));
-            
-            setLeaderboardData({ attendanceLeaders, gathaLeaders });
-          } else {
-            throw new Error('Could not load leaderboard data');
-          }
+          throw new Error('Could not load leaderboard data');
         }
       }
     } catch (err) {
@@ -681,7 +753,6 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
 
   return (
     <div className="bg-white rounded-2xl border-2 border-blue-200 shadow-sm overflow-hidden">
-      {/* Header */}
       <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-3 sm:p-4 text-white">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -699,7 +770,6 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
         <p className="text-xs sm:text-sm opacity-80 mt-1">Top performers this month</p>
       </div>
 
-      {/* Tabs */}
       <div className="flex p-2 bg-gray-100 gap-2">
         <button
           onClick={() => setActiveTab('attendance')}
@@ -719,7 +789,6 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
         </button>
       </div>
 
-      {/* Content */}
       <div className="p-3 sm:p-4">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-8">
@@ -742,15 +811,12 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
             <div className="text-center py-8">
               <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
               <p className="text-gray-500 font-medium text-sm">No data yet this month</p>
-              <p className="text-gray-400 text-xs mt-1">Be the first to top the leaderboard! 🚀</p>
             </div>
           ) : (
             <div className="space-y-2">
               {attendanceLeaders.slice(0, 5).map((user, index) => {
                 const odometer = user.userId || user._id || user.id;
-                const isCurrentUser = odometer === currentUserId || 
-                  user.name === currentUserName || 
-                  user.username === currentUserName;
+                const isCurrentUser = odometer === currentUserId || user.name === currentUserName;
                 const rank = index + 1;
                 
                 return (
@@ -790,15 +856,12 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
             <div className="text-center py-8">
               <BookOpen className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
               <p className="text-gray-500 font-medium text-sm">No data yet this month</p>
-              <p className="text-gray-400 text-xs mt-1">Start learning gathas to rank up! 📚</p>
             </div>
           ) : (
             <div className="space-y-2">
               {gathaLeaders.slice(0, 5).map((user, index) => {
                 const odometer = user.userId || user._id || user.id;
-                const isCurrentUser = odometer === currentUserId || 
-                  user.name === currentUserName || 
-                  user.username === currentUserName;
+                const isCurrentUser = odometer === currentUserId || user.name === currentUserName;
                 const rank = index + 1;
                 
                 return (
@@ -836,7 +899,6 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
         )}
       </div>
 
-      {/* Footer tip */}
       <div className="px-3 sm:px-4 pb-3 sm:pb-4">
         <div className="bg-blue-50 rounded-xl p-2 sm:p-3 border border-blue-200">
           <p className="text-xs text-blue-700 text-center">
@@ -850,10 +912,10 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
 };
 
 // ============================================
-// GATHA ENTRY MODAL - FIXED FOR LARGE FONTS
+// GATHA ENTRY MODAL
 // ============================================
 
-const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData }) => {
+const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, activeUserName }) => {
   const [activeTab, setActiveTab] = useState(editData?.type || 'new');
   const [form, setForm] = useState({
     sutraName: editData?.sutra_name || '',
@@ -907,7 +969,9 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData }) 
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-lg sm:text-xl font-bold">{editData ? 'Edit Entry' : 'Add Gatha'}</h3>
-                  <p className="text-xs sm:text-sm opacity-80">Record your learning progress</p>
+                  <p className="text-xs sm:text-sm opacity-80">
+                    {activeUserName ? `For: ${activeUserName}` : 'Record your learning progress'}
+                  </p>
                 </div>
               </div>
               <button 
@@ -919,7 +983,7 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData }) 
             </div>
           </div>
 
-          {/* Tabs - Only show if not editing */}
+          {/* Tabs */}
           {!editData && (
             <div className="flex p-2 bg-gray-100 gap-2">
               <button
@@ -941,7 +1005,7 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData }) 
             </div>
           )}
 
-          {/* Scrollable Form Content */}
+          {/* Form */}
           <div className="max-h-[50vh] overflow-y-auto p-4 sm:p-5 space-y-4">
             <div>
               <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
@@ -1019,7 +1083,7 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData }) 
             </div>
           </div>
 
-          {/* Fixed Footer with Buttons */}
+          {/* Footer */}
           <div className="p-4 sm:p-5 border-t bg-gray-50 rounded-b-3xl">
             <div className="flex gap-2 sm:gap-3">
               <button
@@ -1051,12 +1115,12 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData }) 
     </div>
   );
 };
-              
+
 // ============================================
 // HISTORY PAGE COMPONENT
 // ============================================
 
-const HistoryPage = () => {
+const HistoryPage = ({ activeUserId }) => {
   const today = new Date();
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
@@ -1081,7 +1145,9 @@ const HistoryPage = () => {
     const token = localStorage.getItem('jainPathshalaToken');
 
     try {
-      const url = `${API_BASE}/history/${year}/${month}`;
+      // Add userId param if viewing for another user
+      const userParam = activeUserId ? `?userId=${activeUserId}` : '';
+      const url = `${API_BASE}/history/${year}/${month}${userParam}`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 
       if (!res.ok) throw new Error('Failed to load history.');
@@ -1097,7 +1163,7 @@ const HistoryPage = () => {
 
   useEffect(() => {
     fetchHistory(selectedYear, selectedMonth);
-  }, [selectedYear, selectedMonth]);
+  }, [selectedYear, selectedMonth, activeUserId]);
 
   const handleMonthChange = (direction) => {
     let newMonth = selectedMonth + direction;
@@ -1185,7 +1251,7 @@ const HistoryPage = () => {
         <div>
           <p className="text-sm font-bold text-blue-800">How to use History</p>
           <p className="text-xs text-blue-600 mt-1">
-            Green days = You were present. Tap on green days to see gatha details.
+            Green days = Present. Tap on green days to see gatha details.
           </p>
         </div>
       </div>
@@ -1280,7 +1346,7 @@ const HistoryPage = () => {
         )}
       </div>
 
-      {/* Day Detail Modal - Fixed for large fonts */}
+      {/* Day Detail Modal */}
       {selectedDay && (
         <div 
           className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 overflow-y-auto" 
@@ -1389,7 +1455,6 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
           <p className="text-sm font-bold text-yellow-800">What is Pending?</p>
           <p className="text-xs text-yellow-700 mt-1">
             After you mark attendance or add gathas, your teacher needs to approve them.
-            Items waiting for approval appear here.
           </p>
         </div>
       </div>
@@ -1413,7 +1478,7 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
           </div>
           <p className="text-4xl sm:text-5xl font-bold">{totalPendingCount}</p>
           <p className="text-xs sm:text-sm opacity-80 mt-1">
-            {totalPendingCount === 0 ? 'All caught up!' : 'items awaiting teacher approval'}
+            {totalPendingCount === 0 ? 'All caught up!' : 'items awaiting approval'}
           </p>
         </div>
       </div>
@@ -1425,7 +1490,6 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
           </div>
           <p className="text-lg sm:text-xl font-bold text-gray-800">All Caught Up! 🎉</p>
           <p className="text-sm text-gray-500 mt-2">No pending approvals</p>
-          <p className="text-xs text-gray-400 mt-1">All your submissions have been reviewed</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-yellow-200 shadow-sm">
@@ -1498,10 +1562,6 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
             <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
             Rejected ({allRejected.length})
           </h3>
-          <div className="bg-red-50 border border-red-200 rounded-xl p-2 sm:p-3 mb-3 text-xs sm:text-sm text-red-700">
-            <p className="font-medium">These submissions were rejected by your teacher.</p>
-            <p className="text-xs mt-1">Please check the reason and try again if needed.</p>
-          </div>
           <div className="space-y-2 sm:space-y-3">
             {allRejected.map((item, index) => (
               <div key={index} className="p-3 sm:p-4 rounded-xl bg-red-50 border-2 border-red-200">
@@ -1576,7 +1636,6 @@ const RecentBadges = ({ stats, onBadgeClick }) => {
     </div>
   );
 };
-
 // Next Badges to Unlock
 const NextBadges = ({ stats, onBadgeClick }) => {
   const nextAchievements = useMemo(() => {
@@ -1641,6 +1700,11 @@ const NextBadges = ({ stats, onBadgeClick }) => {
 export default function StudentDashboard({ user, onLogout }) {
   const [currentPage, setCurrentPage] = useState(PAGES.HOME);
 
+  // Group/Account Switching States
+  const [groupMembers, setGroupMembers] = useState([]);
+  const [activeUser, setActiveUser] = useState(user);
+  const [isLoadingSwitch, setIsLoadingSwitch] = useState(false);
+
   // Data states
   const [attendanceHistory, setAttendanceHistory] = useState([]);
   const [gathaEntries, setGathaEntries] = useState([]);
@@ -1683,6 +1747,11 @@ export default function StudentDashboard({ user, onLogout }) {
   const todayIso = formatLocalDateString(new Date());
   const greeting = getGreeting();
   const [dailyQuote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)]);
+
+  // Get active user ID for API calls
+  const activeUserId = activeUser?._id || activeUser?.id;
+  const loggedInUserId = user?._id || user?.id;
+  const isViewingOther = activeUserId !== loggedInUserId;
 
   // Derived data
   const todayAttendanceMarked = useMemo(
@@ -1803,23 +1872,52 @@ export default function StudentDashboard({ user, onLogout }) {
     return { current, max };
   };
 
-  // API calls
-  const fetchPendingStatus = useCallback(async () => {
+  // ============================================
+  // API CALLS - Modified to support user switching
+  // ============================================
+
+  // Fetch group members
+  const fetchGroupMembers = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
-      const res = await fetch(`${API_BASE}/student/pending`, {
+      const res = await fetch(`${API_BASE}/student/group-members`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const members = data.members || data.groupMembers || [];
+        setGroupMembers(members);
+        
+        // If current user is in the group, ensure they're included
+        if (members.length > 0 && !members.find(m => (m._id || m.id) === loggedInUserId)) {
+          setGroupMembers([user, ...members]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching group members:', error);
+    }
+  }, [loggedInUserId, user]);
+
+  const fetchPendingStatus = useCallback(async (userId = activeUserId) => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    try {
+      const userParam = userId && userId !== loggedInUserId ? `?userId=${userId}` : '';
+      const res = await fetch(`${API_BASE}/student/pending${userParam}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) setPendingStatus(await res.json());
     } catch (error) {
       console.error('Error fetching pending:', error);
     }
-  }, []);
+  }, [activeUserId, loggedInUserId]);
 
-  const fetchAttendance = useCallback(async () => {
+  const fetchAttendance = useCallback(async (userId = activeUserId) => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
-      const res = await fetch(`${API_BASE}/attendance`, { headers: { Authorization: `Bearer ${token}` } });
+      const userParam = userId && userId !== loggedInUserId ? `?userId=${userId}` : '';
+      const res = await fetch(`${API_BASE}/attendance${userParam}`, { 
+        headers: { Authorization: `Bearer ${token}` } 
+      });
       if (res.ok) {
         const data = await res.json();
         setAttendanceHistory(Array.isArray(data) ? data : []);
@@ -1838,12 +1936,15 @@ export default function StudentDashboard({ user, onLogout }) {
     } catch (error) {
       console.error('Error fetching attendance:', error);
     }
-  }, []);
+  }, [activeUserId, loggedInUserId]);
 
-  const fetchGathas = useCallback(async () => {
+  const fetchGathas = useCallback(async (userId = activeUserId) => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
-      const res = await fetch(`${API_BASE}/gatha`, { headers: { Authorization: `Bearer ${token}` } });
+      const userParam = userId && userId !== loggedInUserId ? `?userId=${userId}` : '';
+      const res = await fetch(`${API_BASE}/gatha${userParam}`, { 
+        headers: { Authorization: `Bearer ${token}` } 
+      });
       if (res.ok) {
         const data = await res.json();
         const entries = Array.isArray(data) ? data.map(normalizeEntry) : [];
@@ -1862,12 +1963,13 @@ export default function StudentDashboard({ user, onLogout }) {
     } catch (error) {
       console.error('Error fetching gathas:', error);
     }
-  }, []);
+  }, [activeUserId, loggedInUserId]);
 
-  const fetchMonthlyStats = useCallback(async (year, month) => {
+  const fetchMonthlyStats = useCallback(async (year, month, userId = activeUserId) => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
-      const res = await fetch(`${API_BASE}/stats/comprehensive?year=${year}&month=${month}`, {
+      const userParam = userId && userId !== loggedInUserId ? `&userId=${userId}` : '';
+      const res = await fetch(`${API_BASE}/stats/comprehensive?year=${year}&month=${month}${userParam}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -1882,7 +1984,30 @@ export default function StudentDashboard({ user, onLogout }) {
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
-  }, []);
+  }, [activeUserId, loggedInUserId]);
+
+  // Load all data for a specific user
+  const loadUserData = useCallback(async (userId) => {
+    setIsLoadingSwitch(true);
+    const now = new Date();
+    await Promise.all([
+      fetchAttendance(userId),
+      fetchGathas(userId),
+      fetchPendingStatus(userId),
+      fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1, userId),
+    ]);
+    setIsLoadingSwitch(false);
+  }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
+
+  // Handle user switch
+  const handleUserSwitch = useCallback(async (newUser) => {
+    const newUserId = newUser._id || newUser.id;
+    if (newUserId === activeUserId) return;
+    
+    setActiveUser(newUser);
+    await loadUserData(newUserId);
+    showSuccess(`Switched to ${newUser.name || newUser.username}'s dashboard`);
+  }, [activeUserId, loadUserData]);
 
   // Track online status
   useEffect(() => {
@@ -1904,6 +2029,7 @@ export default function StudentDashboard({ user, onLogout }) {
       setIsLoading(true);
       const now = new Date();
       await Promise.all([
+        fetchGroupMembers(),
         fetchAttendance(),
         fetchGathas(),
         fetchPendingStatus(),
@@ -1936,14 +2062,22 @@ export default function StudentDashboard({ user, onLogout }) {
       clearInterval(pollInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
+  }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats, fetchGroupMembers]);
+
+  // Reset active user when logged in user changes
+  useEffect(() => {
+    setActiveUser(user);
+  }, [user]);
 
   const handleStatsMonthChange = (year, month) => {
     setStatsMonth({ year, month });
     fetchMonthlyStats(year, month);
   };
 
-  // Handlers
+  // ============================================
+  // HANDLERS - Modified to support user switching
+  // ============================================
+
   const markAttendance = async () => {
     if (todayAttendanceStatus !== 'not_marked') return;
 
@@ -1952,13 +2086,17 @@ export default function StudentDashboard({ user, onLogout }) {
     const token = localStorage.getItem('jainPathshalaToken');
 
     try {
+      const body = isViewingOther ? { userId: activeUserId } : {};
       const res = await fetch(`${API_BASE}/attendance/mark`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to mark attendance');
-      showSuccess('✅ Attendance submitted! Waiting for teacher approval.');
+      
+      const forUser = isViewingOther ? ` for ${activeUser.name || activeUser.username}` : '';
+      showSuccess(`✅ Attendance submitted${forUser}! Waiting for approval.`);
       await fetchPendingStatus();
     } catch (error) {
       setGlobalError(error.message);
@@ -1975,10 +2113,15 @@ export default function StudentDashboard({ user, onLogout }) {
     try {
       const url = editingGatha ? `${API_BASE}/gatha/pending/${editingGatha.id}` : `${API_BASE}/gatha`;
 
+      // Add userId if viewing another user
+      const bodyData = isViewingOther 
+        ? { ...formData, userId: activeUserId }
+        : formData;
+
       const res = await fetch(url, {
         method: editingGatha ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(bodyData),
       });
 
       if (!res.ok) {
@@ -1986,7 +2129,8 @@ export default function StudentDashboard({ user, onLogout }) {
         throw new Error(errData.error || 'Failed to submit gatha');
       }
 
-      showSuccess(editingGatha ? '✅ Gatha updated successfully!' : '✅ Gatha submitted! Waiting for approval.');
+      const forUser = isViewingOther ? ` for ${activeUser.name || activeUser.username}` : '';
+      showSuccess(editingGatha ? '✅ Gatha updated successfully!' : `✅ Gatha submitted${forUser}! Waiting for approval.`);
       setShowGathaModal(false);
       setEditingGatha(null);
       await Promise.all([fetchPendingStatus(), fetchGathas()]);
@@ -2027,6 +2171,50 @@ export default function StudentDashboard({ user, onLogout }) {
         </div>
       )}
 
+      {/* User Switcher - Only show if there are group members */}
+      {groupMembers.length > 1 && (
+        <UserSwitcher
+          groupMembers={groupMembers}
+          activeUser={activeUser}
+          loggedInUser={user}
+          onSwitch={handleUserSwitch}
+          isLoading={isLoadingSwitch}
+        />
+      )}
+
+      {/* Viewing Other User Banner */}
+      {isViewingOther && (
+        <div className="bg-blue-100 border-2 border-blue-300 rounded-2xl p-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center text-white font-bold">
+              {(activeUser?.name || activeUser?.username || 'U').charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p className="font-bold text-blue-800 text-sm">
+                Viewing: {activeUser?.name || activeUser?.username}
+              </p>
+              <p className="text-xs text-blue-600">
+                Actions will be performed for this user
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => handleUserSwitch(user)}
+            className="px-3 py-2 bg-blue-500 text-white text-xs font-bold rounded-xl"
+          >
+            Back to Me
+          </button>
+        </div>
+      )}
+
+      {/* Loading Overlay for User Switch */}
+      {isLoadingSwitch && (
+        <div className="bg-white rounded-2xl p-6 border-2 border-orange-200 text-center">
+          <RefreshCw className="w-8 h-8 animate-spin text-orange-500 mx-auto mb-2" />
+          <p className="text-gray-600 text-sm">Loading {activeUser?.name}'s data...</p>
+        </div>
+      )}
+
       {/* Welcome Card - CLICKABLE */}
       <button
         onClick={() => setShowLevelModal(true)}
@@ -2042,7 +2230,10 @@ export default function StudentDashboard({ user, onLogout }) {
                 <span className="text-2xl sm:text-3xl">{greeting.emoji}</span>
                 <span className="text-orange-100 text-xs sm:text-sm font-medium">{greeting.text}</span>
               </div>
-              <h1 className="text-xl sm:text-2xl font-bold truncate">{user?.name || user?.username}</h1>
+              <h1 className="text-xl sm:text-2xl font-bold truncate">
+                {activeUser?.name || activeUser?.username}
+                {isViewingOther && <span className="text-sm opacity-80 ml-2">(Viewing)</span>}
+              </h1>
               <p className="text-orange-100 text-xs sm:text-sm mt-1">{motivationalMessage.text}</p>
             </div>
             <div className="flex flex-col items-center flex-shrink-0 ml-2">
@@ -2077,7 +2268,7 @@ export default function StudentDashboard({ user, onLogout }) {
       </button>
 
       {/* Tips for new users */}
-      {showTips && (
+      {showTips && !isViewingOther && (
         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 sm:p-4">
           <div className="flex items-center justify-between mb-2 sm:mb-3">
             <div className="flex items-center gap-2">
@@ -2115,6 +2306,11 @@ export default function StudentDashboard({ user, onLogout }) {
           <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
             <Target className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
             Today's Goals
+            {isViewingOther && (
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                For {activeUser?.name?.split(' ')[0]}
+              </span>
+            )}
           </h3>
           <span className="text-xs bg-orange-100 text-orange-700 px-2 sm:px-3 py-1 rounded-full font-bold">
             {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
@@ -2163,7 +2359,7 @@ export default function StudentDashboard({ user, onLogout }) {
           >
             <BookOpen className="w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-1 sm:mb-2" />
             <p className="font-bold text-sm">Add Gatha</p>
-            <p className="text-xs opacity-80">Record your learning</p>
+            <p className="text-xs opacity-80">Record learning</p>
             {todaysApprovedGathas.length + todaysPendingGathas.length > 0 && (
               <span className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-5 h-5 sm:w-7 sm:h-7 bg-green-500 rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
                 {todaysApprovedGathas.length + todaysPendingGathas.length}
@@ -2260,7 +2456,7 @@ export default function StudentDashboard({ user, onLogout }) {
         <div className="flex items-center justify-between mb-2 sm:mb-3">
           <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
             <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
-            Your Badges
+            {isViewingOther ? `${activeUser?.name?.split(' ')[0]}'s Badges` : 'Your Badges'}
           </h3>
           <button
             onClick={() => setCurrentPage(PAGES.STATS)}
@@ -2299,14 +2495,26 @@ export default function StudentDashboard({ user, onLogout }) {
           <p className="text-red-700 text-sm font-medium">📵 You are offline. Some features may not work.</p>
         </div>
       )}
+
+      {/* Viewing Other User Banner */}
+      {isViewingOther && (
+        <div className="bg-blue-100 border-2 border-blue-300 rounded-2xl p-3 flex items-center gap-3">
+          <UserCircle className="w-8 h-8 text-blue-600" />
+          <div className="flex-1">
+            <p className="font-bold text-blue-800 text-sm">
+              Viewing stats for: {activeUser?.name || activeUser?.username}
+            </p>
+          </div>
+        </div>
+      )}
       
       {/* Student Achievement Page */}
       <StudentAchievementPage stats={userStats} onMonthChange={handleStatsMonthChange} workingDays={workingDays} />
       
       {/* Leaderboard Section */}
       <LeaderboardSection 
-        currentUserId={user?._id || user?.id}
-        currentUserName={user?.name || user?.username}
+        currentUserId={activeUserId}
+        currentUserName={activeUser?.name || activeUser?.username}
       />
     </div>
   );
@@ -2331,12 +2539,12 @@ export default function StudentDashboard({ user, onLogout }) {
       case PAGES.STATS:
         return renderStats();
       case PAGES.HISTORY:
-        return <HistoryPage />;
+        return <HistoryPage activeUserId={isViewingOther ? activeUserId : null} />;
       case PAGES.PENDING:
         return (
           <PendingPage
             pendingStatus={pendingStatus}
-            onRefresh={fetchPendingStatus}
+            onRefresh={() => fetchPendingStatus()}
             onEdit={(item) => {
               setEditingGatha(item);
               setShowGathaModal(true);
@@ -2370,6 +2578,12 @@ export default function StudentDashboard({ user, onLogout }) {
             </div>
             <div className="min-w-0">
               <h1 className="font-bold text-gray-800 text-xs sm:text-sm truncate">શ્રી સોમચીન્તામણી વાસુપૂજ્યસ્વામી જૈન પાઠશાળા</h1>
+              {isViewingOther && (
+                <p className="text-xs text-blue-600 flex items-center gap-1">
+                  <UserCircle className="w-3 h-3" />
+                  Viewing: {activeUser?.name?.split(' ')[0]}
+                </p>
+              )}
             </div>
           </div>
           <button
@@ -2436,6 +2650,7 @@ export default function StudentDashboard({ user, onLogout }) {
         onSubmit={submitGatha}
         isSubmitting={isSubmitting}
         editData={editingGatha}
+        activeUserName={isViewingOther ? (activeUser?.name || activeUser?.username) : null}
       />
 
       <ConfirmationModal
