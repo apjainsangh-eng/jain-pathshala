@@ -1361,7 +1361,7 @@ const toggleMemberSelection = (username) => {
   const totalNewGathaCount = students.reduce((sum, s) => sum + (s.new_gathas || 0), 0);
 
   const attendanceRate = students.length > 0 
-    ? Math.round((stats?.today_attendance || 0) / students.length * 100)
+    ? Math.round((stats?.today_attendnce || 0) / students.length * 100)
     : 0;
 
   // Filter users for display
@@ -2168,6 +2168,188 @@ const toggleMemberSelection = (username) => {
     );
   };
 
+  // ============ RENDER FAMILY GROUPS SECTION ============
+  const renderFamilyGroupsSection = () => (
+    <div className="mt-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <Users className="w-5 h-5 text-purple-500" />
+          Family Groups
+        </h3>
+        <button
+          onClick={() => {
+            setSelectedMembers([]);
+            setNewGroup({ groupName: '', members: [] });
+            setShowAddGroupModal(true);
+          }}
+          className="flex items-center gap-1 bg-purple-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold active:scale-[0.98]"
+        >
+          <Plus className="w-4 h-4" />
+          Create Group
+        </button>
+      </div>
+
+      <div className="bg-purple-50 rounded-xl p-3 border-2 border-purple-200">
+        <p className="text-xs text-purple-700">
+          💡 Family groups allow members to mark attendance and add gatha for each other without logging out.
+        </p>
+      </div>
+
+      {familyGroupsLoading ? (
+        <div className="text-center py-4">
+          <RefreshCw className="w-6 h-6 animate-spin text-purple-500 mx-auto" />
+        </div>
+      ) : familyGroups.length === 0 ? (
+        <div className="bg-white rounded-xl p-6 border-2 border-gray-200 text-center">
+          <Users className="w-10 h-10 mx-auto text-gray-300 mb-2" />
+          <p className="text-gray-500 text-sm">No family groups created yet</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {familyGroups.map((group) => (
+            <div key={group.id} className="bg-white rounded-xl border-2 border-purple-200 p-3 shadow-sm">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-bold text-gray-800">{group.groupName}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {group.members.length} members
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDeleteGroup(group.id)}
+                  disabled={actionLoading === 'delete-group-' + group.id}
+                  className="p-2 bg-red-100 text-red-600 rounded-lg active:scale-95"
+                >
+                  {actionLoading === 'delete-group-' + group.id ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {group.members.map((member) => (
+                  <span
+                    key={member.username}
+                    className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium"
+                  >
+                    {member.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // ============ RENDER ADD GROUP MODAL ============
+  const renderAddGroupModal = () => {
+    if (!showAddGroupModal) return null;
+
+    // Get students not in any group
+    const studentsInGroups = familyGroups.flatMap(g => g.members.map(m => m.username));
+    const availableStudents = students.filter(s => !studentsInGroups.includes(s.username));
+
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+        <div className="bg-white w-full max-h-[90vh] rounded-t-3xl sm:rounded-2xl sm:max-w-md overflow-hidden animate-slide-up">
+          <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Users className="w-6 h-6" />
+                <h3 className="font-bold text-lg">Create Family Group</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAddGroupModal(false);
+                  setSelectedMembers([]);
+                }}
+                className="p-2 hover:bg-white/20 rounded-full"
+              >
+                <CloseIcon className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Group Name *</label>
+              <input
+                type="text"
+                value={newGroup.groupName}
+                onChange={(e) => setNewGroup({ ...newGroup, groupName: e.target.value })}
+                placeholder="e.g., Sharma Family"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Select Members * ({selectedMembers.length} selected)
+              </label>
+              <p className="text-xs text-gray-500 mb-2">Select at least 2 members</p>
+
+              <div className="max-h-48 overflow-y-auto border-2 border-gray-200 rounded-xl p-2 space-y-1">
+                {availableStudents.map((student) => (
+                  <button
+                    key={student.username}
+                    onClick={() => toggleMemberSelection(student.username)}
+                    className={`w-full flex items-center justify-between p-2 rounded-lg text-left ${
+                      selectedMembers.includes(student.username)
+                        ? 'bg-purple-100 border-2 border-purple-400'
+                        : 'bg-gray-50 border-2 border-transparent'
+                    }`}
+                  >
+                    <span className="text-sm font-medium text-gray-800">{student.name}</span>
+                    {selectedMembers.includes(student.username) && (
+                      <Check className="w-4 h-4 text-purple-600" />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {selectedMembers.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {selectedMembers.map(username => {
+                    const student = students.find(s => s.username === username);
+                    return (
+                      <span
+                        key={username}
+                        className="bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1"
+                      >
+                        {student?.name || username}
+                        <button onClick={() => toggleMemberSelection(username)}>
+                          <CloseIcon className="w-3 h-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="p-4 border-t">
+            <button
+              onClick={handleCreateGroup}
+              disabled={actionLoading === 'create-group' || selectedMembers.length < 2}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3.5 rounded-xl font-bold active:scale-[0.98] disabled:opacity-50"
+            >
+              {actionLoading === 'create-group' ? (
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              ) : (
+                <Users className="w-5 h-5" />
+              )}
+              Create Group
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ============ RENDER USER MANAGEMENT ============
   const renderUserManagement = () => (
     <div className="space-y-4">
@@ -2184,185 +2366,12 @@ const toggleMemberSelection = (username) => {
           <RefreshCw className={`w-4 h-4 ${usersLoading ? 'animate-spin' : ''}`} />
         </button>
       </div>
-  const renderFamilyGroupsSection = () => (
-  <div className="mt-6 space-y-4">
-    <div className="flex items-center justify-between">
-      <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-        <Users className="w-5 h-5 text-purple-500" />
-        Family Groups
-      </h3>
-      <button
-        onClick={() => {
-          setSelectedMembers([]);
-          setNewGroup({ groupName: '', members: [] });
-          setShowAddGroupModal(true);
-        }}
-        className="flex items-center gap-1 bg-purple-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold active:scale-[0.98]"
-      >
-        <Plus className="w-4 h-4" />
-        Create Group
-      </button>
-    </div>
 
-    <div className="bg-purple-50 rounded-xl p-3 border-2 border-purple-200">
-      <p className="text-xs text-purple-700">
-        💡 Family groups allow members to mark attendance and add gatha for each other without logging out.
-      </p>
-    </div>
-
-    {familyGroupsLoading ? (
-      <div className="text-center py-4">
-        <RefreshCw className="w-6 h-6 animate-spin text-purple-500 mx-auto" />
-      </div>
-    ) : familyGroups.length === 0 ? (
-      <div className="bg-white rounded-xl p-6 border-2 border-gray-200 text-center">
-        <Users className="w-10 h-10 mx-auto text-gray-300 mb-2" />
-        <p className="text-gray-500 text-sm">No family groups created yet</p>
-      </div>
-    ) : (
-      <div className="space-y-3">
-        {familyGroups.map((group) => (
-          <div key={group.id} className="bg-white rounded-xl border-2 border-purple-200 p-3 shadow-sm">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="font-bold text-gray-800">{group.groupName}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {group.members.length} members
-                </p>
-              </div>
-              <button
-                onClick={() => handleDeleteGroup(group.id)}
-                disabled={actionLoading === 'delete-group-' + group.id}
-                className="p-2 bg-red-100 text-red-600 rounded-lg active:scale-95"
-              >
-                {actionLoading === 'delete-group-' + group.id ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Trash2 className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {group.members.map((member) => (
-                <span 
-                  key={member.username}
-                  className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium"
-                >
-                  {member.name}
-                </span>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    )}
-  </div>
-);
-
-      const renderAddGroupModal = () => {
-  if (!showAddGroupModal) return null;
-
-  // Get students not in any group
-  const studentsInGroups = familyGroups.flatMap(g => g.members.map(m => m.username));
-  const availableStudents = students.filter(s => !studentsInGroups.includes(s.username));
-
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
-      <div className="bg-white w-full max-h-[90vh] rounded-t-3xl sm:rounded-2xl sm:max-w-md overflow-hidden animate-slide-up">
-        <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-4 text-white">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Users className="w-6 h-6" />
-              <h3 className="font-bold text-lg">Create Family Group</h3>
-            </div>
-            <button
-              onClick={() => {
-                setShowAddGroupModal(false);
-                setSelectedMembers([]);
-              }}
-              className="p-2 hover:bg-white/20 rounded-full"
-            >
-              <CloseIcon className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Group Name *</label>
-            <input
-              type="text"
-              value={newGroup.groupName}
-              onChange={(e) => setNewGroup({ ...newGroup, groupName: e.target.value })}
-              placeholder="e.g., Sharma Family"
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">
-              Select Members * ({selectedMembers.length} selected)
-            </label>
-            <p className="text-xs text-gray-500 mb-2">Select at least 2 members</p>
-            
-            <div className="max-h-48 overflow-y-auto border-2 border-gray-200 rounded-xl p-2 space-y-1">
-              {availableStudents.map((student) => (
-                <button
-                  key={student.username}
-                  onClick={() => toggleMemberSelection(student.username)}
-                  className={`w-full flex items-center justify-between p-2 rounded-lg text-left ${
-                    selectedMembers.includes(student.username)
-                      ? 'bg-purple-100 border-2 border-purple-400'
-                      : 'bg-gray-50 border-2 border-transparent'
-                  }`}
-                >
-                  <span className="text-sm font-medium text-gray-800">{student.name}</span>
-                  {selectedMembers.includes(student.username) && (
-                    <Check className="w-4 h-4 text-purple-600" />
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {selectedMembers.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {selectedMembers.map(username => {
-                  const student = students.find(s => s.username === username);
-                  return (
-                    <span 
-                      key={username}
-                      className="bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1"
-                    >
-                      {student?.name || username}
-                      <button onClick={() => toggleMemberSelection(username)}>
-                        <CloseIcon className="w-3 h-3" />
-                      </button>
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="p-4 border-t">
-          <button
-            onClick={handleCreateGroup}
-            disabled={actionLoading === 'create-group' || selectedMembers.length < 2}
-            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3.5 rounded-xl font-bold active:scale-[0.98] disabled:opacity-50"
-          >
-            {actionLoading === 'create-group' ? (
-              <RefreshCw className="w-5 h-5 animate-spin" />
-            ) : (
-              <Users className="w-5 h-5" />
-            )}
-            Create Group
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
+      {/* Render Family Groups Here */}
+      {renderFamilyGroupsSection()}
+      
+      {/* Render Add Group Modal Here */}
+      {renderAddGroupModal()}
 
       {/* Action Buttons */}
       <div className="grid grid-cols-2 gap-3">
@@ -2482,7 +2491,6 @@ const toggleMemberSelection = (username) => {
                 </div>
               </div>
             </div>
-                     {renderFamilyGroupsSection()}
           ))}
 
           {filteredUsers.length === 0 && (
