@@ -2492,6 +2492,8 @@ const toggleMemberSelection = (username) => {
           )}
         </div>
       )}
+         {renderFamilyGroupsSection()}
+    {renderAddGroupModal()}
     </div>
   );
 
