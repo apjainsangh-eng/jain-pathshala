@@ -81,7 +81,7 @@ const HistoryPage = ({ activeStudent }) => {
     try {
       // We append studentId as a query parameter so the backend knows WHO to fetch for
       // Assuming your student object has an _id field. Adjust if it uses 'id'.
-      const studentId = activeStudent._id || activeStudent.id; 
+      const studentId = activeStudent.username || activeStudent.id || activeStudent._id;
       const url = `${API_BASE}/history/${year}/${month}?studentId=${studentId}`;
       
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -531,3 +531,4 @@ const HistoryPage = ({ activeStudent }) => {
 };
 
 export default HistoryPage;
+
