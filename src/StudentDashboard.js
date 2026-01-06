@@ -1139,14 +1139,15 @@ const HistoryPage = ({ activeUserId }) => {
     'જુલાઈ', 'ઓગસ્ટ', 'સપ્ટેમ્બર', 'ઓક્ટોબર', 'નવેમ્બર', 'ડિસેમ્બર',
   ];
 
-  const fetchHistory = async (year, month) => {
+  const fetchHistory = useCallback(async (year, month) => {
     setIsLoading(true);
     setError(null);
     const token = localStorage.getItem('jainPathshalaToken');
 
     try {
-      // Add userId param if viewing for another user
-      const userParam = activeUserId ? `?userId=${activeUserId}` : '';
+      // FIX: Changed 'userId' to 'studentId' to match Backend
+      const userParam = activeUserId ? `?studentId=${activeUserId}` : '';
+      
       const url = `${API_BASE}/history/${year}/${month}${userParam}`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 
@@ -1159,11 +1160,12 @@ const HistoryPage = ({ activeUserId }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeUserId]); // Added activeUserId dependency so it refreshes when user switches
 
+  // Trigger fetch when Year, Month OR Active User changes
   useEffect(() => {
     fetchHistory(selectedYear, selectedMonth);
-  }, [selectedYear, selectedMonth, activeUserId]);
+  }, [selectedYear, selectedMonth, fetchHistory]);
 
   const handleMonthChange = (direction) => {
     let newMonth = selectedMonth + direction;
@@ -1249,7 +1251,9 @@ const HistoryPage = ({ activeUserId }) => {
       <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
         <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-bold text-blue-800">How to use History</p>
+          <p className="text-sm font-bold text-blue-800">
+             {activeUserId ? `Viewing ${activeUserId}'s History` : "My Personal History"}
+          </p>
           <p className="text-xs text-blue-600 mt-1">
             Green days = Present. Tap on green days to see gatha details.
           </p>
