@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   AlertCircle,
   AlertTriangle,
@@ -150,13 +150,12 @@ const getMotivationalMessage = (streak, attendance, gathas) => {
 const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoading }) => {
   const [isOpen, setIsOpen] = useState(false);
   
-  // Don't show if no group members or only one member (the user themselves)
   if (!groupMembers || groupMembers.length <= 1) {
     return null;
   }
 
-  const activeUserData = groupMembers.find(m => m._id === activeUser?._id || m.id === activeUser?.id) || activeUser;
-  const isViewingOther = activeUser?._id !== loggedInUser?._id && activeUser?.id !== loggedInUser?.id;
+  const activeUserData = groupMembers.find(m => m._id === activeUser?._id || m.id === activeUser?.id || m.username === activeUser?.username) || activeUser;
+  const isViewingOther = (activeUser?.username || activeUser?.name) !== (loggedInUser?.username || loggedInUser?.name);
 
   return (
     <div className="relative">
@@ -202,7 +201,6 @@ const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoad
         </div>
       </button>
 
-      {/* Dropdown */}
       {isOpen && (
         <>
           <div 
@@ -218,15 +216,15 @@ const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoad
             </div>
             <div className="max-h-60 overflow-y-auto">
               {groupMembers.map((member) => {
-                const memberId = member._id || member.id;
-                const activeId = activeUser?._id || activeUser?.id;
-                const loggedInId = loggedInUser?._id || loggedInUser?.id;
-                const isActive = memberId === activeId;
-                const isLoggedIn = memberId === loggedInId;
+                const memberUsername = member.username || member.name;
+                const activeUsername = activeUser?.username || activeUser?.name;
+                const loggedInUsername = loggedInUser?.username || loggedInUser?.name;
+                const isActive = memberUsername === activeUsername;
+                const isLoggedIn = memberUsername === loggedInUsername;
                 
                 return (
                   <button
-                    key={memberId}
+                    key={memberUsername}
                     onClick={() => {
                       onSwitch(member);
                       setIsOpen(false);
@@ -484,7 +482,6 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
           className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in duration-200"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
           <div className="p-4 sm:p-5 text-white bg-gradient-to-r from-indigo-500 to-purple-600 rounded-t-3xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -505,9 +502,7 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
             </div>
           </div>
 
-          {/* Scrollable Content */}
           <div className="max-h-[60vh] overflow-y-auto">
-            {/* Current Status */}
             <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 border-b">
               <div className="flex items-center justify-between mb-3">
                 <div>
@@ -539,7 +534,6 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
               )}
             </div>
 
-            {/* XP Breakdown */}
             <div className="p-4 border-b">
               <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
                 <Zap className="w-5 h-5 text-yellow-500 flex-shrink-0" />
@@ -587,7 +581,6 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
               </div>
             </div>
 
-            {/* All Levels */}
             <div className="p-4">
               <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
                 <TrendingUp className="w-5 h-5 text-blue-500 flex-shrink-0" />
@@ -649,7 +642,6 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
             </div>
           </div>
 
-          {/* Footer */}
           <div className="p-4 bg-gray-50 border-t rounded-b-3xl">
             <button
               onClick={onClose}
@@ -815,8 +807,8 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
           ) : (
             <div className="space-y-2">
               {attendanceLeaders.slice(0, 5).map((user, index) => {
-                const odometer = user.userId || user._id || user.id;
-                const isCurrentUser = odometer === currentUserId || user.name === currentUserName;
+                const odometer = user.userId || user._id || user.id || user.username;
+                const isCurrentUser = odometer === currentUserId || user.name === currentUserName || user.username === currentUserId;
                 const rank = index + 1;
                 
                 return (
@@ -860,8 +852,8 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
           ) : (
             <div className="space-y-2">
               {gathaLeaders.slice(0, 5).map((user, index) => {
-                const odometer = user.userId || user._id || user.id;
-                const isCurrentUser = odometer === currentUserId || user.name === currentUserName;
+                const odometer = user.userId || user._id || user.id || user.username;
+                const isCurrentUser = odometer === currentUserId || user.name === currentUserName || user.username === currentUserId;
                 const rank = index + 1;
                 
                 return (
@@ -960,7 +952,6 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
           className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in duration-200" 
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
           <div className={`p-4 sm:p-5 text-white rounded-t-3xl ${activeTab === 'new' ? 'bg-gradient-to-r from-purple-500 to-indigo-600' : 'bg-gradient-to-r from-blue-500 to-cyan-600'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -983,7 +974,6 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
             </div>
           </div>
 
-          {/* Tabs */}
           {!editData && (
             <div className="flex p-2 bg-gray-100 gap-2">
               <button
@@ -1005,7 +995,6 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
             </div>
           )}
 
-          {/* Form */}
           <div className="max-h-[50vh] overflow-y-auto p-4 sm:p-5 space-y-4">
             <div>
               <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
@@ -1083,7 +1072,6 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
             </div>
           </div>
 
-          {/* Footer */}
           <div className="p-4 sm:p-5 border-t bg-gray-50 rounded-b-3xl">
             <div className="flex gap-2 sm:gap-3">
               <button
@@ -1115,7 +1103,6 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
     </div>
   );
 };
-
 // ============================================
 // HISTORY PAGE COMPONENT
 // ============================================
@@ -1145,9 +1132,7 @@ const HistoryPage = ({ activeUserId }) => {
     const token = localStorage.getItem('jainPathshalaToken');
 
     try {
-      // FIX: Changed 'userId' to 'studentId' to match Backend
       const userParam = activeUserId ? `?studentId=${activeUserId}` : '';
-      
       const url = `${API_BASE}/history/${year}/${month}${userParam}`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 
@@ -1160,9 +1145,8 @@ const HistoryPage = ({ activeUserId }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [activeUserId]); // Added activeUserId dependency so it refreshes when user switches
+  }, [activeUserId]);
 
-  // Trigger fetch when Year, Month OR Active User changes
   useEffect(() => {
     fetchHistory(selectedYear, selectedMonth);
   }, [selectedYear, selectedMonth, fetchHistory]);
@@ -1599,7 +1583,10 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
   );
 };
 
-// Recent Badges Component
+// ============================================
+// RECENT BADGES COMPONENT
+// ============================================
+
 const RecentBadges = ({ stats, onBadgeClick }) => {
   const recentlyUnlocked = useMemo(() => {
     return MONTHLY_ACHIEVEMENTS
@@ -1640,7 +1627,11 @@ const RecentBadges = ({ stats, onBadgeClick }) => {
     </div>
   );
 };
-// Next Badges to Unlock
+
+// ============================================
+// NEXT BADGES COMPONENT
+// ============================================
+
 const NextBadges = ({ stats, onBadgeClick }) => {
   const nextAchievements = useMemo(() => {
     return MONTHLY_ACHIEVEMENTS
@@ -1698,7 +1689,7 @@ const NextBadges = ({ stats, onBadgeClick }) => {
 };
 
 // ============================================
-// MAIN STUDENT DASHBOARD COMPONENT - CORRECTED
+// MAIN STUDENT DASHBOARD COMPONENT - FIXED
 // ============================================
 
 export default function StudentDashboard({ user, onLogout }) {
@@ -1709,6 +1700,12 @@ export default function StudentDashboard({ user, onLogout }) {
   const [groupName, setGroupName] = useState(null);
   const [activeUser, setActiveUser] = useState(user);
   const [isLoadingSwitch, setIsLoadingSwitch] = useState(false);
+
+  // REF to track current active user (prevents stale closures)
+  const activeUserRef = useRef(activeUser);
+  useEffect(() => {
+    activeUserRef.current = activeUser;
+  }, [activeUser]);
 
   // Data states
   const [attendanceHistory, setAttendanceHistory] = useState([]);
@@ -1818,10 +1815,9 @@ export default function StudentDashboard({ user, onLogout }) {
   };
 
   // ============================================
-  // API CALLS - Using correct backend endpoints
+  // API CALLS
   // ============================================
 
-  // Fetch family/group members - CORRECTED ENDPOINT
   const fetchGroupMembers = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
@@ -1834,7 +1830,6 @@ export default function StudentDashboard({ user, onLogout }) {
         setGroupName(data.groupName || null);
         
         if (members.length > 0) {
-          // Convert to format expected by UserSwitcher
           const formattedMembers = members.map(m => ({
             _id: m.username,
             id: m.username,
@@ -1851,30 +1846,6 @@ export default function StudentDashboard({ user, onLogout }) {
       console.error('Error fetching family members:', error);
     }
   }, []);
-
-  // Fetch data for the current active user
-  const fetchUserData = useCallback(async (username) => {
-    const token = localStorage.getItem('jainPathshalaToken');
-    
-    // If viewing logged-in user, use regular endpoints
-    if (username === loggedInUsername) {
-      return null; // Will use default fetch functions
-    }
-    
-    // For family members, use the family-member data endpoint
-    try {
-      const res = await fetch(`${API_BASE}/family-member/${username}/data`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch (error) {
-      console.error('Error fetching family member data:', error);
-    }
-    return null;
-  }, [loggedInUsername]);
 
   const fetchPendingStatus = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
@@ -1960,76 +1931,181 @@ export default function StudentDashboard({ user, onLogout }) {
     }
   }, []);
 
-  // Load data for a switched user using the family-member endpoint
+  // ============================================
+  // FIXED: Load data for a switched user
+  // ============================================
   const loadUserData = useCallback(async (username) => {
     setIsLoadingSwitch(true);
+    setGlobalError('');
+    const token = localStorage.getItem('jainPathshalaToken');
     
     try {
-      const data = await fetchUserData(username);
+      console.log('Loading data for user:', username);
       
-      if (data) {
-        // Update state with family member's data
-        setAttendanceHistory(data.recentAttendance || []);
-        setGathaEntries((data.recentGathas || []).map(normalizeEntry));
-        setPendingStatus({
-          attendance: [],
-          gatha: data.pendingGathas || []
-        });
-        
-        // Calculate stats from the data
-        const streakData = calculateStreak(data.recentAttendance || []);
-        setCurrentStreak(streakData.current);
-        setMaxStreak(streakData.max);
-        
-        // Monthly stats
-        const currentMonth = new Date().getMonth();
-        const currentYear = new Date().getFullYear();
-        
-        const monthlyAtt = (data.recentAttendance || []).filter((r) => {
-          const date = new Date(r.date);
-          return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
-        }).length;
-        setMonthlyAttendance(monthlyAtt);
-        
-        const monthlyNew = (data.recentGathas || [])
-          .filter((e) => {
-            const date = new Date(e.created_at || e.date);
-            return date.getMonth() === currentMonth && date.getFullYear() === currentYear && e.type === 'new';
-          })
-          .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
-        setMonthlyNewGathas(monthlyNew);
+      const res = await fetch(`${API_BASE}/family-member/${username}/data`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to load data (${res.status})`);
       }
+      
+      const data = await res.json();
+      console.log('Family member data received:', data);
+      
+      // Update state with family member's data
+      const recentAttendance = data.recentAttendance || [];
+      const recentGathas = (data.recentGathas || []).map(normalizeEntry);
+      
+      setAttendanceHistory(recentAttendance);
+      setGathaEntries(recentGathas);
+      setPendingStatus({
+        attendance: data.pendingAttendance || [],
+        gatha: data.pendingGathas || []
+      });
+      
+      // Use stats from the response if available
+      const stats = data.stats || {};
+      setCurrentStreak(stats.currentStreak ?? calculateStreak(recentAttendance).current);
+      setMaxStreak(stats.maxStreak ?? calculateStreak(recentAttendance).max);
+      setMonthlyAttendance(stats.monthlyAttendance ?? 0);
+      setMonthlyNewGathas(stats.monthlyNewGathas ?? 0);
+      setMonthlyRevisionGathas(stats.monthlyRevisionGathas ?? 0);
+      setWorkingDays(stats.workingDays ?? DEFAULT_WORKING_DAYS);
+      
+      return true;
     } catch (error) {
       console.error('Error loading user data:', error);
-      setGlobalError('Failed to load user data');
+      setGlobalError(`Failed to load data: ${error.message}`);
+      return false;
     } finally {
       setIsLoadingSwitch(false);
     }
-  }, [fetchUserData]);
+  }, []);
 
-  // Handle user switch
+  // ============================================
+  // FIXED: Handle user switch
+  // ============================================
   const handleUserSwitch = useCallback(async (newUser) => {
     const newUsername = newUser.username || newUser.name;
-    if (newUsername === activeUsername) return;
+    const currentActiveUsername = activeUserRef.current?.username || activeUserRef.current?.name;
     
+    // Don't switch if it's the same user
+    if (newUsername === currentActiveUsername) {
+      console.log('Same user, skipping switch');
+      return;
+    }
+    
+    console.log(`Switching from ${currentActiveUsername} to ${newUsername}`);
+    
+    // Set active user first to update UI immediately
     setActiveUser(newUser);
     
     if (newUsername === loggedInUsername) {
       // Switching back to self - reload own data
-      const now = new Date();
-      await Promise.all([
-        fetchAttendance(),
-        fetchGathas(),
-        fetchPendingStatus(),
-        fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1),
-      ]);
-      showSuccess('Switched back to your dashboard');
+      setIsLoadingSwitch(true);
+      try {
+        const now = new Date();
+        await Promise.all([
+          fetchAttendance(),
+          fetchGathas(),
+          fetchPendingStatus(),
+          fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1),
+        ]);
+        showSuccess('Switched back to your dashboard');
+      } finally {
+        setIsLoadingSwitch(false);
+      }
     } else {
       // Load family member's data
-      await loadUserData(newUsername);
-      showSuccess(`Switched to ${newUser.name || newUsername}'s dashboard`);
+      const success = await loadUserData(newUsername);
+      if (success) {
+        showSuccess(`Switched to ${newUser.name || newUsername}'s dashboard`);
+      } else {
+        // Revert to previous user on failure
+        setActiveUser(activeUserRef.current);
+      }
     }
-  }, [activeUsername, loggedInUsername, loadUserData, fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
+  }, [loggedInUsername, loadUserData, fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
+
+  // ============================================
+  // FIXED: Calculate stats from local data (fallback)
+  // ============================================
+  const calculateLocalStats = useCallback((year, month) => {
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 0);
+    
+    const monthlyAtt = attendanceHistory.filter((r) => {
+      const date = new Date(r.date);
+      return date >= monthStart && date <= monthEnd;
+    }).length;
+    setMonthlyAttendance(monthlyAtt);
+    
+    const monthlyNew = gathaEntries
+      .filter((e) => {
+        const date = new Date(e.created_at || e.date);
+        return date >= monthStart && date <= monthEnd && e.type === 'new';
+      })
+      .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
+    setMonthlyNewGathas(monthlyNew);
+    
+    const monthlyRevision = gathaEntries
+      .filter((e) => {
+        const date = new Date(e.created_at || e.date);
+        return date >= monthStart && date <= monthEnd && e.type === 'revision';
+      })
+      .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
+    setMonthlyRevisionGathas(monthlyRevision);
+  }, [attendanceHistory, gathaEntries]);
+
+  // ============================================
+  // FIXED: Handle stats month change for both self and family members
+  // ============================================
+  const handleStatsMonthChange = useCallback(async (year, month) => {
+    console.log(`Month changed to: ${year}-${month}`);
+    setStatsMonth({ year, month });
+    
+    const token = localStorage.getItem('jainPathshalaToken');
+    const currentActiveUsername = activeUserRef.current?.username || activeUserRef.current?.name;
+    
+    try {
+      let url;
+      if (currentActiveUsername === loggedInUsername) {
+        // Self - use regular stats endpoint
+        url = `${API_BASE}/stats/comprehensive?year=${year}&month=${month}`;
+      } else {
+        // Family member - use family member stats endpoint
+        url = `${API_BASE}/family-member/${currentActiveUsername}/stats?year=${year}&month=${month}`;
+      }
+      
+      console.log('Fetching stats from:', url);
+      
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        console.log('Stats received:', data);
+        
+        setMonthlyAttendance(data.monthlyAttendance ?? 0);
+        setMonthlyNewGathas(data.monthlyNewGathas ?? 0);
+        setMonthlyRevisionGathas(data.monthlyRevisionGathas ?? 0);
+        setCurrentStreak(data.currentStreak ?? 0);
+        setMaxStreak(data.maxStreak ?? 0);
+        setWorkingDays(data.workingDays ?? DEFAULT_WORKING_DAYS);
+      } else {
+        console.error('Stats fetch failed:', res.status);
+        // Fallback: Calculate from local data
+        calculateLocalStats(year, month);
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      // Fallback: Calculate from local data
+      calculateLocalStats(year, month);
+    }
+  }, [loggedInUsername, calculateLocalStats]);
 
   // Track online status
   useEffect(() => {
@@ -2090,18 +2166,10 @@ export default function StudentDashboard({ user, onLogout }) {
     setActiveUser(user);
   }, [user]);
 
-  const handleStatsMonthChange = (year, month) => {
-    setStatsMonth({ year, month });
-    if (!isViewingOther) {
-      fetchMonthlyStats(year, month);
-    }
-  };
-
   // ============================================
-  // HANDLERS - Using correct backend endpoints
+  // DERIVED DATA
   // ============================================
 
-  // Derived data
   const todayAttendanceMarked = useMemo(
     () => attendanceHistory.some((r) => formatLocalDateString(r.date) === todayIso),
     [attendanceHistory, todayIso]
@@ -2134,7 +2202,6 @@ export default function StudentDashboard({ user, onLogout }) {
     return att + gatha;
   }, [pendingStatus]);
 
-  // User stats for achievements
   const userStats = useMemo(() => ({
     monthlyAttendance,
     monthlyNewGathas,
@@ -2143,7 +2210,6 @@ export default function StudentDashboard({ user, onLogout }) {
     workingDays,
   }), [monthlyAttendance, monthlyNewGathas, currentStreak, maxStreak, workingDays]);
 
-  // Calculate XP and level
   const xpBreakdown = useMemo(
     () => calculateTotalXP(userStats, MONTHLY_ACHIEVEMENTS),
     [userStats]
@@ -2161,7 +2227,10 @@ export default function StudentDashboard({ user, onLogout }) {
     [currentStreak, monthlyAttendance, monthlyNewGathas]
   );
 
-  // Mark attendance - USES CORRECT ENDPOINT
+  // ============================================
+  // HANDLERS
+  // ============================================
+
   const markAttendance = async () => {
     if (todayAttendanceStatus !== 'not_marked') return;
 
@@ -2170,7 +2239,6 @@ export default function StudentDashboard({ user, onLogout }) {
     const token = localStorage.getItem('jainPathshalaToken');
 
     try {
-      // Use different endpoint based on whether viewing own or family member
       const endpoint = isViewingOther 
         ? `${API_BASE}/attendance/mark-for`
         : `${API_BASE}/attendance/mark`;
@@ -2190,7 +2258,6 @@ export default function StudentDashboard({ user, onLogout }) {
       
       showSuccess(data.message || '✅ Attendance submitted! Waiting for approval.');
       
-      // Refresh data
       if (isViewingOther) {
         await loadUserData(activeUsername);
       } else {
@@ -2204,7 +2271,6 @@ export default function StudentDashboard({ user, onLogout }) {
     }
   };
 
-  // Submit gatha - USES CORRECT ENDPOINT
   const submitGatha = async (formData) => {
     const token = localStorage.getItem('jainPathshalaToken');
     setIsSubmitting(true);
@@ -2214,15 +2280,12 @@ export default function StudentDashboard({ user, onLogout }) {
       let url, bodyData;
       
       if (editingGatha) {
-        // Editing existing pending gatha
         url = `${API_BASE}/gatha/pending/${editingGatha.id}`;
         bodyData = formData;
       } else if (isViewingOther) {
-        // Adding gatha for family member
         url = `${API_BASE}/gatha-for`;
         bodyData = { ...formData, forUsername: activeUsername };
       } else {
-        // Adding gatha for self
         url = `${API_BASE}/gatha`;
         bodyData = formData;
       }
@@ -2243,7 +2306,6 @@ export default function StudentDashboard({ user, onLogout }) {
       setShowGathaModal(false);
       setEditingGatha(null);
       
-      // Refresh data
       if (isViewingOther) {
         await loadUserData(activeUsername);
       } else {
@@ -2279,14 +2341,12 @@ export default function StudentDashboard({ user, onLogout }) {
   // ==================== RENDER HOME PAGE ====================
   const renderHome = () => (
     <div className="space-y-4">
-      {/* Offline Banner */}
       {!isOnline && (
         <div className="bg-red-100 border border-red-300 rounded-xl p-3 text-center">
           <p className="text-red-700 text-sm font-medium">📵 You are offline. Some features may not work.</p>
         </div>
       )}
 
-      {/* User Switcher - Only show if there are group members */}
       {groupMembers.length > 1 && (
         <UserSwitcher
           groupMembers={groupMembers}
@@ -2297,7 +2357,6 @@ export default function StudentDashboard({ user, onLogout }) {
         />
       )}
 
-      {/* Viewing Other User Banner */}
       {isViewingOther && (
         <div className="bg-blue-100 border-2 border-blue-300 rounded-2xl p-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -2322,7 +2381,6 @@ export default function StudentDashboard({ user, onLogout }) {
         </div>
       )}
 
-      {/* Loading Overlay for User Switch */}
       {isLoadingSwitch && (
         <div className="bg-white rounded-2xl p-6 border-2 border-orange-200 text-center">
           <RefreshCw className="w-8 h-8 animate-spin text-orange-500 mx-auto mb-2" />
@@ -2382,7 +2440,6 @@ export default function StudentDashboard({ user, onLogout }) {
         </div>
       </button>
 
-      {/* Tips for new users */}
       {showTips && !isViewingOther && (
         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 sm:p-4">
           <div className="flex items-center justify-between mb-2 sm:mb-3">
@@ -2390,10 +2447,7 @@ export default function StudentDashboard({ user, onLogout }) {
               <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
               <span className="font-bold text-blue-800 text-sm sm:text-base">Quick Tips</span>
             </div>
-            <button
-              onClick={() => setShowTips(false)}
-              className="text-blue-400 p-1"
-            >
+            <button onClick={() => setShowTips(false)} className="text-blue-400 p-1">
               <CloseIcon size={16} />
             </button>
           </div>
@@ -2412,7 +2466,6 @@ export default function StudentDashboard({ user, onLogout }) {
         </div>
       )}
 
-      {/* Streak Card */}
       <StreakDisplay streak={currentStreak} maxStreak={maxStreak} />
 
       {/* Today's Quick Actions */}
@@ -2483,7 +2536,6 @@ export default function StudentDashboard({ user, onLogout }) {
           </button>
         </div>
 
-        {/* Today's Gathas List */}
         {(todaysApprovedGathas.length > 0 || todaysPendingGathas.length > 0) && (
           <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t-2 border-gray-100">
             <p className="text-xs sm:text-sm font-bold text-gray-700 mb-2 sm:mb-3 flex items-center gap-2">
@@ -2502,11 +2554,7 @@ export default function StudentDashboard({ user, onLogout }) {
                   }`}
                 >
                   <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                    <div
-                      className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        entry.type === 'new' ? 'bg-purple-200' : 'bg-blue-200'
-                      }`}
-                    >
+                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${entry.type === 'new' ? 'bg-purple-200' : 'bg-blue-200'}`}>
                       {entry.type === 'new' ? <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-purple-700" /> : <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 text-blue-700" />}
                     </div>
                     <div className="min-w-0">
@@ -2518,25 +2566,10 @@ export default function StudentDashboard({ user, onLogout }) {
                     <PendingBadge status={entry.status} size="small" />
                     {entry.status === 'pending' && !isViewingOther && (
                       <div className="flex gap-1">
-                        <button
-                          onClick={() => {
-                            setEditingGatha(entry);
-                            setShowGathaModal(true);
-                          }}
-                          className="p-1 sm:p-1.5 bg-blue-100 rounded-lg text-blue-600"
-                        >
+                        <button onClick={() => { setEditingGatha(entry); setShowGathaModal(true); }} className="p-1 sm:p-1.5 bg-blue-100 rounded-lg text-blue-600">
                           <Edit2 size={10} className="sm:w-3 sm:h-3" />
                         </button>
-                        <button
-                          onClick={() =>
-                            setConfirmAction({
-                              title: 'Delete Gatha',
-                              message: 'Are you sure you want to delete this entry?',
-                              handler: () => deletePendingGatha(entry.id),
-                            })
-                          }
-                          className="p-1 sm:p-1.5 bg-red-100 rounded-lg text-red-600"
-                        >
+                        <button onClick={() => setConfirmAction({ title: 'Delete Gatha', message: 'Are you sure you want to delete this entry?', handler: () => deletePendingGatha(entry.id) })} className="p-1 sm:p-1.5 bg-red-100 rounded-lg text-red-600">
                           <Trash2 size={10} className="sm:w-3 sm:h-3" />
                         </button>
                       </div>
@@ -2549,45 +2582,26 @@ export default function StudentDashboard({ user, onLogout }) {
         )}
       </div>
 
-      {/* Quick Stats */}
       <div className="grid grid-cols-2 gap-2 sm:gap-3">
-        <QuickStatCard
-          icon={CalendarDays}
-          value={monthlyAttendance}
-          label="Days Present"
-          color="green"
-          sublabel="This Month"
-        />
-        <QuickStatCard
-          icon={BookMarked}
-          value={monthlyNewGathas}
-          label="New Gathas"
-          color="purple"
-          sublabel="This Month"
-        />
+        <QuickStatCard icon={CalendarDays} value={monthlyAttendance} label="Days Present" color="green" sublabel="This Month" />
+        <QuickStatCard icon={BookMarked} value={monthlyNewGathas} label="New Gathas" color="purple" sublabel="This Month" />
       </div>
 
-      {/* Recent Badges */}
       <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-yellow-200 shadow-sm">
         <div className="flex items-center justify-between mb-2 sm:mb-3">
           <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
             <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
             {isViewingOther ? `${(activeUser?.name || activeUsername)?.split(' ')[0]}'s Badges` : 'Your Badges'}
           </h3>
-          <button
-            onClick={() => setCurrentPage(PAGES.STATS)}
-            className="text-xs bg-yellow-100 text-yellow-700 px-2 sm:px-3 py-1 rounded-full font-bold flex items-center gap-1"
-          >
+          <button onClick={() => setCurrentPage(PAGES.STATS)} className="text-xs bg-yellow-100 text-yellow-700 px-2 sm:px-3 py-1 rounded-full font-bold flex items-center gap-1">
             View All <ChevronRight className="w-3 h-3" />
           </button>
         </div>
         <RecentBadges stats={userStats} onBadgeClick={setSelectedAchievement} />
       </div>
 
-      {/* Next Badges */}
       <NextBadges stats={userStats} onBadgeClick={setSelectedAchievement} />
 
-      {/* Daily Quote */}
       <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-3 sm:p-4 text-white shadow-lg relative overflow-hidden">
         <div className="absolute top-0 right-0 w-20 sm:w-24 h-20 sm:h-24 bg-white/10 rounded-full -mr-10 sm:-mr-12 -mt-10 sm:-mt-12" />
         <div className="relative z-10 flex items-start gap-2 sm:gap-3">
@@ -2602,7 +2616,7 @@ export default function StudentDashboard({ user, onLogout }) {
     </div>
   );
 
-  // ==================== RENDER STATS PAGE ====================
+  // ==================== RENDER STATS PAGE (FIXED) ====================
   const renderStats = () => (
     <div className="space-y-4">
       {!isOnline && (
@@ -2618,11 +2632,19 @@ export default function StudentDashboard({ user, onLogout }) {
             <p className="font-bold text-blue-800 text-sm">
               Viewing stats for: {activeUser?.name || activeUsername}
             </p>
+            <p className="text-xs text-blue-600">
+              Change month to see different periods
+            </p>
           </div>
         </div>
       )}
       
-      <StudentAchievementPage stats={userStats} onMonthChange={handleStatsMonthChange} workingDays={workingDays} />
+      <StudentAchievementPage 
+        stats={userStats} 
+        onMonthChange={handleStatsMonthChange} 
+        workingDays={workingDays}
+        key={`stats-${activeUsername}-${statsMonth.year}-${statsMonth.month}`}
+      />
       
       <LeaderboardSection 
         currentUserId={activeUsername}
@@ -2656,17 +2678,8 @@ export default function StudentDashboard({ user, onLogout }) {
           <PendingPage
             pendingStatus={pendingStatus}
             onRefresh={fetchPendingStatus}
-            onEdit={(item) => {
-              setEditingGatha(item);
-              setShowGathaModal(true);
-            }}
-            onDelete={(item) =>
-              setConfirmAction({
-                title: 'Delete Gatha',
-                message: 'Are you sure you want to delete this entry?',
-                handler: () => deletePendingGatha(item.id),
-              })
-            }
+            onEdit={(item) => { setEditingGatha(item); setShowGathaModal(true); }}
+            onDelete={(item) => setConfirmAction({ title: 'Delete Gatha', message: 'Are you sure you want to delete this entry?', handler: () => deletePendingGatha(item.id) })}
             isSubmitting={isSubmitting}
           />
         );
@@ -2680,7 +2693,6 @@ export default function StudentDashboard({ user, onLogout }) {
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 pb-24">
       <SuccessToast message={successMessage} onClose={() => setSuccessMessage('')} />
 
-      {/* Header */}
       <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm shadow-md px-3 sm:px-4 py-2 sm:py-3">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -2710,7 +2722,6 @@ export default function StudentDashboard({ user, onLogout }) {
       <div className="max-w-lg mx-auto px-3 sm:px-4 py-3 sm:py-4">
         <ErrorBanner message={globalError} onClose={() => setGlobalError('')} />
 
-        {/* Navigation Tabs */}
         <div className="grid grid-cols-4 gap-1 sm:gap-2 mb-3 sm:mb-4">
           {[
             { key: PAGES.HOME, icon: Home, label: 'Home' },
@@ -2730,13 +2741,7 @@ export default function StudentDashboard({ user, onLogout }) {
               <tab.icon className="w-4 h-4 sm:w-5 sm:h-5" />
               <span className="text-xs">{tab.label}</span>
               {tab.badge > 0 && (
-                <span
-                  className={`absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-xs font-bold shadow ${
-                    tab.badgeColor === 'red'
-                      ? 'bg-red-500 text-white animate-pulse'
-                      : 'bg-yellow-500 text-white'
-                  }`}
-                >
+                <span className={`absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-xs font-bold shadow ${tab.badgeColor === 'red' ? 'bg-red-500 text-white animate-pulse' : 'bg-yellow-500 text-white'}`}>
                   {tab.badge}
                 </span>
               )}
@@ -2751,13 +2756,9 @@ export default function StudentDashboard({ user, onLogout }) {
         </div>
       </div>
 
-      {/* Modals */}
       <GathaEntryModal
         isOpen={showGathaModal}
-        onClose={() => {
-          setShowGathaModal(false);
-          setEditingGatha(null);
-        }}
+        onClose={() => { setShowGathaModal(false); setEditingGatha(null); }}
         onSubmit={submitGatha}
         isSubmitting={isSubmitting}
         editData={editingGatha}
