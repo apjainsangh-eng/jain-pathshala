@@ -10,22 +10,17 @@ import {
   Plus,
   X as CloseIcon,
   TrendingUp,
-  AlertTriangle,
-  Trophy,
 } from 'lucide-react';
 
 // -------------------------------------
 // VERCEL DEPLOYMENT CONFIGURATION
-// Use relative path '/api' in Vercel production to hit the serverless function.
-// For local dev, fall back to localhost:5000/api
 // -------------------------------------
 const API_BASE = (process.env.NODE_ENV === 'production' ? '/api' : (process.env.REACT_APP_API_BASE?.trim() || 'http://localhost:5000/api'));
 const DEFAULT_DATE_OPTIONS = { day: 'numeric', month: 'long', year: 'numeric' };
 
 
 // -------------------------------------
-// Helper utilities (Needed for independent functioning)
-// These functions were previously external but are necessary for this component.
+// Helper utilities
 // -------------------------------------
 const coerceToDate = (input) => {
   if (input instanceof Date) return new Date(input.getTime());
@@ -52,14 +47,14 @@ const formatLocalDateString = (input = new Date()) => {
 const formatDateIn = (input, options = DEFAULT_DATE_OPTIONS) => {
   const parsed = coerceToDate(input);
   if (!parsed) return '';
-  // Note: Since 'en-IN' locale requires the options to be available, we merge default.
   return parsed.toLocaleDateString('en-IN', { ...DEFAULT_DATE_OPTIONS, ...options });
 };
 
 // -------------------------------------
 // HistoryPage Component
 // -------------------------------------
-const HistoryPage = () => { // Note: Removed props since we included helpers directly
+// CHANGE 1: Accept activeStudent as a prop
+const HistoryPage = ({ activeStudent }) => { 
   const today = new Date();
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
@@ -74,20 +69,31 @@ const HistoryPage = () => { // Note: Removed props since we included helpers dir
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
+  // CHANGE 2: Update fetch logic to use the activeStudent ID
   const fetchHistory = useCallback(async (year, month) => {
+    // If no student is selected yet, don't fetch
+    if (!activeStudent) return;
+
     setIsLoading(true);
     setError(null);
     const token = localStorage.getItem('jainPathshalaToken');
 
     try {
-      const url = `${API_BASE}/history/${year}/${month}`;
+      // We append studentId as a query parameter so the backend knows WHO to fetch for
+      // Assuming your student object has an _id field. Adjust if it uses 'id'.
+      const studentId = activeStudent._id || activeStudent.id; 
+      const url = `${API_BASE}/history/${year}/${month}?studentId=${studentId}`;
+      
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 
       if (!res.ok) {
         const errorText = await res.text();
-        // Try to parse JSON error if available
-        const errorData = JSON.parse(errorText.split('\n')[0].trim()); 
-        throw new Error(errorData.error || `HTTP ${res.status}: Failed to load history.`);
+        try {
+          const errorData = JSON.parse(errorText.split('\n')[0].trim()); 
+          throw new Error(errorData.error || `HTTP ${res.status}: Failed to load history.`);
+        } catch (e) {
+           throw new Error(`HTTP ${res.status}: Failed to load history.`);
+        }
       }
 
       const data = await res.json();
@@ -99,8 +105,9 @@ const HistoryPage = () => { // Note: Removed props since we included helpers dir
     } finally {
       setIsLoading(false);
     }
-  }, []); 
+  }, [activeStudent]); // Re-create function if activeStudent changes
 
+  // CHANGE 3: Trigger fetch when Year, Month, OR activeStudent changes
   useEffect(() => {
     fetchHistory(selectedYear, selectedMonth);
   }, [selectedYear, selectedMonth, fetchHistory]);
@@ -140,11 +147,10 @@ const HistoryPage = () => { // Note: Removed props since we included helpers dir
 
   const activityData = historyData?.dailyActivity ?? {};
 
-  // Filter to get only days where user was present
   const presentDays = useMemo(() => {
     return Object.entries(activityData)
       .filter(([_, activity]) => activity?.present === true)
-      .sort((a, b) => new Date(b[0]) - new Date(a[0])); // Sort by date descending (newest first)
+      .sort((a, b) => new Date(b[0]) - new Date(a[0]));
   }, [activityData]);
 
   const monthlySummary = useMemo(() => {
@@ -237,7 +243,9 @@ const HistoryPage = () => { // Note: Removed props since we included helpers dir
       return (
         <div className="text-center py-16">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-orange-200 border-t-orange-500"></div>
-          <p className="mt-4 text-gray-600 font-medium">Loading your history...</p>
+          <p className="mt-4 text-gray-600 font-medium">
+             Loading {activeStudent?.name ? `${activeStudent.name}'s` : 'your'} history...
+          </p>
         </div>
       );
     }
@@ -268,7 +276,7 @@ const HistoryPage = () => { // Note: Removed props since we included helpers dir
     return (
       <div className="space-y-3">
         {presentDays.map(([dateStr, activity]) => {
-          const { gathas = { new: 0, revision: 0 }, details = [] } = activity;
+          const { gathas = { new: 0, revision: 0 } } = activity;
           const newCount = Number(gathas.new || 0);
           const revisionCount = Number(gathas.revision || 0);
           const totalCount = newCount + revisionCount;
@@ -291,7 +299,7 @@ const HistoryPage = () => { // Note: Removed props since we included helpers dir
                   <div className="w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br from-green-100 to-green-200 text-green-700 flex-shrink-0">
                     <Check size={26} strokeWidth={3} />
                   </div>
-                  
+                   
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="font-bold text-gray-800 text-lg">
@@ -469,7 +477,9 @@ const HistoryPage = () => { // Note: Removed props since we included helpers dir
   return (
     <div className="bg-white rounded-3xl shadow-xl p-8 border-4 border-orange-200 mb-6">
       <h2 className="text-3xl font-bold text-gray-800 mb-6 border-b-2 border-gray-100 pb-4 flex items-center gap-3">
-        <Clock size={32} className="text-orange-500" /> Personal History
+        <Clock size={32} className="text-orange-500" /> 
+        {/* CHANGE 4: Dynamic Title based on selected student */}
+        {activeStudent?.name ? `${activeStudent.name}'s History` : 'Personal History'}
       </h2>
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
