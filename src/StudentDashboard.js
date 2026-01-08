@@ -1418,6 +1418,1727 @@ const HistoryPage = ({ activeUserId }) => {
   );
 };
 
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  Award,
+  BookMarked,
+  BookOpen,
+  Calendar,
+  CalendarDays,
+  Check,
+  CheckCircle,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Crown,
+  Edit2,
+  Flame,
+  HelpCircle,
+  Home,
+  Info,
+  Loader,
+  LogOut,
+  Medal,
+  Plus,
+  RefreshCw,
+  Star,
+  Target,
+  Trash2,
+  Trophy,
+  TrendingUp,
+  Users,
+  X as CloseIcon,
+  Zap,
+  Sparkles,
+  UserCircle,
+  ChevronUp,
+  Filter,
+} from 'lucide-react';
+
+// Import Achievement Components
+import StudentAchievementPage, {
+  calculateAchievementProgress,
+  calculateTotalXP,
+  getUserLevel,
+  MONTHLY_ACHIEVEMENTS,
+  XP_VALUES,
+  DEFAULT_WORKING_DAYS,
+  AchievementDetailModal,
+  ACHIEVEMENT_COLORS,
+  LEVELS,
+} from './Student_achievement';
+
+// ============================================
+// CONFIGURATION & CONSTANTS
+// ============================================
+
+const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.vercel.app/api';
+const DEFAULT_DATE_OPTIONS = { day: 'numeric', month: 'long', year: 'numeric' };
+
+// Page Navigation
+const PAGES = {
+  HOME: 'home',
+  STATS: 'stats',
+  HISTORY: 'history',
+  PENDING: 'pending',
+};
+
+// Period Options for Stats
+const PERIOD_OPTIONS = {
+  TODAY: 'today',
+  WEEK: 'week',
+  MONTH: 'month',
+  YEAR: 'year',
+  CUSTOM: 'custom',
+};
+
+// Motivational Quotes
+const QUOTES = [
+  { text: "અહિંસા પરમો ધર્મઃ", meaning: "Non-violence is the supreme religion", emoji: "🙏", lang: "Sanskrit" },
+  { text: "ક્ષમા વીરસ્ય ભૂષણમ્", meaning: "Forgiveness is the ornament of the brave", emoji: "💪", lang: "Sanskrit" },
+  { text: "જીવો જીવસ્ય જીવનમ્", meaning: "Live and let live", emoji: "🌱", lang: "Sanskrit" },
+  { text: "પરસ્પરોપગ્રહો જીવાનામ્", meaning: "Souls render service to one another", emoji: "🤝", lang: "Sanskrit" },
+  { text: "ધર્મ એ જ શ્રેષ્ઠ મિત્ર છે", meaning: "Dharma is the best friend", emoji: "🙏", lang: "Gujarati" },
+  { text: "સત્ય બોલો, પ્રિય બોલો", meaning: "Speak truth, speak pleasantly", emoji: "💬", lang: "Gujarati" },
+  { text: "જ્ઞાન જ શક્તિ છે", meaning: "Knowledge is power", emoji: "📚", lang: "Gujarati" },
+  { text: "મહેનત નો કોઈ વિકલ્પ નથી", meaning: "There is no substitute for hard work", emoji: "⭐", lang: "Gujarati" },
+];
+
+// Tips icon color classes
+const TIP_ICON_COLORS = {
+  blue: 'text-blue-500',
+  purple: 'text-purple-500',
+  yellow: 'text-yellow-500',
+  orange: 'text-orange-500',
+};
+
+// Tips for new users
+const HELPFUL_TIPS = [
+  { icon: Calendar, tipText: "Tap the blue button to mark your attendance daily", color: "blue" },
+  { icon: BookOpen, tipText: "Record your gatha learning with the purple button", color: "purple" },
+  { icon: Trophy, tipText: "Check Stats to see your achievements and progress", color: "yellow" },
+  { icon: Clock, tipText: "Pending tab shows items waiting for teacher approval", color: "orange" },
+];
+
+// ============================================
+// HELPER UTILITIES
+// ============================================
+
+const coerceToDate = (input) => {
+  if (input instanceof Date) return new Date(input.getTime());
+  if (typeof input === 'number') return new Date(input);
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    const isoLike = trimmed.length <= 10 ? `${trimmed}T00:00:00` : trimmed;
+    const parsed = new Date(isoLike);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
+};
+
+export const formatLocalDateString = (input = new Date()) => {
+  const parsed = coerceToDate(input);
+  if (!parsed) return '';
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, '0');
+  const d = String(parsed.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+export const formatDateIn = (input, options = DEFAULT_DATE_OPTIONS) => {
+  const parsed = coerceToDate(input);
+  if (!parsed) return '';
+  return parsed.toLocaleDateString('en-IN', { ...DEFAULT_DATE_OPTIONS, ...options });
+};
+
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 5) return { text: 'Good Night', emoji: '🌙', period: 'night' };
+  if (hour < 12) return { text: 'Good Morning', emoji: '🌅', period: 'morning' };
+  if (hour < 17) return { text: 'Good Afternoon', emoji: '☀️', period: 'afternoon' };
+  if (hour < 21) return { text: 'Good Evening', emoji: '🌆', period: 'evening' };
+  return { text: 'Good Night', emoji: '🌙', period: 'night' };
+};
+
+const getMotivationalMessage = (streak, attendance, gathas) => {
+  if (streak >= 7) return { text: "You're on fire! Keep the streak going! 🔥", type: "streak" };
+  if (attendance >= 50) return { text: "Amazing dedication! You're a star! ⭐", type: "attendance" };
+  if (gathas >= 25) return { text: "Great gatha progress! Keep learning! 📚", type: "gatha" };
+  if (streak >= 3) return { text: "Nice streak! Don't break the chain! 💪", type: "streak" };
+  if (attendance >= 10) return { text: "You're doing great! Stay consistent! 🎯", type: "attendance" };
+  return { text: "Every journey begins with a single step! 🚀", type: "motivation" };
+};
+
+// ============================================
+// FIXED: STREAK CALCULATION WITH SUNDAY HANDLING
+// ============================================
+
+const calculateStreakWithSundaySkip = (history) => {
+  if (!history || history.length === 0) return { current: 0, max: 0 };
+
+  // Get unique attendance dates sorted in descending order (most recent first)
+  const sortedDates = history
+    .map((r) => formatLocalDateString(r.date))
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .sort((a, b) => new Date(b) - new Date(a));
+
+  if (sortedDates.length === 0) return { current: 0, max: 0 };
+
+  // Helper: Check if a date is Sunday
+  const isSunday = (dateStr) => {
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.getDay() === 0; // 0 = Sunday
+  };
+
+  // Helper: Get the next expected working day (skipping Sundays)
+  const getNextExpectedDay = (dateStr) => {
+    const date = new Date(dateStr + 'T00:00:00');
+    let nextDay = new Date(date);
+    nextDay.setDate(nextDay.getDate() - 1);
+    
+    // Skip Sunday
+    while (isSunday(formatLocalDateString(nextDay))) {
+      nextDay.setDate(nextDay.getDate() - 1);
+    }
+    
+    return formatLocalDateString(nextDay);
+  };
+
+  // Helper: Get days between two dates (excluding Sundays)
+  const getWorkingDaysBetween = (date1Str, date2Str) => {
+    const date1 = new Date(date1Str + 'T00:00:00');
+    const date2 = new Date(date2Str + 'T00:00:00');
+    
+    let count = 0;
+    let current = new Date(Math.max(date1, date2));
+    const end = new Date(Math.min(date1, date2));
+    
+    while (current > end) {
+      current.setDate(current.getDate() - 1);
+      if (!isSunday(formatLocalDateString(current))) {
+        count++;
+      }
+    }
+    
+    return count;
+  };
+
+  // Calculate current streak
+  let currentStreak = 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = formatLocalDateString(today);
+  
+  // Get yesterday (or last working day if yesterday was Sunday)
+  let checkDate = new Date(today);
+  checkDate.setDate(checkDate.getDate() - 1);
+  while (isSunday(formatLocalDateString(checkDate))) {
+    checkDate.setDate(checkDate.getDate() - 1);
+  }
+  const lastWorkingDayStr = formatLocalDateString(checkDate);
+
+  // Check if attended today or the last working day
+  const attendedToday = sortedDates.includes(todayStr);
+  const attendedLastWorkingDay = sortedDates.includes(lastWorkingDayStr);
+
+  if (!attendedToday && !attendedLastWorkingDay) {
+    // Check if the gap is more than allowed (considering Sunday skip)
+    const mostRecentAttendance = sortedDates[0];
+    const workingDaysGap = getWorkingDaysBetween(todayStr, mostRecentAttendance);
+    
+    if (workingDaysGap > 1) {
+      currentStreak = 0;
+    }
+  }
+
+  // Count the streak
+  if (sortedDates.length > 0) {
+    currentStreak = 1;
+    
+    for (let i = 0; i < sortedDates.length - 1; i++) {
+      const currentDate = sortedDates[i];
+      const nextDate = sortedDates[i + 1];
+      
+      // Calculate working days between these two dates
+      const workingDaysGap = getWorkingDaysBetween(currentDate, nextDate);
+      
+      if (workingDaysGap === 1) {
+        // Consecutive working days
+        currentStreak++;
+      } else if (workingDaysGap === 0) {
+        // Same day (shouldn't happen but handle it)
+        continue;
+      } else {
+        // Gap too large, streak breaks here for current
+        break;
+      }
+    }
+  }
+
+  // Verify current streak is valid (should include today or last working day)
+  if (currentStreak > 0) {
+    const mostRecentAttendance = sortedDates[0];
+    if (mostRecentAttendance !== todayStr && mostRecentAttendance !== lastWorkingDayStr) {
+      const workingDaysFromToday = getWorkingDaysBetween(todayStr, mostRecentAttendance);
+      if (workingDaysFromToday > 1) {
+        currentStreak = 0;
+      }
+    }
+  }
+
+  // Calculate max streak
+  let maxStreak = 0;
+  let tempStreak = 1;
+
+  for (let i = 0; i < sortedDates.length - 1; i++) {
+    const currentDate = sortedDates[i];
+    const nextDate = sortedDates[i + 1];
+    const workingDaysGap = getWorkingDaysBetween(currentDate, nextDate);
+
+    if (workingDaysGap === 1) {
+      tempStreak++;
+    } else {
+      maxStreak = Math.max(maxStreak, tempStreak);
+      tempStreak = 1;
+    }
+  }
+
+  maxStreak = Math.max(maxStreak, tempStreak, currentStreak);
+
+  return { current: currentStreak, max: maxStreak };
+};
+
+// ============================================
+// PERIOD SELECTOR COMPONENT
+// ============================================
+
+const PeriodSelector = ({ selectedPeriod, onPeriodChange, customDateRange, onCustomDateChange }) => {
+  const [showCustom, setShowCustom] = useState(false);
+  
+  const periods = [
+    { key: PERIOD_OPTIONS.TODAY, label: 'Today', icon: '📅' },
+    { key: PERIOD_OPTIONS.WEEK, label: 'This Week', icon: '📆' },
+    { key: PERIOD_OPTIONS.MONTH, label: 'This Month', icon: '🗓️' },
+    { key: PERIOD_OPTIONS.YEAR, label: 'This Year', icon: '📊' },
+    { key: PERIOD_OPTIONS.CUSTOM, label: 'Custom', icon: '🔧' },
+  ];
+
+  const handlePeriodClick = (period) => {
+    if (period === PERIOD_OPTIONS.CUSTOM) {
+      setShowCustom(true);
+    } else {
+      setShowCustom(false);
+    }
+    onPeriodChange(period);
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-orange-200 shadow-sm overflow-hidden">
+      <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-3 text-white">
+        <div className="flex items-center gap-2">
+          <Filter className="w-5 h-5" />
+          <h3 className="font-bold text-sm sm:text-base">Select Period</h3>
+        </div>
+      </div>
+      
+      <div className="p-3">
+        <div className="flex flex-wrap gap-2">
+          {periods.map((period) => (
+            <button
+              key={period.key}
+              onClick={() => handlePeriodClick(period.key)}
+              className={`px-3 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-1.5 ${
+                selectedPeriod === period.key
+                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <span>{period.icon}</span>
+              {period.label}
+            </button>
+          ))}
+        </div>
+
+        {(selectedPeriod === PERIOD_OPTIONS.CUSTOM || showCustom) && (
+          <div className="mt-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+            <p className="text-xs font-bold text-gray-700 mb-2">Custom Date Range</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-gray-500">Start Date</label>
+                <input
+                  type="date"
+                  value={customDateRange.startDate}
+                  onChange={(e) => onCustomDateChange({ ...customDateRange, startDate: e.target.value })}
+                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-orange-400 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">End Date</label>
+                <input
+                  type="date"
+                  value={customDateRange.endDate}
+                  onChange={(e) => onCustomDateChange({ ...customDateRange, endDate: e.target.value })}
+                  max={formatLocalDateString(new Date())}
+                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg text-sm focus:border-orange-400 focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// DATE RANGE HELPER
+// ============================================
+
+const getDateRangeForPeriod = (period, customRange = null) => {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  
+  let startDate, endDate;
+
+  switch (period) {
+    case PERIOD_OPTIONS.TODAY:
+      startDate = new Date(now);
+      endDate = new Date(now);
+      break;
+    case PERIOD_OPTIONS.WEEK:
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
+      endDate = new Date(now);
+      break;
+    case PERIOD_OPTIONS.MONTH:
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = new Date(now);
+      break;
+    case PERIOD_OPTIONS.YEAR:
+      startDate = new Date(now.getFullYear(), 0, 1);
+      endDate = new Date(now);
+      break;
+    case PERIOD_OPTIONS.CUSTOM:
+      if (customRange && customRange.startDate && customRange.endDate) {
+        startDate = new Date(customRange.startDate + 'T00:00:00');
+        endDate = new Date(customRange.endDate + 'T00:00:00');
+      } else {
+        // Default to this month if no custom range
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now);
+      }
+      break;
+    default:
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = new Date(now);
+  }
+
+  return {
+    startDate: formatLocalDateString(startDate),
+    endDate: formatLocalDateString(endDate),
+  };
+};
+
+// ============================================
+// USER SWITCHER COMPONENT
+// ============================================
+
+const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoading }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  if (!groupMembers || groupMembers.length <= 1) {
+    return null;
+  }
+
+  const activeUserData = groupMembers.find(m => m._id === activeUser?._id || m.id === activeUser?.id || m.username === activeUser?.username) || activeUser;
+  const isViewingOther = (activeUser?.username || activeUser?.name) !== (loggedInUser?.username || loggedInUser?.name);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={isLoading}
+        className={`w-full flex items-center justify-between gap-2 p-3 rounded-2xl border-2 transition-all ${
+          isViewingOther 
+            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-300' 
+            : 'bg-white border-orange-200'
+        } shadow-sm active:scale-[0.99]`}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md flex-shrink-0 ${
+            isViewingOther 
+              ? 'bg-gradient-to-br from-blue-400 to-indigo-500' 
+              : 'bg-gradient-to-br from-orange-400 to-amber-500'
+          }`}>
+            {(activeUserData?.name || activeUserData?.username || 'U').charAt(0).toUpperCase()}
+          </div>
+          <div className="text-left min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="font-bold text-gray-800 text-sm truncate">
+                {activeUserData?.name || activeUserData?.username}
+              </p>
+              {isViewingOther && (
+                <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full animate-pulse flex-shrink-0">
+                  Viewing
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500">
+              {groupMembers.length} members in group • Tap to switch
+            </p>
+          </div>
+        </div>
+        <div className={`p-2 rounded-lg transition-colors flex-shrink-0 ${isOpen ? 'bg-orange-100' : 'bg-gray-100'}`}>
+          {isOpen ? (
+            <ChevronUp className="w-4 h-4 text-gray-600" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-gray-600" />
+          )}
+        </div>
+      </button>
+
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setIsOpen(false)} 
+          />
+          <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border-2 border-orange-200 shadow-xl z-50 overflow-hidden animate-in slide-in-from-top-2 duration-200">
+            <div className="p-2 bg-orange-50 border-b border-orange-200">
+              <p className="text-xs font-bold text-orange-800 flex items-center gap-2">
+                <Users className="w-3 h-3" />
+                Switch Account
+              </p>
+            </div>
+            <div className="max-h-60 overflow-y-auto">
+              {groupMembers.map((member) => {
+                const memberUsername = member.username || member.name;
+                const activeUsername = activeUser?.username || activeUser?.name;
+                const loggedInUsername = loggedInUser?.username || loggedInUser?.name;
+                const isActive = memberUsername === activeUsername;
+                const isLoggedIn = memberUsername === loggedInUsername;
+                
+                return (
+                  <button
+                    key={memberUsername}
+                    onClick={() => {
+                      onSwitch(member);
+                      setIsOpen(false);
+                    }}
+                    disabled={isLoading}
+                    className={`w-full flex items-center gap-3 p-3 transition-all ${
+                      isActive 
+                        ? 'bg-orange-100' 
+                        : 'hover:bg-gray-50 active:bg-gray-100'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md flex-shrink-0 ${
+                      isActive 
+                        ? 'bg-gradient-to-br from-orange-400 to-amber-500' 
+                        : 'bg-gradient-to-br from-gray-400 to-gray-500'
+                    }`}>
+                      {(member.name || member.username || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 text-left min-w-0">
+                      <p className="font-bold text-gray-800 text-sm truncate">
+                        {member.name || member.username}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {member.username}
+                        {isLoggedIn && ' • (You)'}
+                      </p>
+                    </div>
+                    {isActive && (
+                      <CheckCircle className="w-5 h-5 text-orange-500 flex-shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="p-2 bg-gray-50 border-t border-gray-200">
+              <p className="text-xs text-gray-500 text-center">
+                💡 You can add gathas and mark attendance for any member
+              </p>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// REUSABLE COMPONENTS
+// ============================================
+
+const ConfirmationModal = ({ title, message, onConfirm, onCancel, confirmText = "Delete", confirmColor = "red" }) => {
+  if (!title) return null;
+
+  return (
+    <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-4 sm:p-6 animate-in zoom-in duration-200 my-auto">
+        <div className="flex items-center mb-4">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-yellow-100 flex items-center justify-center mr-3 sm:mr-4 flex-shrink-0">
+            <AlertTriangle className="w-6 h-6 sm:w-7 sm:h-7 text-yellow-500" />
+          </div>
+          <div className="min-w-0">
+            <h4 className="text-base sm:text-lg font-bold text-gray-800 truncate">{title}</h4>
+            <p className="text-xs sm:text-sm text-gray-500">This action cannot be undone</p>
+          </div>
+        </div>
+        <p className="text-gray-600 mb-4 sm:mb-6 text-sm bg-gray-50 p-3 rounded-xl">{message}</p>
+        <div className="flex gap-2 sm:gap-3">
+          <button 
+            onClick={onCancel} 
+            className="flex-1 px-3 sm:px-4 py-3 bg-gray-100 text-gray-700 font-bold rounded-2xl active:scale-[0.98] transition-transform text-sm sm:text-base"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className={`flex-1 px-3 sm:px-4 py-3 ${confirmColor === 'red' ? 'bg-red-500' : 'bg-orange-500'} text-white font-bold rounded-2xl active:scale-[0.98] transition-transform shadow-lg text-sm sm:text-base`}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PendingBadge = ({ status, size = 'normal' }) => {
+  const badges = {
+    pending: { className: 'text-yellow-700 bg-yellow-100 border-yellow-200', icon: Clock, label: 'Pending' },
+    approved: { className: 'text-green-700 bg-green-100 border-green-200', icon: Check, label: 'Approved' },
+    rejected: { className: 'text-red-700 bg-red-100 border-red-200', icon: CloseIcon, label: 'Rejected' },
+  };
+
+  const badge = badges[status];
+  if (!badge) return null;
+  const Icon = badge.icon;
+
+  const sizeClasses = size === 'small' ? 'text-xs px-2 py-0.5' : 'text-xs px-2.5 py-1';
+
+  return (
+    <span className={`inline-flex items-center gap-1 font-bold rounded-full border ${sizeClasses} ${badge.className}`}>
+      <Icon className={`${size === 'small' ? 'w-3 h-3' : 'w-3.5 h-3.5'} ${status === 'pending' ? 'animate-pulse' : ''}`} />
+      {badge.label}
+    </span>
+  );
+};
+
+const SuccessToast = ({ message, onClose }) => {
+  if (!message) return null;
+
+  return (
+    <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top duration-300 px-4 w-full max-w-sm">
+      <div className="bg-green-500 text-white px-4 sm:px-6 py-3 rounded-2xl shadow-lg flex items-center gap-2 sm:gap-3">
+        <CheckCircle className="w-5 h-5 flex-shrink-0" />
+        <span className="font-medium text-sm sm:text-base flex-1">{message}</span>
+        <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-full flex-shrink-0">
+          <CloseIcon className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const ErrorBanner = ({ message, onClose }) => {
+  if (!message) return null;
+
+  return (
+    <div className="bg-red-50 border-l-4 border-red-500 p-3 sm:p-4 rounded-xl mb-4 flex items-start gap-2 sm:gap-3 shadow-sm animate-in slide-in-from-top duration-200">
+      <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <p className="text-red-700 text-sm font-medium break-words">{message}</p>
+      </div>
+      <button onClick={onClose} className="text-red-400 p-1 hover:bg-red-100 rounded-lg flex-shrink-0">
+        <CloseIcon size={18} />
+      </button>
+    </div>
+  );
+};
+
+const StreakDisplay = ({ streak, maxStreak }) => {
+  const getStreakInfo = (s) => {
+    if (s >= 30) return { label: 'Legendary!', color: 'from-yellow-400 to-orange-500', emoji: '🔥', tier: 'diamond' };
+    if (s >= 14) return { label: 'Amazing!', color: 'from-purple-400 to-pink-500', emoji: '⚡', tier: 'gold' };
+    if (s >= 7) return { label: 'Great!', color: 'from-blue-400 to-indigo-500', emoji: '✨', tier: 'silver' };
+    if (s >= 3) return { label: 'Good!', color: 'from-green-400 to-emerald-500', emoji: '🌟', tier: 'bronze' };
+    if (s >= 1) return { label: 'Started!', color: 'from-cyan-400 to-blue-500', emoji: '🚀', tier: 'starter' };
+    return { label: 'Start today!', color: 'from-gray-400 to-gray-500', emoji: '💪', tier: 'none' };
+  };
+
+  const info = getStreakInfo(streak);
+
+  return (
+    <div className={`bg-gradient-to-r ${info.color} rounded-2xl p-4 text-white shadow-lg relative overflow-hidden`}>
+      <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
+      <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12" />
+
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Flame className="w-5 h-5 sm:w-6 sm:h-6" />
+            <span className="font-bold text-sm sm:text-base">Current Streak</span>
+          </div>
+          <span className="text-2xl sm:text-3xl">{info.emoji}</span>
+        </div>
+        <div className="flex items-end gap-3">
+          <div>
+            <p className="text-4xl sm:text-5xl font-bold">{streak}</p>
+            <p className="text-xs sm:text-sm opacity-80">{streak === 1 ? 'day' : 'days'}</p>
+          </div>
+          <div className="flex-1 text-right">
+            <p className="text-base sm:text-lg font-bold">{info.label}</p>
+            <p className="text-xs opacity-80 flex items-center justify-end gap-1">
+              <Trophy className="w-3 h-3" /> Best: {maxStreak} days
+            </p>
+          </div>
+        </div>
+        <p className="text-xs opacity-70 mt-2 text-center">
+          📅 Sundays don't count - your streak is safe!
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const QuickStatCard = ({ icon: Icon, value, label, color, sublabel }) => {
+  const colorClasses = {
+    green: 'bg-green-50 border-green-200 text-green-600',
+    purple: 'bg-purple-50 border-purple-200 text-purple-600',
+    blue: 'bg-blue-50 border-blue-200 text-blue-600',
+    orange: 'bg-orange-50 border-orange-200 text-orange-600',
+    yellow: 'bg-yellow-50 border-yellow-200 text-yellow-600',
+  };
+
+  return (
+    <div className={`rounded-2xl p-3 sm:p-4 border-2 ${colorClasses[color]} shadow-sm`}>
+      <div className="flex items-center justify-between mb-2">
+        <Icon className="w-6 h-6 sm:w-7 sm:h-7" />
+        {sublabel && (
+          <span className={`text-xs px-2 py-0.5 rounded-full bg-white/80 font-bold`}>
+            {sublabel}
+          </span>
+        )}
+      </div>
+      <p className="text-2xl sm:text-3xl font-bold text-gray-800">{value}</p>
+      <p className="text-xs text-gray-500 mt-1">{label}</p>
+    </div>
+  );
+};
+
+const HelpTooltip = ({ text }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative inline-block">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-1 text-gray-400 hover:text-gray-600"
+      >
+        <HelpCircle className="w-4 h-4" />
+      </button>
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute z-50 bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg">
+            {text}
+            <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// LEVEL DETAILS MODAL
+// ============================================
+
+const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel, stats }) => {
+  if (!isOpen) return null;
+
+  const allLevels = LEVELS || [
+    { level: 1, name: 'Beginner', minXP: 0, icon: '🌱' },
+    { level: 2, name: 'Learner', minXP: 50, icon: '📚' },
+    { level: 3, name: 'Student', minXP: 150, icon: '✨' },
+    { level: 4, name: 'Scholar', minXP: 300, icon: '⭐' },
+    { level: 5, name: 'Expert', minXP: 500, icon: '🏆' },
+    { level: 6, name: 'Master', minXP: 800, icon: '👑' },
+    { level: 7, name: 'Guru', minXP: 1200, icon: '🔱' },
+    { level: 8, name: 'Legend', minXP: 2000, icon: '💎' },
+  ];
+
+  return (
+    <div 
+      className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 overflow-y-auto" 
+      onClick={onClose}
+    >
+      <div className="min-h-full flex items-center justify-center p-4 py-8">
+        <div 
+          className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in duration-200"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-4 sm:p-5 text-white bg-gradient-to-r from-indigo-500 to-purple-600 rounded-t-3xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white/20 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl flex-shrink-0">
+                  {userLevel.icon}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-lg sm:text-xl font-bold">Level Progress</h3>
+                  <p className="text-sm opacity-80">Your XP Journey</p>
+                </div>
+              </div>
+              <button 
+                onClick={onClose} 
+                className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors flex-shrink-0"
+              >
+                <CloseIcon size={24} />
+              </button>
+            </div>
+          </div>
+
+          <div className="max-h-[60vh] overflow-y-auto">
+            <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 border-b">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-sm text-gray-600">Current Level</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center gap-2">
+                    <span className="text-2xl sm:text-3xl">{userLevel.icon}</span>
+                    {userLevel.name}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-600">Total XP</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-indigo-600">{currentXP}</p>
+                </div>
+              </div>
+              
+              {userLevel.nextLevel && (
+                <div className="bg-white rounded-xl p-3 border border-indigo-200">
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="text-gray-600">Next: {userLevel.nextLevel.name} {userLevel.nextLevel.icon}</span>
+                    <span className="font-bold text-indigo-600">{userLevel.xpToNextLevel - userLevel.xpInCurrentLevel} XP needed</span>
+                  </div>
+                  <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full transition-all duration-500"
+                      style={{ width: `${userLevel.progressToNext * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-b">
+              <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
+                <Zap className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+                How You Earned XP This Month
+              </h4>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 bg-green-50 rounded-xl border border-green-200">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-green-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-green-700" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-800 text-sm">Attendance</p>
+                      <p className="text-xs text-gray-500">{stats?.monthlyAttendance || 0} days × {XP_VALUES.attendance} XP</p>
+                    </div>
+                  </div>
+                  <p className="font-bold text-green-600 text-sm flex-shrink-0">+{(stats?.monthlyAttendance || 0) * XP_VALUES.attendance} XP</p>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-purple-50 rounded-xl border border-purple-200">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-purple-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-purple-700" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-800 text-sm">New Gathas</p>
+                      <p className="text-xs text-gray-500">{stats?.monthlyNewGathas || 0} × {XP_VALUES.new_gatha || 2} XP</p>
+                    </div>
+                  </div>
+                  <p className="font-bold text-purple-600 text-sm flex-shrink-0">+{(stats?.monthlyNewGathas || 0) * (XP_VALUES.new_gatha || 2)} XP</p>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-xl border border-yellow-200">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-yellow-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-700" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-800 text-sm">Achievements</p>
+                      <p className="text-xs text-gray-500">Badges unlocked</p>
+                    </div>
+                  </div>
+                  <p className="font-bold text-yellow-600 text-sm flex-shrink-0">+{xpBreakdown?.achievements || 0} XP</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4">
+              <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
+                <TrendingUp className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                All Levels
+              </h4>
+              <div className="space-y-2">
+                {allLevels.map((level, index) => {
+                  const isCurrentLevel = level.level === userLevel.level;
+                  const isUnlocked = currentXP >= level.minXP;
+                  const isNext = !isUnlocked && (index === 0 || currentXP >= allLevels[index - 1].minXP);
+
+                  return (
+                    <div 
+                      key={level.level}
+                      className={`flex items-center justify-between p-2 sm:p-3 rounded-xl border-2 transition-all ${
+                        isCurrentLevel 
+                          ? 'bg-gradient-to-r from-indigo-100 to-purple-100 border-indigo-400 shadow-md' 
+                          : isUnlocked
+                          ? 'bg-green-50 border-green-200'
+                          : isNext
+                          ? 'bg-blue-50 border-blue-300 border-dashed'
+                          : 'bg-gray-50 border-gray-200 opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-xl sm:text-2xl flex-shrink-0 ${
+                          isCurrentLevel ? 'bg-indigo-200' : isUnlocked ? 'bg-green-200' : 'bg-gray-200'
+                        }`}>
+                          {level.icon}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                            <p className="font-bold text-gray-800 text-sm">Lv.{level.level} {level.name}</p>
+                            {isCurrentLevel && (
+                              <span className="text-xs bg-indigo-500 text-white px-1.5 py-0.5 rounded">YOU</span>
+                            )}
+                            {isNext && (
+                              <span className="text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded">NEXT</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            {level.minXP === 0 ? 'Starting level' : `${level.minXP} XP required`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        {isUnlocked ? (
+                          <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-500" />
+                        ) : (
+                          <p className="text-xs sm:text-sm font-bold text-gray-400">
+                            {level.minXP - currentXP} XP
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-gray-50 border-t rounded-b-3xl">
+            <button
+              onClick={onClose}
+              className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold py-3 sm:py-3.5 rounded-xl active:scale-[0.98] transition-transform shadow-lg text-sm sm:text-base"
+            >
+              Got it! 💪
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// LEADERBOARD COMPONENT - FIXED
+// ============================================
+
+const LeaderboardSection = ({ currentUserId, currentUserName, dateRange }) => {
+  const [activeTab, setActiveTab] = useState('attendance');
+  const [leaderboardData, setLeaderboardData] = useState({ attendanceLeaders: [], gathaLeaders: [] });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchLeaderboard = useCallback(async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const { startDate, endDate } = dateRange || getDateRangeForPeriod(PERIOD_OPTIONS.MONTH);
+      
+      console.log('Fetching leaderboard for:', startDate, 'to', endDate);
+      
+      let res = await fetch(
+        `${API_BASE}/leaderboard?startDate=${startDate}&endDate=${endDate}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (res.ok) {
+        const data = await res.json();
+        setLeaderboardData(data);
+      } else {
+        res = await fetch(
+          `${API_BASE}/analytics/leaderboard?startDate=${startDate}&endDate=${endDate}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        if (res.ok) {
+          const data = await res.json();
+          setLeaderboardData({
+            attendanceLeaders: data.attendanceLeaders || data.topAttendance || [],
+            gathaLeaders: data.gathaLeaders || data.topGathas || [],
+          });
+        } else {
+          throw new Error('Could not load leaderboard data');
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching leaderboard:', err);
+      setError('Unable to load leaderboard');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [dateRange]);
+
+  // Refetch when dateRange changes
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
+
+  const getRankIcon = (rank) => {
+    switch (rank) {
+      case 1: return <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />;
+      case 2: return <Medal className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />;
+      case 3: return <Medal className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />;
+      default: return <span className="w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-xs sm:text-sm font-bold text-gray-500">#{rank}</span>;
+    }
+  };
+
+  const getRankBg = (rank, isCurrentUser) => {
+    if (isCurrentUser) return 'bg-gradient-to-r from-orange-100 to-amber-100 border-orange-400';
+    switch (rank) {
+      case 1: return 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-300';
+      case 2: return 'bg-gray-50 border-gray-300';
+      case 3: return 'bg-amber-50 border-amber-300';
+      default: return 'bg-white border-gray-200';
+    }
+  };
+
+  const getRankEmoji = (rank) => {
+    switch (rank) {
+      case 1: return '🥇';
+      case 2: return '🥈';
+      case 3: return '🥉';
+      default: return '';
+    }
+  };
+
+  const attendanceLeaders = leaderboardData?.attendanceLeaders || [];
+  const gathaLeaders = leaderboardData?.gathaLeaders || [];
+
+  // Get period label for display
+  const getPeriodLabel = () => {
+    if (dateRange) {
+      const start = new Date(dateRange.startDate);
+      const end = new Date(dateRange.endDate);
+      if (start.toDateString() === end.toDateString()) {
+        return formatDateIn(start, { day: 'numeric', month: 'short' });
+      }
+      return `${formatDateIn(start, { day: 'numeric', month: 'short' })} - ${formatDateIn(end, { day: 'numeric', month: 'short' })}`;
+    }
+    return 'This Month';
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-blue-200 shadow-sm overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-3 sm:p-4 text-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 sm:w-6 sm:h-6" />
+            <h3 className="text-base sm:text-lg font-bold">🏆 Leaderboard</h3>
+          </div>
+          <button
+            onClick={fetchLeaderboard}
+            disabled={isLoading}
+            className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+        <p className="text-xs sm:text-sm opacity-80 mt-1">Top performers: {getPeriodLabel()}</p>
+      </div>
+
+      <div className="flex p-2 bg-gray-100 gap-2">
+        <button
+          onClick={() => setActiveTab('attendance')}
+          className={`flex-1 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
+            activeTab === 'attendance' ? 'bg-green-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+          }`}
+        >
+          <Calendar className="w-3 h-3 sm:w-4 sm:h-4" /> Attendance
+        </button>
+        <button
+          onClick={() => setActiveTab('gatha')}
+          className={`flex-1 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
+            activeTab === 'gatha' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+          }`}
+        >
+          <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" /> New Gathas
+        </button>
+      </div>
+
+      <div className="p-3 sm:p-4">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-8">
+            <RefreshCw className="w-8 h-8 sm:w-10 sm:h-10 animate-spin text-blue-500 mb-3" />
+            <p className="text-gray-500 text-sm">Loading leaderboard...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
+            <p className="text-gray-500 text-sm">{error}</p>
+            <button
+              onClick={fetchLeaderboard}
+              className="mt-3 px-4 py-2 bg-blue-100 text-blue-700 rounded-xl font-medium text-sm"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : activeTab === 'attendance' ? (
+          attendanceLeaders.length === 0 ? (
+            <div className="text-center py-8">
+              <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
+              <p className="text-gray-500 font-medium text-sm">No data yet for this period</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {attendanceLeaders.slice(0, 5).map((user, index) => {
+                const odometer = user.userId || user._id || user.id || user.username;
+                const isCurrentUser = odometer === currentUserId || user.name === currentUserName || user.username === currentUserId;
+                const rank = index + 1;
+                
+                return (
+                  <div 
+                    key={odometer || index}
+                    className={`flex items-center justify-between p-2 sm:p-3 rounded-xl border-2 transition-all ${getRankBg(rank, isCurrentUser)}`}
+                  >
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {getRankIcon(rank)}
+                        <span className="text-base sm:text-lg">{getRankEmoji(rank)}</span>
+                      </div>
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold shadow-md flex-shrink-0 text-sm">
+                        {(user.name || user.username || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-800 text-sm flex items-center gap-1 sm:gap-2 flex-wrap">
+                          <span className="truncate">{user.name || user.username}</span>
+                          {isCurrentUser && (
+                            <span className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded animate-pulse flex-shrink-0">You</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500">{user.totalAttendance || user.count || 0} days present</p>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xl sm:text-2xl font-bold text-green-600">{user.totalAttendance || user.count || 0}</p>
+                      <p className="text-xs text-gray-400">days</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ) : (
+          gathaLeaders.length === 0 ? (
+            <div className="text-center py-8">
+              <BookOpen className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
+              <p className="text-gray-500 font-medium text-sm">No data yet for this period</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {gathaLeaders.slice(0, 5).map((user, index) => {
+                const odometer = user.userId || user._id || user.id || user.username;
+                const isCurrentUser = odometer === currentUserId || user.name === currentUserName || user.username === currentUserId;
+                const rank = index + 1;
+                
+                return (
+                  <div 
+                    key={odometer || index}
+                    className={`flex items-center justify-between p-2 sm:p-3 rounded-xl border-2 transition-all ${getRankBg(rank, isCurrentUser)}`}
+                  >
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {getRankIcon(rank)}
+                        <span className="text-base sm:text-lg">{getRankEmoji(rank)}</span>
+                      </div>
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white font-bold shadow-md flex-shrink-0 text-sm">
+                        {(user.name || user.username || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-800 text-sm flex items-center gap-1 sm:gap-2 flex-wrap">
+                          <span className="truncate">{user.name || user.username}</span>
+                          {isCurrentUser && (
+                            <span className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded animate-pulse flex-shrink-0">You</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500">{user.totalGathas || user.count || 0} new gathas</p>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xl sm:text-2xl font-bold text-purple-600">{user.totalGathas || user.count || 0}</p>
+                      <p className="text-xs text-gray-400">gathas</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        )}
+      </div>
+
+      <div className="px-3 sm:px-4 pb-3 sm:pb-4">
+        <div className="bg-blue-50 rounded-xl p-2 sm:p-3 border border-blue-200">
+          <p className="text-xs text-blue-700 text-center">
+            <Sparkles className="w-3 h-3 inline mr-1" />
+            Stats based on selected period. Keep learning to stay on top! 🌟
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// GATHA ENTRY MODAL
+// ============================================
+
+const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, activeUserName }) => {
+  const [activeTab, setActiveTab] = useState(editData?.type || 'new');
+  const [form, setForm] = useState({
+    sutraName: editData?.sutra_name || '',
+    whichGatha: editData?.which_gatha || '',
+    totalGatha: editData?.total_gatha?.toString() || '',
+  });
+
+  useEffect(() => {
+    if (editData) {
+      setActiveTab(editData.type || 'new');
+      setForm({
+        sutraName: editData.sutra_name || '',
+        whichGatha: editData.which_gatha || '',
+        totalGatha: editData.total_gatha?.toString() || '',
+      });
+    } else {
+      setForm({ sutraName: '', whichGatha: '', totalGatha: '' });
+    }
+  }, [editData]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = () => {
+    onSubmit({
+      type: activeTab,
+      sutra_name: form.sutraName,
+      which_gatha: form.whichGatha,
+      total_gatha: Number(form.totalGatha),
+    });
+  };
+
+  const isValid = form.sutraName && form.whichGatha && form.totalGatha;
+  const commonSutras = ['નવકાર', 'પંચ પરમેષ્ઠી', 'લોગસ્સ', 'ઉવસગ્ગહરં'];
+
+  return (
+    <div 
+      className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 overflow-y-auto" 
+      onClick={onClose}
+    >
+      <div className="min-h-full flex items-center justify-center p-4 py-8">
+        <div 
+          className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in duration-200" 
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className={`p-4 sm:p-5 text-white rounded-t-3xl ${activeTab === 'new' ? 'bg-gradient-to-r from-purple-500 to-indigo-600' : 'bg-gradient-to-r from-blue-500 to-cyan-600'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-lg sm:text-xl font-bold">{editData ? 'Edit Entry' : 'Add Gatha'}</h3>
+                  <p className="text-xs sm:text-sm opacity-80">
+                    {activeUserName ? `For: ${activeUserName}` : 'Record your learning progress'}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={onClose} 
+                className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors flex-shrink-0"
+              >
+                <CloseIcon size={24} />
+              </button>
+            </div>
+          </div>
+
+          {!editData && (
+            <div className="flex p-2 bg-gray-100 gap-2">
+              <button
+                onClick={() => setActiveTab('new')}
+                className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
+                  activeTab === 'new' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+                }`}
+              >
+                <Plus className="w-4 h-4 sm:w-5 sm:h-5" /> New Learning
+              </button>
+              <button
+                onClick={() => setActiveTab('revision')}
+                className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
+                  activeTab === 'revision' ? 'bg-blue-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+                }`}
+              >
+                <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" /> Revision
+              </button>
+            </div>
+          )}
+
+          <div className="max-h-[50vh] overflow-y-auto p-4 sm:p-5 space-y-4">
+            <div>
+              <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
+                📖 Sutra Name
+                <HelpTooltip text="Enter the name of the sutra you learned or revised" />
+              </label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {commonSutras.map((sutra) => (
+                  <button
+                    key={sutra}
+                    type="button"
+                    onClick={() => setForm({ ...form, sutraName: sutra })}
+                    className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all ${
+                      form.sutraName === sutra
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {sutra}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                value={form.sutraName}
+                onChange={(e) => setForm({ ...form, sutraName: e.target.value })}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
+                placeholder="Enter sutra name or select above"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
+                📝 Which Gatha
+                <HelpTooltip text="Enter the gatha numbers you completed (e.g., 1-5 or 3,4,5)" />
+              </label>
+              <input
+                type="text"
+                value={form.whichGatha}
+                onChange={(e) => setForm({ ...form, whichGatha: e.target.value })}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
+                placeholder="e.g., Gatha 1-5 or 3,4,5"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
+                #️⃣ Total Count
+                <HelpTooltip text="How many gathas did you complete in total?" />
+              </label>
+              <div className="flex gap-2">
+                {[1, 3, 5, 10].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setForm({ ...form, totalGatha: num.toString() })}
+                    className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all ${
+                      form.totalGatha === num.toString()
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                value={form.totalGatha}
+                onChange={(e) => setForm({ ...form, totalGatha: e.target.value })}
+                className="w-full mt-2 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
+                placeholder="Or enter custom count"
+                min="1"
+              />
+            </div>
+          </div>
+
+          <div className="p-4 sm:p-5 border-t bg-gray-50 rounded-b-3xl">
+            <div className="flex gap-2 sm:gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl active:scale-[0.98] transition-transform text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting || !isValid}
+                className={`flex-1 py-3 font-bold rounded-xl text-white shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform text-sm ${
+                  activeTab === 'new'
+                    ? 'bg-gradient-to-r from-purple-500 to-purple-600'
+                    : 'bg-gradient-to-r from-blue-500 to-blue-600'
+                }`}
+              >
+                {isSubmitting ? (
+                  <Loader className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                ) : (
+                  <Check className="w-4 h-4 sm:w-5 sm:h-5" />
+                )}
+                {editData ? 'Save' : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// HISTORY PAGE COMPONENT
+// ============================================
+
+const HistoryPage = ({ activeUserId }) => {
+  const today = new Date();
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
+  const [historyData, setHistoryData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(null);
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+
+  const monthNamesGujarati = [
+    'જાન્યુઆરી', 'ફેબ્રુઆરી', 'માર્ચ', 'એપ્રિલ', 'મે', 'જૂન',
+    'જુલાઈ', 'ઓગસ્ટ', 'સપ્ટેમ્બર', 'ઓક્ટોબર', 'નવેમ્બર', 'ડિસેમ્બર',
+  ];
+
+  const fetchHistory = useCallback(async (year, month) => {
+    setIsLoading(true);
+    setError(null);
+    const token = localStorage.getItem('jainPathshalaToken');
+
+    try {
+      const userParam = activeUserId ? `?studentId=${activeUserId}` : '';
+      const url = `${API_BASE}/history/${year}/${month}${userParam}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+
+      if (!res.ok) throw new Error('Failed to load history.');
+      const data = await res.json();
+      setHistoryData(data);
+    } catch (err) {
+      setError(err.message || 'Failed to load history.');
+      setHistoryData(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeUserId]);
+
+  useEffect(() => {
+    fetchHistory(selectedYear, selectedMonth);
+  }, [selectedYear, selectedMonth, fetchHistory]);
+
+  const handleMonthChange = (direction) => {
+    let newMonth = selectedMonth + direction;
+    let newYear = selectedYear;
+
+    if (newMonth > 12) { newMonth = 1; newYear += 1; }
+    else if (newMonth < 1) { newMonth = 12; newYear -= 1; }
+
+    const currentMonth = today.getMonth() + 1;
+    const currentYear = today.getFullYear();
+
+    if (newYear > currentYear || (newYear === currentYear && newMonth > currentMonth)) return;
+
+    setSelectedYear(newYear);
+    setSelectedMonth(newMonth);
+  };
+
+  const activityData = historyData?.dailyActivity ?? {};
+  const todayIso = formatLocalDateString(today);
+
+  const monthlySummary = useMemo(() => {
+    let presentCount = 0, newGathas = 0, revisionGathas = 0;
+
+    Object.entries(activityData).forEach(([_, activity]) => {
+      const normalized = activity || {};
+      const gathas = normalized.gathas || { new: 0, revision: 0 };
+      if (normalized.present) presentCount += 1;
+      newGathas += Number(gathas.new || 0);
+      revisionGathas += Number(gathas.revision || 0);
+    });
+
+    return { presentDays: presentCount, newGathas, revisionGathas };
+  }, [activityData]);
+
+  const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+  const firstDayOfMonth = new Date(selectedYear, selectedMonth - 1, 1).getDay();
+
+  const renderCalendar = () => {
+    const days = [];
+
+    for (let i = 0; i < firstDayOfMonth; i++) {
+      days.push(<div key={`empty-${i}`} className="h-9 sm:h-11" />);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const activity = activityData[dateStr];
+      const isPresent = activity?.present === true;
+      const isToday = dateStr === todayIso;
+      const hasGathas = (activity?.gathas?.new || 0) + (activity?.gathas?.revision || 0) > 0;
+      const isFuture = new Date(dateStr) > today;
+      const isSunday = new Date(dateStr + 'T00:00:00').getDay() === 0;
+
+      days.push(
+        <button
+          key={day}
+          onClick={() => isPresent && setSelectedDay({ dateStr, activity })}
+          disabled={!isPresent || isFuture}
+          className={`h-9 w-9 sm:h-11 sm:w-11 rounded-lg sm:rounded-xl flex items-center justify-center text-xs sm:text-sm font-bold transition-all ${
+            isPresent
+              ? 'bg-gradient-to-br from-green-400 to-green-600 text-white shadow-md active:scale-95'
+              : isToday
+              ? 'bg-orange-100 text-orange-600 border-2 border-orange-400 ring-2 ring-orange-200'
+              : isSunday
+              ? 'bg-red-50 text-red-300'
+              : isFuture
+              ? 'text-gray-200'
+              : 'text-gray-400 hover:bg-gray-100'
+          }`}
+        >
+          <div className="relative">
+            {day}
+            {hasGathas && isPresent && (
+              <span className="absolute -top-1 -right-2 w-2 h-2 bg-purple-500 rounded-full" />
+            )}
+          </div>
+        </button>
+      );
+    }
+
+    return days;
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
+        <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-bold text-blue-800">
+             {activeUserId ? `Viewing ${activeUserId}'s History` : "My Personal History"}
+          </p>
+          <p className="text-xs text-blue-600 mt-1">
+            Green days = Present. Red-tinted = Sunday (Holiday). Tap on green days for details.
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-orange-200 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => handleMonthChange(-1)}
+            className="p-2 sm:p-3 rounded-xl bg-orange-50 active:scale-95 transition-transform"
+          >
+            <ChevronLeft size={20} className="text-orange-600 sm:w-6 sm:h-6" />
+          </button>
+          <div className="text-center">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-800">
+              {monthNames[selectedMonth - 1]} {selectedYear}
+            </h3>
+            <p className="text-xs text-gray-500">{monthNamesGujarati[selectedMonth - 1]}</p>
+          </div>
+          <button
+            onClick={() => handleMonthChange(1)}
+            disabled={selectedMonth === today.getMonth() + 1 && selectedYear === today.getFullYear()}
+            className="p-2 sm:p-3 rounded-xl bg-orange-50 active:scale-95 transition-transform disabled:opacity-40"
+          >
+            <ChevronRight size={20} className="text-orange-600 sm:w-6 sm:h-6" />
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="text-center py-12">
+            <RefreshCw className="w-10 h-10 sm:w-12 sm:h-12 animate-spin text-orange-500 mx-auto" />
+            <p className="mt-4 text-gray-600 font-medium text-sm sm:text-base">Loading history...</p>
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 sm:p-6 text-center">
+            <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-red-400 mx-auto mb-3" />
+            <p className="text-red-700 font-medium text-sm">{error}</p>
+            <button
+              onClick={() => fetchHistory(selectedYear, selectedMonth)}
+              className="mt-3 px-4 py-2 bg-red-100 text-red-700 rounded-xl font-medium text-sm"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="bg-gray-50 rounded-xl p-2 sm:p-3 mb-4">
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                  <div key={i} className={`h-6 sm:h-8 flex items-center justify-center text-xs font-bold ${i === 0 ? 'text-red-400' : 'text-gray-400'}`}>
+                    {d}
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {renderCalendar()}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-3 sm:gap-4 text-xs mb-4 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-md bg-gradient-to-br from-green-400 to-green-600" />
+                <span className="text-gray-600">Present ({monthlySummary.presentDays})</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-md bg-red-50 border border-red-200" />
+                <span className="text-gray-600">Sunday</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-purple-500" />
+                <span className="text-gray-600">Has Gathas</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              <div className="bg-green-50 border-2 border-green-200 rounded-xl p-2 sm:p-3 text-center">
+                <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 mx-auto mb-1" />
+                <p className="text-xl sm:text-2xl font-bold text-green-600">{monthlySummary.presentDays}</p>
+                <p className="text-xs text-gray-500">Days Present</p>
+              </div>
+              <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-2 sm:p-3 text-center">
+                <Plus className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500 mx-auto mb-1" />
+                <p className="text-xl sm:text-2xl font-bold text-purple-600">{monthlySummary.newGathas}</p>
+                <p className="text-xs text-gray-500">New Gathas</p>
+              </div>
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-2 sm:p-3 text-center">
+                <RefreshCw className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 mx-auto mb-1" />
+                <p className="text-xl sm:text-2xl font-bold text-blue-600">{monthlySummary.revisionGathas}</p>
+                <p className="text-xs text-gray-500">Revisions</p>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Day Detail Modal */}
+      {selectedDay && (
+        <div 
+          className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 overflow-y-auto" 
+          onClick={() => setSelectedDay(null)}
+        >
+          <div className="min-h-full flex items-center justify-center p-4 py-8">
+            <div 
+              className="bg-white rounded-3xl p-4 sm:p-6 w-full max-w-md shadow-2xl animate-in zoom-in duration-200" 
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-green-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+                    <Check className="w-6 h-6 sm:w-7 sm:h-7 text-green-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-gray-800 text-base sm:text-lg">
+                      {formatDateIn(selectedDay.dateStr, { weekday: 'short', day: 'numeric', month: 'short' })}
+                    </h3>
+                    <PendingBadge status="approved" />
+                  </div>
+                </div>
+                <button onClick={() => setSelectedDay(null)} className="p-2 bg-gray-100 rounded-xl flex-shrink-0">
+                  <CloseIcon size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4 max-h-[50vh] overflow-y-auto">
+                <div className="bg-purple-50 rounded-xl p-3 sm:p-4 border-2 border-purple-200">
+                  <h4 className="font-bold text-purple-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
+                    <Plus size={18} className="text-purple-600 flex-shrink-0" />
+                    New Gathas: {selectedDay.activity.gathas?.new || 0}
+                  </h4>
+                  {(selectedDay.activity.details || []).filter((d) => d.type === 'new').length === 0 ? (
+                    <p className="text-sm text-purple-600 bg-white/50 px-3 py-2 rounded-lg">No new gathas recorded</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {(selectedDay.activity.details || []).filter((d) => d.type === 'new').map((entry, idx) => (
+                        <div key={idx} className="bg-white rounded-lg p-3 border border-purple-200">
+                          <p className="text-sm"><strong>Sutra:</strong> {entry.sutra_name}</p>
+                          <p className="text-sm"><strong>Gatha:</strong> {entry.which_gatha}</p>
+                          <p className="text-sm font-bold text-purple-700">Count: {entry.total_gatha}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-blue-50 rounded-xl p-3 sm:p-4 border-2 border-blue-200">
+                  <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
+                    <RefreshCw size={18} className="text-blue-600 flex-shrink-0" />
+                    Revisions: {selectedDay.activity.gathas?.revision || 0}
+                  </h4>
+                  {(selectedDay.activity.details || []).filter((d) => d.type === 'revision').length === 0 ? (
+                    <p className="text-sm text-blue-600 bg-white/50 px-3 py-2 rounded-lg">No revisions recorded</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {(selectedDay.activity.details || []).filter((d) => d.type === 'revision').map((entry, idx) => (
+                        <div key={idx} className="bg-white rounded-lg p-3 border border-blue-200">
+                          <p className="text-sm"><strong>Sutra:</strong> {entry.sutra_name}</p>
+                          <p className="text-sm"><strong>Gatha:</strong> {entry.which_gatha}</p>
+                          <p className="text-sm font-bold text-blue-700">Count: {entry.total_gatha}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedDay(null)}
+                className="w-full mt-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold py-3 rounded-xl active:scale-[0.98] transition-transform text-sm sm:text-base"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ============================================
 // PENDING PAGE COMPONENT
 // ============================================
@@ -1584,13 +3305,17 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
 };
 
 // ============================================
-// RECENT BADGES COMPONENT
+// RECENT BADGES COMPONENT - FIXED
 // ============================================
 
 const RecentBadges = ({ stats, onBadgeClick }) => {
   const recentlyUnlocked = useMemo(() => {
+    if (!stats) return [];
     return MONTHLY_ACHIEVEMENTS
-      .filter((a) => calculateAchievementProgress(a, stats).unlocked)
+      .filter((a) => {
+        const progress = calculateAchievementProgress(a, stats);
+        return progress.unlocked && progress.current >= progress.target;
+      })
       .slice(0, 4);
   }, [stats]);
 
@@ -1629,14 +3354,15 @@ const RecentBadges = ({ stats, onBadgeClick }) => {
 };
 
 // ============================================
-// NEXT BADGES COMPONENT
+// NEXT BADGES COMPONENT - FIXED
 // ============================================
 
 const NextBadges = ({ stats, onBadgeClick }) => {
   const nextAchievements = useMemo(() => {
+    if (!stats) return [];
     return MONTHLY_ACHIEVEMENTS
       .map((a) => ({ ...a, ...calculateAchievementProgress(a, stats) }))
-      .filter((a) => !a.unlocked && a.progress > 0)
+      .filter((a) => !a.unlocked && a.progress > 0 && a.current < a.target)
       .sort((a, b) => b.progress - a.progress)
       .slice(0, 2);
   }, [stats]);
@@ -1672,7 +3398,7 @@ const NextBadges = ({ stats, onBadgeClick }) => {
                   <div className="flex-1 h-1.5 sm:h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div
                       className={`h-full bg-gradient-to-r ${colors.bg} rounded-full`}
-                      style={{ width: `${achievement.progress * 100}%` }}
+                      style={{ width: `${Math.min(achievement.progress * 100, 100)}%` }}
                     />
                   </div>
                   <span className="text-xs font-bold text-gray-500 flex-shrink-0">
@@ -1689,7 +3415,7 @@ const NextBadges = ({ stats, onBadgeClick }) => {
 };
 
 // ============================================
-// MAIN STUDENT DASHBOARD COMPONENT - FIXED
+// MAIN STUDENT DASHBOARD COMPONENT - FULLY FIXED
 // ============================================
 
 export default function StudentDashboard({ user, onLogout }) {
@@ -1715,7 +3441,7 @@ export default function StudentDashboard({ user, onLogout }) {
   // Online status
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // Stats (Monthly focused)
+  // Stats (Period based)
   const [monthlyAttendance, setMonthlyAttendance] = useState(0);
   const [monthlyNewGathas, setMonthlyNewGathas] = useState(0);
   const [monthlyRevisionGathas, setMonthlyRevisionGathas] = useState(0);
@@ -1723,14 +3449,13 @@ export default function StudentDashboard({ user, onLogout }) {
   const [maxStreak, setMaxStreak] = useState(0);
   const [workingDays, setWorkingDays] = useState(DEFAULT_WORKING_DAYS);
 
-  // Selected month for stats page
-  const [statsMonth, setStatsMonth] = useState(() => {
-    const now = new Date();
-    return {
-      year: now.getFullYear(),
-      month: now.getMonth() + 1,
-    };
+  // Period selection for stats
+  const [selectedPeriod, setSelectedPeriod] = useState(PERIOD_OPTIONS.MONTH);
+  const [customDateRange, setCustomDateRange] = useState({
+    startDate: formatLocalDateString(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
+    endDate: formatLocalDateString(new Date()),
   });
+  const [statsDateRange, setStatsDateRange] = useState(() => getDateRangeForPeriod(PERIOD_OPTIONS.MONTH));
 
   // UI states
   const [isLoading, setIsLoading] = useState(true);
@@ -1769,50 +3494,6 @@ export default function StudentDashboard({ user, onLogout }) {
     total_gatha: Number(entry.total_gatha ?? entry.totalGatha ?? 0),
     created_at: entry.created_at ?? entry.date ?? null,
   });
-
-  const calculateStreak = (history) => {
-    const sortedDates = history
-      .map((r) => formatLocalDateString(r.date))
-      .filter((v, i, a) => a.indexOf(v) === i)
-      .sort((a, b) => new Date(b) - new Date(a));
-
-    if (sortedDates.length === 0) return { current: 0, max: 0 };
-
-    let current = 0;
-    let max = 0;
-    let tempStreak = 1;
-
-    for (let i = 0; i < sortedDates.length; i++) {
-      if (i === 0) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const date = new Date(sortedDates[i]);
-        const diffDays = Math.floor((today - date) / (1000 * 60 * 60 * 24));
-        if (diffDays > 1) {
-          current = 0;
-        } else {
-          current = 1;
-        }
-      }
-
-      if (i < sortedDates.length - 1) {
-        const currentDate = new Date(sortedDates[i]);
-        const nextDate = new Date(sortedDates[i + 1]);
-        const diffDays = Math.floor((currentDate - nextDate) / (1000 * 60 * 60 * 24));
-
-        if (diffDays === 1) {
-          tempStreak++;
-          if (i === 0 || current > 0) current = tempStreak;
-        } else {
-          max = Math.max(max, tempStreak);
-          tempStreak = 1;
-        }
-      }
-    }
-
-    max = Math.max(max, tempStreak, current);
-    return { current, max };
-  };
 
   // ============================================
   // API CALLS
@@ -1868,7 +3549,9 @@ export default function StudentDashboard({ user, onLogout }) {
       if (res.ok) {
         const data = await res.json();
         setAttendanceHistory(Array.isArray(data) ? data : []);
-        const streakData = calculateStreak(data);
+        
+        // Use fixed streak calculation with Sunday skip
+        const streakData = calculateStreakWithSundaySkip(data);
         setCurrentStreak(streakData.current);
         setMaxStreak(streakData.max);
 
@@ -1911,25 +3594,117 @@ export default function StudentDashboard({ user, onLogout }) {
     }
   }, []);
 
-  const fetchMonthlyStats = useCallback(async (year, month) => {
+  // ============================================
+  // FIXED: Fetch stats for a specific date range
+  // ============================================
+  const fetchStatsForDateRange = useCallback(async (startDate, endDate) => {
     const token = localStorage.getItem('jainPathshalaToken');
+    const currentActiveUsername = activeUserRef.current?.username || activeUserRef.current?.name;
+    
     try {
-      const res = await fetch(`${API_BASE}/stats/comprehensive?year=${year}&month=${month}`, {
+      let url;
+      if (currentActiveUsername === loggedInUsername) {
+        url = `${API_BASE}/stats/range?startDate=${startDate}&endDate=${endDate}`;
+      } else {
+        url = `${API_BASE}/family-member/${currentActiveUsername}/stats?startDate=${startDate}&endDate=${endDate}`;
+      }
+      
+      console.log('Fetching stats from:', url);
+      
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      
       if (res.ok) {
         const data = await res.json();
-        setMonthlyAttendance(data.monthlyAttendance ?? 0);
-        setMonthlyNewGathas(data.monthlyNewGathas ?? 0);
-        setMonthlyRevisionGathas(data.monthlyRevisionGathas ?? 0);
-        setCurrentStreak(data.currentStreak ?? 0);
-        setMaxStreak(data.maxStreak ?? 0);
+        console.log('Stats received:', data);
+        
+        setMonthlyAttendance(data.attendance ?? data.monthlyAttendance ?? 0);
+        setMonthlyNewGathas(data.newGathas ?? data.monthlyNewGathas ?? 0);
+        setMonthlyRevisionGathas(data.revisionGathas ?? data.monthlyRevisionGathas ?? 0);
+        
+        // Keep streak as overall (not period-specific)
+        if (data.currentStreak !== undefined) {
+          setCurrentStreak(data.currentStreak);
+        }
+        if (data.maxStreak !== undefined) {
+          setMaxStreak(data.maxStreak);
+        }
+        
         setWorkingDays(data.workingDays ?? DEFAULT_WORKING_DAYS);
+        return true;
+      } else {
+        console.error('Stats fetch failed:', res.status);
+        return false;
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
+      return false;
     }
-  }, []);
+  }, [loggedInUsername]);
+
+  // ============================================
+  // FIXED: Calculate stats from local data (fallback)
+  // ============================================
+  const calculateLocalStats = useCallback((startDate, endDate) => {
+    const start = new Date(startDate + 'T00:00:00');
+    const end = new Date(endDate + 'T23:59:59');
+    
+    const periodAttendance = attendanceHistory.filter((r) => {
+      const date = new Date(r.date);
+      return date >= start && date <= end;
+    }).length;
+    setMonthlyAttendance(periodAttendance);
+    
+    const periodNewGathas = gathaEntries
+      .filter((e) => {
+        const date = new Date(e.created_at || e.date);
+        return date >= start && date <= end && e.type === 'new';
+      })
+      .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
+    setMonthlyNewGathas(periodNewGathas);
+    
+    const periodRevisionGathas = gathaEntries
+      .filter((e) => {
+        const date = new Date(e.created_at || e.date);
+        return date >= start && date <= end && e.type === 'revision';
+      })
+      .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
+    setMonthlyRevisionGathas(periodRevisionGathas);
+  }, [attendanceHistory, gathaEntries]);
+
+  // ============================================
+  // FIXED: Handle period change
+  // ============================================
+  const handlePeriodChange = useCallback(async (newPeriod) => {
+    setSelectedPeriod(newPeriod);
+    
+    const dateRange = getDateRangeForPeriod(newPeriod, customDateRange);
+    setStatsDateRange(dateRange);
+    
+    console.log('Period changed to:', newPeriod, 'Date range:', dateRange);
+    
+    const success = await fetchStatsForDateRange(dateRange.startDate, dateRange.endDate);
+    if (!success) {
+      calculateLocalStats(dateRange.startDate, dateRange.endDate);
+    }
+  }, [customDateRange, fetchStatsForDateRange, calculateLocalStats]);
+
+  // ============================================
+  // FIXED: Handle custom date range change
+  // ============================================
+  const handleCustomDateChange = useCallback(async (newRange) => {
+    setCustomDateRange(newRange);
+    
+    if (selectedPeriod === PERIOD_OPTIONS.CUSTOM && newRange.startDate && newRange.endDate) {
+      setStatsDateRange(newRange);
+      
+      const success = await fetchStatsForDateRange(newRange.startDate, newRange.endDate);
+      if (!success) {
+        calculateLocalStats(newRange.startDate, newRange.endDate);
+      }
+    }
+  }, [selectedPeriod, fetchStatsForDateRange, calculateLocalStats]);
 
   // ============================================
   // FIXED: Load data for a switched user
@@ -1965,10 +3740,13 @@ export default function StudentDashboard({ user, onLogout }) {
         gatha: data.pendingGathas || []
       });
       
+      // Use fixed streak calculation with Sunday skip
+      const streakData = calculateStreakWithSundaySkip(recentAttendance);
+      
       // Use stats from the response if available
       const stats = data.stats || {};
-      setCurrentStreak(stats.currentStreak ?? calculateStreak(recentAttendance).current);
-      setMaxStreak(stats.maxStreak ?? calculateStreak(recentAttendance).max);
+      setCurrentStreak(stats.currentStreak ?? streakData.current);
+      setMaxStreak(stats.maxStreak ?? streakData.max);
       setMonthlyAttendance(stats.monthlyAttendance ?? 0);
       setMonthlyNewGathas(stats.monthlyNewGathas ?? 0);
       setMonthlyRevisionGathas(stats.monthlyRevisionGathas ?? 0);
@@ -2006,13 +3784,16 @@ export default function StudentDashboard({ user, onLogout }) {
       // Switching back to self - reload own data
       setIsLoadingSwitch(true);
       try {
-        const now = new Date();
         await Promise.all([
           fetchAttendance(),
           fetchGathas(),
           fetchPendingStatus(),
-          fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1),
         ]);
+        
+        // Refresh stats for current period
+        const dateRange = getDateRangeForPeriod(selectedPeriod, customDateRange);
+        await fetchStatsForDateRange(dateRange.startDate, dateRange.endDate);
+        
         showSuccess('Switched back to your dashboard');
       } finally {
         setIsLoadingSwitch(false);
@@ -2027,85 +3808,7 @@ export default function StudentDashboard({ user, onLogout }) {
         setActiveUser(activeUserRef.current);
       }
     }
-  }, [loggedInUsername, loadUserData, fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
-
-  // ============================================
-  // FIXED: Calculate stats from local data (fallback)
-  // ============================================
-  const calculateLocalStats = useCallback((year, month) => {
-    const monthStart = new Date(year, month - 1, 1);
-    const monthEnd = new Date(year, month, 0);
-    
-    const monthlyAtt = attendanceHistory.filter((r) => {
-      const date = new Date(r.date);
-      return date >= monthStart && date <= monthEnd;
-    }).length;
-    setMonthlyAttendance(monthlyAtt);
-    
-    const monthlyNew = gathaEntries
-      .filter((e) => {
-        const date = new Date(e.created_at || e.date);
-        return date >= monthStart && date <= monthEnd && e.type === 'new';
-      })
-      .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
-    setMonthlyNewGathas(monthlyNew);
-    
-    const monthlyRevision = gathaEntries
-      .filter((e) => {
-        const date = new Date(e.created_at || e.date);
-        return date >= monthStart && date <= monthEnd && e.type === 'revision';
-      })
-      .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
-    setMonthlyRevisionGathas(monthlyRevision);
-  }, [attendanceHistory, gathaEntries]);
-
-  // ============================================
-  // FIXED: Handle stats month change for both self and family members
-  // ============================================
-  const handleStatsMonthChange = useCallback(async (year, month) => {
-    console.log(`Month changed to: ${year}-${month}`);
-    setStatsMonth({ year, month });
-    
-    const token = localStorage.getItem('jainPathshalaToken');
-    const currentActiveUsername = activeUserRef.current?.username || activeUserRef.current?.name;
-    
-    try {
-      let url;
-      if (currentActiveUsername === loggedInUsername) {
-        // Self - use regular stats endpoint
-        url = `${API_BASE}/stats/comprehensive?year=${year}&month=${month}`;
-      } else {
-        // Family member - use family member stats endpoint
-        url = `${API_BASE}/family-member/${currentActiveUsername}/stats?year=${year}&month=${month}`;
-      }
-      
-      console.log('Fetching stats from:', url);
-      
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        console.log('Stats received:', data);
-        
-        setMonthlyAttendance(data.monthlyAttendance ?? 0);
-        setMonthlyNewGathas(data.monthlyNewGathas ?? 0);
-        setMonthlyRevisionGathas(data.monthlyRevisionGathas ?? 0);
-        setCurrentStreak(data.currentStreak ?? 0);
-        setMaxStreak(data.maxStreak ?? 0);
-        setWorkingDays(data.workingDays ?? DEFAULT_WORKING_DAYS);
-      } else {
-        console.error('Stats fetch failed:', res.status);
-        // Fallback: Calculate from local data
-        calculateLocalStats(year, month);
-      }
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-      // Fallback: Calculate from local data
-      calculateLocalStats(year, month);
-    }
-  }, [loggedInUsername, calculateLocalStats]);
+  }, [loggedInUsername, loadUserData, fetchAttendance, fetchGathas, fetchPendingStatus, selectedPeriod, customDateRange, fetchStatsForDateRange]);
 
   // Track online status
   useEffect(() => {
@@ -2125,14 +3828,17 @@ export default function StudentDashboard({ user, onLogout }) {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      const now = new Date();
       await Promise.all([
         fetchGroupMembers(),
         fetchAttendance(),
         fetchGathas(),
         fetchPendingStatus(),
-        fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1),
       ]);
+      
+      // Fetch initial stats for default period (this month)
+      const initialDateRange = getDateRangeForPeriod(PERIOD_OPTIONS.MONTH);
+      await fetchStatsForDateRange(initialDateRange.startDate, initialDateRange.endDate);
+      
       setIsLoading(false);
     };
     loadData();
@@ -2159,7 +3865,7 @@ export default function StudentDashboard({ user, onLogout }) {
       clearInterval(pollInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats, fetchGroupMembers, isViewingOther]);
+  }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchGroupMembers, fetchStatsForDateRange, isViewingOther]);
 
   // Reset active user when logged in user changes
   useEffect(() => {
@@ -2217,8 +3923,12 @@ export default function StudentDashboard({ user, onLogout }) {
 
   const userLevel = useMemo(() => getUserLevel(xpBreakdown.total), [xpBreakdown.total]);
 
+  // FIXED: Only count badges that are truly unlocked (current >= target)
   const unlockedBadgesCount = useMemo(
-    () => MONTHLY_ACHIEVEMENTS.filter((a) => calculateAchievementProgress(a, userStats).unlocked).length,
+    () => MONTHLY_ACHIEVEMENTS.filter((a) => {
+      const progress = calculateAchievementProgress(a, userStats);
+      return progress.unlocked && progress.current >= progress.target;
+    }).length,
     [userStats]
   );
 
@@ -2335,6 +4045,24 @@ export default function StudentDashboard({ user, onLogout }) {
       setGlobalError(error.message);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Get period label for display
+  const getPeriodLabel = () => {
+    switch (selectedPeriod) {
+      case PERIOD_OPTIONS.TODAY:
+        return 'Today';
+      case PERIOD_OPTIONS.WEEK:
+        return 'This Week';
+      case PERIOD_OPTIONS.MONTH:
+        return 'This Month';
+      case PERIOD_OPTIONS.YEAR:
+        return 'This Year';
+      case PERIOD_OPTIONS.CUSTOM:
+        return `${formatDateIn(statsDateRange.startDate, { day: 'numeric', month: 'short' })} - ${formatDateIn(statsDateRange.endDate, { day: 'numeric', month: 'short' })}`;
+      default:
+        return 'This Month';
     }
   };
 
@@ -2583,8 +4311,8 @@ export default function StudentDashboard({ user, onLogout }) {
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:gap-3">
-        <QuickStatCard icon={CalendarDays} value={monthlyAttendance} label="Days Present" color="green" sublabel="This Month" />
-        <QuickStatCard icon={BookMarked} value={monthlyNewGathas} label="New Gathas" color="purple" sublabel="This Month" />
+        <QuickStatCard icon={CalendarDays} value={monthlyAttendance} label="Days Present" color="green" sublabel={getPeriodLabel()} />
+        <QuickStatCard icon={BookMarked} value={monthlyNewGathas} label="New Gathas" color="purple" sublabel={getPeriodLabel()} />
       </div>
 
       <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-yellow-200 shadow-sm">
@@ -2616,7 +4344,7 @@ export default function StudentDashboard({ user, onLogout }) {
     </div>
   );
 
-  // ==================== RENDER STATS PAGE (FIXED) ====================
+  // ==================== RENDER STATS PAGE - FULLY FIXED ====================
   const renderStats = () => (
     <div className="space-y-4">
       {!isOnline && (
@@ -2633,22 +4361,78 @@ export default function StudentDashboard({ user, onLogout }) {
               Viewing stats for: {activeUser?.name || activeUsername}
             </p>
             <p className="text-xs text-blue-600">
-              Change month to see different periods
+              Select a period to see different time ranges
             </p>
           </div>
         </div>
       )}
+
+      {/* Period Selector */}
+      <PeriodSelector
+        selectedPeriod={selectedPeriod}
+        onPeriodChange={handlePeriodChange}
+        customDateRange={customDateRange}
+        onCustomDateChange={handleCustomDateChange}
+      />
+
+      {/* Stats Summary for Selected Period */}
+      <div className="bg-white rounded-2xl p-4 border-2 border-orange-200 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-gray-800 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-orange-500" />
+            Stats Summary
+          </h3>
+          <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full font-bold">
+            {getPeriodLabel()}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-green-50 border-2 border-green-200 rounded-xl p-3 text-center">
+            <Calendar className="w-6 h-6 text-green-500 mx-auto mb-1" />
+            <p className="text-2xl font-bold text-green-600">{monthlyAttendance}</p>
+            <p className="text-xs text-gray-500">Days Present</p>
+          </div>
+          <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-3 text-center">
+            <Plus className="w-6 h-6 text-purple-500 mx-auto mb-1" />
+            <p className="text-2xl font-bold text-purple-600">{monthlyNewGathas}</p>
+            <p className="text-xs text-gray-500">New Gathas</p>
+          </div>
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-3 text-center">
+            <RefreshCw className="w-6 h-6 text-blue-500 mx-auto mb-1" />
+            <p className="text-2xl font-bold text-blue-600">{monthlyRevisionGathas}</p>
+            <p className="text-xs text-gray-500">Revisions</p>
+          </div>
+        </div>
+
+        {/* Streak Info (Overall, not period-specific) */}
+        <div className="mt-4 p-3 bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl border border-orange-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Flame className="w-5 h-5 text-orange-500" />
+              <span className="font-bold text-gray-800 text-sm">Current Streak</span>
+            </div>
+            <div className="text-right">
+              <span className="text-2xl font-bold text-orange-600">{currentStreak}</span>
+              <span className="text-sm text-gray-500 ml-1">days</span>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+            <Trophy className="w-3 h-3" /> Best streak: {maxStreak} days • Sundays don't count!
+          </p>
+        </div>
+      </div>
       
       <StudentAchievementPage 
         stats={userStats} 
-        onMonthChange={handleStatsMonthChange} 
         workingDays={workingDays}
-        key={`stats-${activeUsername}-${statsMonth.year}-${statsMonth.month}`}
+        key={`stats-${activeUsername}-${selectedPeriod}-${statsDateRange.startDate}-${statsDateRange.endDate}`}
       />
       
       <LeaderboardSection 
         currentUserId={activeUsername}
         currentUserName={activeUser?.name || activeUsername}
+        dateRange={statsDateRange}
       />
     </div>
   );
