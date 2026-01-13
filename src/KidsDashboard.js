@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   AlertCircle,
   AlertTriangle,
@@ -31,6 +31,7 @@ import {
   X as CloseIcon,
   Zap,
   Sparkles,
+  UserCircle, // Added missing import
 } from 'lucide-react';
 
 // Import Achievement Components
@@ -54,7 +55,7 @@ const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.ve
 const DEFAULT_DATE_OPTIONS = { day: 'numeric', month: 'long', year: 'numeric' };
 
 // Kids list for reference
-const KIDS_LIST = ['aditi', 'ariha', 'ashvi', 'dhanvi', 'moxa', 'sattva', 'venya', 'virti', 'vivan','prakhar'];
+const KIDS_LIST = ['aditi', 'ariha', 'ashvi', 'dhanvi', 'moxa', 'sattva', 'venya', 'virti', 'vivan', 'prakhar'];
 
 // Page Navigation
 const PAGES = {
@@ -140,6 +141,92 @@ const getMotivationalMessage = (streak, attendance, gathas) => {
   if (streak >= 3) return { text: "Nice streak! Keep it up! 💪" };
   if (attendance >= 5) return { text: "You're doing great! 🎯" };
   return { text: "Let's learn something new today! 🚀" };
+};
+
+// --- UPDATED STREAK LOGIC (Handles Sunday Holidays) ---
+const calculateStreakWithHolidays = (attendanceHistory) => {
+  if (!attendanceHistory || attendanceHistory.length === 0) return { current: 0, max: 0 };
+
+  // 1. Extract unique dates, sort descending (newest first)
+  const sortedDates = attendanceHistory
+    .map((r) => {
+      const d = coerceToDate(r.date);
+      d.setHours(0,0,0,0);
+      return d;
+    })
+    .sort((a, b) => b - a)
+    .filter((date, index, self) => 
+      index === 0 || date.getTime() !== self[index - 1].getTime()
+    );
+
+  if (sortedDates.length === 0) return { current: 0, max: 0 };
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  let currentStreak = 0;
+  let maxStreak = 0;
+  let tempStreak = 0;
+
+  // Check if the most recent attendance is today or yesterday
+  const lastAttended = sortedDates[0];
+  const diffFromToday = Math.floor((today - lastAttended) / (1000 * 60 * 60 * 24));
+  
+  // Logic to determine if current streak is active (allow gap if it's Sunday)
+  let isCurrentStreakActive = diffFromToday <= 1; 
+  if (diffFromToday > 1) {
+    let gapValid = true;
+    for(let i = 1; i < diffFromToday; i++) {
+        const gapDay = new Date(today);
+        gapDay.setDate(today.getDate() - i);
+        if (gapDay.getDay() !== 0) { // 0 is Sunday
+            gapValid = false;
+            break;
+        }
+    }
+    isCurrentStreakActive = gapValid;
+  }
+
+  // Iterate through dates to calculate streaks
+  for (let i = 0; i < sortedDates.length; i++) {
+    if (tempStreak === 0) tempStreak = 1;
+
+    if (i < sortedDates.length - 1) {
+      const currentDate = sortedDates[i];
+      const nextDate = sortedDates[i + 1];
+      const diffDays = Math.floor((currentDate - nextDate) / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 1) {
+        tempStreak++;
+      } else if (diffDays > 1) {
+        // Gap detected. Check if gap consists ONLY of Sundays.
+        let isHolidayGap = true;
+        for (let j = 1; j < diffDays; j++) {
+           const gapDay = new Date(currentDate);
+           gapDay.setDate(currentDate.getDate() - j);
+           if (gapDay.getDay() !== 0) { // If any day in gap is NOT Sunday
+              isHolidayGap = false;
+              break;
+           }
+        }
+
+        if (isHolidayGap) {
+          tempStreak++; // Gap was just holidays, continue streak
+        } else {
+          // Streak broken
+          if (maxStreak < tempStreak) maxStreak = tempStreak;
+          if (i === tempStreak - 1 && isCurrentStreakActive) currentStreak = tempStreak;
+          tempStreak = 1; 
+        }
+      }
+    } else {
+      if (maxStreak < tempStreak) maxStreak = tempStreak;
+      if (i === tempStreak - 1 && isCurrentStreakActive) currentStreak = tempStreak;
+    }
+  }
+
+  if (maxStreak < tempStreak) maxStreak = tempStreak;
+  return { current: currentStreak, max: maxStreak };
 };
 
 // ============================================
@@ -496,7 +583,7 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
 // KIDS LEADERBOARD COMPONENT
 // ============================================
 
-const KidsLeaderboardSection = ({ currentUserId, currentUserName }) => {
+const KidsLeaderboardSection = ({ currentUserId, currentUserName, dateRange }) => {
   const [activeTab, setActiveTab] = useState('attendance');
   const [leaderboardData, setLeaderboardData] = useState({ attendanceLeaders: [], gathaLeaders: [] });
   const [isLoading, setIsLoading] = useState(true);
@@ -508,12 +595,22 @@ const KidsLeaderboardSection = ({ currentUserId, currentUserName }) => {
     setError(null);
     
     try {
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      let startStr, endStr;
+      
+      // Use provided date range or fallback to current month
+      if (dateRange && dateRange.start && dateRange.end) {
+        startStr = formatLocalDateString(dateRange.start);
+        endStr = formatLocalDateString(dateRange.end);
+      } else {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        startStr = formatLocalDateString(startOfMonth);
+        endStr = formatLocalDateString(endOfMonth);
+      }
       
       let res = await fetch(
-        `${API_BASE}/leaderboard/kids?startDate=${formatLocalDateString(startOfMonth)}&endDate=${formatLocalDateString(endOfMonth)}`,
+        `${API_BASE}/leaderboard/kids?startDate=${startStr}&endDate=${endStr}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
@@ -522,7 +619,7 @@ const KidsLeaderboardSection = ({ currentUserId, currentUserName }) => {
         setLeaderboardData(data);
       } else {
         res = await fetch(
-          `${API_BASE}/leaderboard?startDate=${formatLocalDateString(startOfMonth)}&endDate=${formatLocalDateString(endOfMonth)}`,
+          `${API_BASE}/leaderboard?startDate=${startStr}&endDate=${endStr}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         
@@ -530,14 +627,14 @@ const KidsLeaderboardSection = ({ currentUserId, currentUserName }) => {
           const data = await res.json();
           
           const filteredAttendance = (data.attendanceLeaders || [])
-  .filter(leader => KIDS_LIST.includes(leader.username?.toLowerCase()) || KIDS_LIST.includes(leader.name?.toLowerCase()))
-  // 👉 ADD .sort() HERE (before .map)
-  .map((leader, index) => ({ ...leader, rank: index + 1 }));
+            .filter(leader => KIDS_LIST.includes(leader.username?.toLowerCase()) || KIDS_LIST.includes(leader.name?.toLowerCase()))
+            .sort((a, b) => (b.totalAttendance || b.count || 0) - (a.totalAttendance || a.count || 0)) // Ensure sorted
+            .map((leader, index) => ({ ...leader, rank: index + 1 }));
 
-const filteredGatha = (data.gathaLeaders || [])
-  .filter(leader => KIDS_LIST.includes(leader.username?.toLowerCase()) || KIDS_LIST.includes(leader.name?.toLowerCase()))
-  // 👉 ADD .sort() HERE (before .map)
-  .map((leader, index) => ({ ...leader, rank: index + 1 }));
+          const filteredGatha = (data.gathaLeaders || [])
+            .filter(leader => KIDS_LIST.includes(leader.username?.toLowerCase()) || KIDS_LIST.includes(leader.name?.toLowerCase()))
+            .sort((a, b) => (b.totalGathas || b.count || 0) - (a.totalGathas || a.count || 0)) // Ensure sorted
+            .map((leader, index) => ({ ...leader, rank: index + 1 }));
           
           setLeaderboardData({
             attendanceLeaders: filteredAttendance,
@@ -553,7 +650,7 @@ const filteredGatha = (data.gathaLeaders || [])
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [dateRange]); // Added dependency on dateRange
 
   useEffect(() => {
     fetchLeaderboard();
@@ -941,7 +1038,7 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData }) 
 // HISTORY PAGE COMPONENT
 // ============================================
 
-const HistoryPage = () => {
+const HistoryPage = ({ activeUserId }) => {
   const today = new Date();
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
@@ -955,13 +1052,19 @@ const HistoryPage = () => {
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
-  const fetchHistory = async (year, month) => {
+  const monthNamesGujarati = [
+    'જાન્યુઆરી', 'ફેબ્રુઆરી', 'માર્ચ', 'એપ્રિલ', 'મે', 'જૂન',
+    'જુલાઈ', 'ઓગસ્ટ', 'સપ્ટેમ્બર', 'ઓક્ટોબર', 'નવેમ્બર', 'ડિસેમ્બર',
+  ];
+
+  const fetchHistory = useCallback(async (year, month) => {
     setIsLoading(true);
     setError(null);
     const token = localStorage.getItem('jainPathshalaToken');
 
     try {
-      const url = `${API_BASE}/history/${year}/${month}`;
+      const userParam = activeUserId ? `?studentId=${activeUserId}` : '';
+      const url = `${API_BASE}/history/${year}/${month}${userParam}`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 
       if (!res.ok) throw new Error('Failed to load history.');
@@ -973,11 +1076,11 @@ const HistoryPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeUserId]);
 
   useEffect(() => {
     fetchHistory(selectedYear, selectedMonth);
-  }, [selectedYear, selectedMonth]);
+  }, [selectedYear, selectedMonth, fetchHistory]);
 
   const handleMonthChange = (direction) => {
     let newMonth = selectedMonth + direction;
@@ -1001,7 +1104,7 @@ const HistoryPage = () => {
   const monthlySummary = useMemo(() => {
     let presentCount = 0, newGathas = 0, revisionGathas = 0;
 
-    Object.entries(activityData).forEach(([, activity]) => {
+    Object.entries(activityData).forEach(([_, activity]) => {
       const normalized = activity || {};
       const gathas = normalized.gathas || { new: 0, revision: 0 };
       if (normalized.present) presentCount += 1;
@@ -1232,281 +1335,36 @@ const HistoryPage = () => {
 };
 
 // ============================================
-// PENDING PAGE COMPONENT
-// ============================================
-
-const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting }) => {
-  const allPending = [
-    ...(pendingStatus.attendance?.filter((p) => p.status === 'pending').map((p) => ({ ...p, itemType: 'attendance' })) || []),
-    ...(pendingStatus.gatha?.filter((p) => p.status === 'pending').map((p) => ({ ...p, itemType: 'gatha' })) || []),
-  ];
-
-  const allRejected = [
-    ...(pendingStatus.attendance?.filter((p) => p.status === 'rejected').map((p) => ({ ...p, itemType: 'attendance' })) || []),
-    ...(pendingStatus.gatha?.filter((p) => p.status === 'rejected').map((p) => ({ ...p, itemType: 'gatha' })) || []),
-  ];
-
-  const totalPendingCount = allPending.length;
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 flex items-start gap-3">
-        <Clock className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-bold text-yellow-800">What's this? 🤔</p>
-          <p className="text-xs text-yellow-700 mt-1">
-            When you mark attendance or add gathas, your teacher checks them first.
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-gradient-to-r from-yellow-400 to-orange-400 rounded-2xl p-5 text-white shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
-        <div className="relative z-10">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Clock className="w-6 h-6" />
-              <span className="font-bold text-lg">Waiting for Teacher</span>
-            </div>
-            <button
-              onClick={onRefresh}
-              disabled={isSubmitting}
-              className="p-2.5 bg-white/20 rounded-xl hover:bg-white/30 transition-colors"
-            >
-              <RefreshCw className={`w-5 h-5 ${isSubmitting ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-          <p className="text-5xl font-bold">{totalPendingCount}</p>
-          <p className="text-sm opacity-80 mt-1">
-            {totalPendingCount === 0 ? 'Nothing waiting! 🎉' : 'items waiting'}
-          </p>
-        </div>
-      </div>
-
-      {totalPendingCount === 0 ? (
-        <div className="bg-white rounded-2xl p-8 border-2 border-green-200 text-center shadow-sm">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-10 h-10 text-green-500" />
-          </div>
-          <p className="text-xl font-bold text-gray-800">All Done! 🎉</p>
-          <p className="text-sm text-gray-500 mt-2">Nothing is waiting!</p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl p-4 border-2 border-yellow-200 shadow-sm">
-          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-yellow-500" />
-            Waiting...
-          </h3>
-          <div className="space-y-3">
-            {allPending.map((item, index) => (
-              <div
-                key={index}
-                className={`p-4 rounded-xl border-2 ${
-                  item.itemType === 'attendance' ? 'bg-blue-50 border-blue-200' : 'bg-purple-50 border-purple-200'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                        item.itemType === 'attendance' ? 'bg-blue-200' : 'bg-purple-200'
-                      }`}
-                    >
-                      {item.itemType === 'attendance' ? (
-                        <Calendar className="w-6 h-6 text-blue-700" />
-                      ) : (
-                        <BookOpen className="w-6 h-6 text-purple-700" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-800">
-                        {item.itemType === 'attendance' ? 'I was here!' : `Gatha - ${item.type === 'new' ? 'New' : 'Practice'}`}
-                      </p>
-                      <p className="text-sm text-gray-600">{formatDateIn(item.date)}</p>
-                      {item.itemType === 'gatha' && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          {item.sutra_name} • {item.total_gatha} gathas
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <PendingBadge status="pending" />
-                    {item.itemType === 'gatha' && (
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => onEdit(item)}
-                          className="p-2 bg-blue-100 rounded-lg text-blue-600 active:scale-95 transition-transform"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        <button
-                          onClick={() => onDelete(item)}
-                          className="p-2 bg-red-100 rounded-lg text-red-600 active:scale-95 transition-transform"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {allRejected.length > 0 && (
-        <div className="bg-white rounded-2xl p-4 border-2 border-red-200 shadow-sm">
-          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-red-500" />
-            Try Again ({allRejected.length})
-          </h3>
-          <div className="space-y-3">
-            {allRejected.map((item, index) => (
-              <div key={index} className="p-4 rounded-xl bg-red-50 border-2 border-red-200">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-red-200 rounded-lg flex items-center justify-center">
-                    {item.itemType === 'attendance' ? (
-                      <Calendar className="w-5 h-5 text-red-700" />
-                    ) : (
-                      <BookOpen className="w-5 h-5 text-red-700" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-800">
-                      {item.itemType === 'attendance' ? 'Attendance' : `Gatha - ${item.type}`}
-                    </p>
-                    <p className="text-sm text-gray-600">{formatDateIn(item.date)}</p>
-                  </div>
-                  <PendingBadge status="rejected" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ============================================
-// RECENT BADGES COMPONENT
-// ============================================
-
-const RecentBadges = ({ stats, onBadgeClick }) => {
-  const recentlyUnlocked = useMemo(() => {
-    return MONTHLY_ACHIEVEMENTS
-      .filter((a) => calculateAchievementProgress(a, stats).unlocked)
-      .slice(0, 4);
-  }, [stats]);
-
-  if (recentlyUnlocked.length === 0) {
-    return (
-      <div className="bg-gray-50 rounded-xl p-6 text-center border-2 border-gray-200">
-        <Award className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-        <p className="text-gray-500 text-sm">No badges yet!</p>
-        <p className="text-gray-400 text-xs mt-1">Keep learning to earn some! 🌟</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
-      {recentlyUnlocked.map((achievement) => {
-        const Icon = achievement.icon;
-        const colors = ACHIEVEMENT_COLORS[achievement.color];
-
-        return (
-          <button
-            key={achievement.id}
-            onClick={() => onBadgeClick?.(achievement)}
-            className="flex-shrink-0 w-20 p-2 bg-white rounded-xl border-2 border-gray-200 shadow-sm active:scale-95 transition-transform"
-          >
-            <div className={`w-10 h-10 rounded-full mx-auto mb-1 flex items-center justify-center bg-gradient-to-br ${colors.bg}`}>
-              <Icon className="w-5 h-5 text-white" />
-            </div>
-            <p className="text-xs font-bold text-gray-800 text-center truncate">{achievement.title}</p>
-            <p className="text-xs text-center">{colors.icon}</p>
-          </button>
-        );
-      })}
-    </div>
-  );
-};
-
-// ============================================
-// NEXT BADGES COMPONENT
-// ============================================
-
-const NextBadges = ({ stats, onBadgeClick }) => {
-  const nextAchievements = useMemo(() => {
-    return MONTHLY_ACHIEVEMENTS
-      .map((a) => ({ ...a, ...calculateAchievementProgress(a, stats) }))
-      .filter((a) => !a.unlocked && a.progress > 0)
-      .sort((a, b) => b.progress - a.progress)
-      .slice(0, 2);
-  }, [stats]);
-
-  if (nextAchievements.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border-2 border-green-200">
-      <h4 className="font-bold text-green-800 mb-3 flex items-center gap-2">
-        <Target className="w-5 h-5" />
-        Almost There! 🎯
-      </h4>
-      <div className="space-y-3">
-        {nextAchievements.map((achievement) => {
-          const Icon = achievement.icon;
-          const colors = ACHIEVEMENT_COLORS[achievement.color];
-
-          return (
-            <button
-              key={achievement.id}
-              onClick={() => onBadgeClick?.(achievement)}
-              className="w-full flex items-center gap-3 bg-white rounded-xl p-3 border border-green-200 text-left active:scale-[0.98] transition-transform"
-            >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br ${colors.bg}`}>
-                <Icon className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1">
-                <p className="font-bold text-gray-800 text-sm">{achievement.title}</p>
-                <p className="text-xs text-gray-500">({achievement.subtitle})</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full bg-gradient-to-r ${colors.bg} rounded-full`}
-                      style={{ width: `${achievement.progress * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-xs font-bold text-gray-500">
-                    {achievement.current}/{achievement.target}
-                  </span>
-                </div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-// ============================================
-// MAIN KIDS DASHBOARD COMPONENT
+// MAIN KIDS DASHBOARD COMPONENT - FIXED
 // ============================================
 
 export default function KidsDashboard({ user, onLogout }) {
   const [currentPage, setCurrentPage] = useState(PAGES.HOME);
 
+  // Group/Account Switching States (Not used but kept for consistency)
+  const [groupMembers, setGroupMembers] = useState([]);
+  const [activeUser, setActiveUser] = useState(user);
+  const [isLoadingSwitch, setIsLoadingSwitch] = useState(false);
+
+  // Stats Date Filtering - Crucial for Leaderboard Sync
+  const [statsDateRange, setStatsDateRange] = useState(() => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  });
+
+  const activeUserRef = useRef(activeUser);
+  useEffect(() => {
+    activeUserRef.current = activeUser;
+  }, [activeUser]);
+
   // Data states
   const [attendanceHistory, setAttendanceHistory] = useState([]);
   const [gathaEntries, setGathaEntries] = useState([]);
   const [pendingStatus, setPendingStatus] = useState({ attendance: [], gatha: [] });
-  
+   
   // Online status
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
@@ -1568,7 +1426,6 @@ export default function KidsDashboard({ user, onLogout }) {
     return att + gatha;
   }, [pendingStatus]);
 
-  // User stats for achievements
   const userStats = useMemo(() => ({
     monthlyAttendance,
     monthlyNewGathas,
@@ -1577,7 +1434,6 @@ export default function KidsDashboard({ user, onLogout }) {
     workingDays,
   }), [monthlyAttendance, monthlyNewGathas, currentStreak, maxStreak, workingDays]);
 
-  // Calculate XP and level
   const xpBreakdown = useMemo(
     () => calculateTotalXP(userStats, MONTHLY_ACHIEVEMENTS),
     [userStats]
@@ -1595,7 +1451,6 @@ export default function KidsDashboard({ user, onLogout }) {
     [currentStreak, monthlyAttendance, monthlyNewGathas]
   );
 
-  // Helpers
   const showSuccess = (msg) => {
     setSuccessMessage(msg);
     setTimeout(() => setSuccessMessage(''), 3000);
@@ -1607,54 +1462,9 @@ export default function KidsDashboard({ user, onLogout }) {
     sutra_name: entry.sutra_name ?? entry.sutraName ?? '',
     which_gatha: entry.which_gatha ?? entry.whichGatha ?? '',
     total_gatha: Number(entry.total_gatha ?? entry.totalGatha ?? 0),
-    created_at: entry.created_at ?? entry.date ?? null,
+    created_at: entry.date ?? entry.created_at ?? null, // FIXED: Prioritize `date` for accurate history
   });
 
-  const calculateStreakFromHistory = (history) => {
-    const sortedDates = history
-      .map((r) => formatLocalDateString(r.date))
-      .filter((v, i, a) => a.indexOf(v) === i)
-      .sort((a, b) => new Date(b) - new Date(a));
-
-    if (sortedDates.length === 0) return { current: 0, max: 0 };
-
-    let current = 0;
-    let max = 0;
-    let tempStreak = 1;
-
-    for (let i = 0; i < sortedDates.length; i++) {
-      if (i === 0) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const date = new Date(sortedDates[i]);
-        const diffDays = Math.floor((today - date) / (1000 * 60 * 60 * 24));
-        if (diffDays > 1) {
-          current = 0;
-        } else {
-          current = 1;
-        }
-      }
-
-      if (i < sortedDates.length - 1) {
-        const currentDate = new Date(sortedDates[i]);
-        const nextDate = new Date(sortedDates[i + 1]);
-        const diffDays = Math.floor((currentDate - nextDate) / (1000 * 60 * 60 * 24));
-
-        if (diffDays === 1) {
-          tempStreak++;
-          if (i === 0 || current > 0) current = tempStreak;
-        } else {
-          max = Math.max(max, tempStreak);
-          tempStreak = 1;
-        }
-      }
-    }
-
-    max = Math.max(max, tempStreak, current);
-    return { current, max };
-  };
-
-  // API calls
   const fetchPendingStatus = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
@@ -1673,14 +1483,17 @@ export default function KidsDashboard({ user, onLogout }) {
       const res = await fetch(`${API_BASE}/attendance`, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const data = await res.json();
-        setAttendanceHistory(Array.isArray(data) ? data : []);
-        const streakData = calculateStreakFromHistory(data);
+        const history = Array.isArray(data) ? data : [];
+        setAttendanceHistory(history);
+        
+        // FIXED: Use smart streak logic that ignores Sundays
+        const streakData = calculateStreakWithHolidays(history);
         setCurrentStreak(streakData.current);
         setMaxStreak(streakData.max);
 
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
-        const monthlyCount = data.filter((r) => {
+        const monthlyCount = history.filter((r) => {
           const date = new Date(r.date);
           return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
         }).length;
@@ -1734,21 +1547,17 @@ export default function KidsDashboard({ user, onLogout }) {
     }
   }, []);
 
-  // Track online status
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
-  // Initial load
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -1763,7 +1572,6 @@ export default function KidsDashboard({ user, onLogout }) {
     };
     loadData();
 
-    // Poll every 30 seconds - only if online
     const pollInterval = setInterval(() => {
       if (navigator.onLine) {
         fetchPendingStatus();
@@ -1772,7 +1580,6 @@ export default function KidsDashboard({ user, onLogout }) {
       }
     }, 30000);
 
-    // Refresh when tab becomes visible - only if online
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && navigator.onLine) {
         fetchPendingStatus();
@@ -1790,16 +1597,19 @@ export default function KidsDashboard({ user, onLogout }) {
 
   const handleStatsMonthChange = (year, month) => {
     fetchMonthlyStats(year, month);
+    
+    // FIXED: Update statsDateRange so leaderboard syncs with selected month
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0);
+    end.setHours(23, 59, 59, 999);
+    setStatsDateRange({ start, end });
   };
 
-  // Handlers
   const markAttendance = async () => {
     if (todayAttendanceStatus !== 'not_marked') return;
-
     setGlobalError('');
     setIsSubmitting(true);
     const token = localStorage.getItem('jainPathshalaToken');
-
     try {
       const res = await fetch(`${API_BASE}/attendance/mark`, {
         method: 'POST',
@@ -1820,21 +1630,17 @@ export default function KidsDashboard({ user, onLogout }) {
     const token = localStorage.getItem('jainPathshalaToken');
     setIsSubmitting(true);
     setGlobalError('');
-
     try {
       const url = editingGatha ? `${API_BASE}/gatha/pending/${editingGatha.id}` : `${API_BASE}/gatha`;
-
       const res = await fetch(url, {
         method: editingGatha ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(formData),
       });
-
       if (!res.ok) {
         const errData = await res.json();
         throw new Error(errData.error || 'Failed to submit gatha');
       }
-
       showSuccess(editingGatha ? '✅ Updated!' : '✅ Sent to teacher!');
       setShowGathaModal(false);
       setEditingGatha(null);
@@ -1850,7 +1656,6 @@ export default function KidsDashboard({ user, onLogout }) {
     setConfirmAction(null);
     const token = localStorage.getItem('jainPathshalaToken');
     setIsSubmitting(true);
-
     try {
       const res = await fetch(`${API_BASE}/gatha/pending/${id}`, {
         method: 'DELETE',
@@ -1869,7 +1674,6 @@ export default function KidsDashboard({ user, onLogout }) {
   // ==================== RENDER HOME PAGE ====================
   const renderHome = () => (
     <div className="space-y-4">
-      {/* Offline Banner */}
       {!isOnline && (
         <div className="bg-red-100 border border-red-300 rounded-xl p-3 text-center">
           <p className="text-red-700 text-sm font-medium">📵 You're offline. Some things may not work.</p>
@@ -1877,7 +1681,7 @@ export default function KidsDashboard({ user, onLogout }) {
       )}
 
       {/* Welcome Card - CLICKABLE */}
-      <button
+      <button 
         onClick={() => setShowLevelModal(true)}
         className="w-full text-left bg-gradient-to-br from-pink-400 via-purple-400 to-indigo-400 rounded-3xl p-5 text-white shadow-lg relative overflow-hidden active:scale-[0.99] transition-transform"
       >
@@ -1913,7 +1717,7 @@ export default function KidsDashboard({ user, onLogout }) {
             </div>
             {userLevel.nextLevel && (
               <div className="h-2 bg-white/30 rounded-full overflow-hidden">
-                <div
+                <div 
                   className="h-full bg-white rounded-full transition-all duration-500"
                   style={{ width: `${userLevel.progressToNext * 100}%` }}
                 />
@@ -1932,10 +1736,7 @@ export default function KidsDashboard({ user, onLogout }) {
               <HelpCircle className="w-5 h-5 text-pink-500" />
               <span className="font-bold text-pink-800">How to use this app!</span>
             </div>
-            <button
-              onClick={() => setShowTips(false)}
-              className="text-pink-400 p-1"
-            >
+            <button onClick={() => setShowTips(false)} className="text-pink-400 p-1">
               <CloseIcon size={18} />
             </button>
           </div>
@@ -1959,12 +1760,12 @@ export default function KidsDashboard({ user, onLogout }) {
 
       {/* Today's Quick Actions */}
       <div className="bg-white rounded-2xl p-4 border-2 border-pink-200 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-gray-800 flex items-center gap-2">
-            <Target className="w-5 h-5 text-pink-500" />
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
+            <Target className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
             Today's Goals! 🎯
           </h3>
-          <span className="text-xs bg-pink-100 text-pink-700 px-3 py-1 rounded-full font-bold">
+          <span className="text-xs bg-pink-100 text-pink-700 px-2 sm:px-3 py-1 rounded-full font-bold">
             {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
           </span>
         </div>
@@ -2032,18 +1833,14 @@ export default function KidsDashboard({ user, onLogout }) {
                 ...todaysApprovedGathas.map((e) => ({ ...e, status: 'approved' })),
                 ...todaysPendingGathas.map((e) => ({ ...e, status: 'pending' })),
               ].map((entry) => (
-                <div
-                  key={entry.id}
+                <div 
+                  key={entry.id} 
                   className={`flex items-center justify-between p-3 rounded-xl ${
                     entry.status === 'approved' ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        entry.type === 'new' ? 'bg-purple-200' : 'bg-blue-200'
-                      }`}
-                    >
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${entry.type === 'new' ? 'bg-purple-200' : 'bg-blue-200'}`}>
                       {entry.type === 'new' ? <Plus className="w-5 h-5 text-purple-700" /> : <RefreshCw className="w-5 h-5 text-blue-700" />}
                     </div>
                     <div>
@@ -2055,23 +1852,18 @@ export default function KidsDashboard({ user, onLogout }) {
                     <PendingBadge status={entry.status} size="small" />
                     {entry.status === 'pending' && (
                       <div className="flex gap-1">
-                        <button
-                          onClick={() => {
-                            setEditingGatha(entry);
-                            setShowGathaModal(true);
-                          }}
+                        <button 
+                          onClick={() => { setEditingGatha(entry); setShowGathaModal(true); }} 
                           className="p-1.5 bg-blue-100 rounded-lg text-blue-600"
                         >
                           <Edit2 size={12} />
                         </button>
-                        <button
-                          onClick={() =>
-                            setConfirmAction({
-                              title: 'Delete?',
-                              message: 'Do you want to remove this gatha?',
-                              handler: () => deletePendingGatha(entry.id),
-                            })
-                          }
+                        <button 
+                          onClick={() => setConfirmAction({ 
+                            title: 'Delete?', 
+                            message: 'Do you want to remove this gatha?', 
+                            handler: () => deletePendingGatha(entry.id) 
+                          })} 
                           className="p-1.5 bg-red-100 rounded-lg text-red-600"
                         >
                           <Trash2 size={12} />
@@ -2088,20 +1880,8 @@ export default function KidsDashboard({ user, onLogout }) {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <QuickStatCard
-          icon={CalendarDays}
-          value={monthlyAttendance}
-          label="Days I Came! 🎉"
-          color="green"
-          sublabel="This Month"
-        />
-        <QuickStatCard
-          icon={BookMarked}
-          value={monthlyNewGathas}
-          label="New Gathas! ✨"
-          color="purple"
-          sublabel="This Month"
-        />
+        <QuickStatCard icon={CalendarDays} value={monthlyAttendance} label="Days I Came! 🎉" color="green" sublabel="This Month" />
+        <QuickStatCard icon={BookMarked} value={monthlyNewGathas} label="New Gathas! ✨" color="purple" sublabel="This Month" />
       </div>
 
       {/* Recent Badges */}
@@ -2111,8 +1891,8 @@ export default function KidsDashboard({ user, onLogout }) {
             <Trophy className="w-5 h-5 text-yellow-500" />
             My Badges! 🏆
           </h3>
-          <button
-            onClick={() => setCurrentPage(PAGES.STATS)}
+          <button 
+            onClick={() => setCurrentPage(PAGES.STATS)} 
             className="text-xs bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full font-bold flex items-center gap-1"
           >
             See All <ChevronRight className="w-3 h-3" />
@@ -2149,6 +1929,7 @@ export default function KidsDashboard({ user, onLogout }) {
       <KidsLeaderboardSection 
         currentUserId={user?._id || user?.id}
         currentUserName={user?.name || user?.username}
+        dateRange={statsDateRange} // Correctly synced date range
       />
     </div>
   );
@@ -2168,33 +1949,20 @@ export default function KidsDashboard({ user, onLogout }) {
     }
 
     switch (currentPage) {
-      case PAGES.HOME:
-        return renderHome();
-      case PAGES.STATS:
-        return renderStats();
-      case PAGES.HISTORY:
-        return <HistoryPage />;
-      case PAGES.PENDING:
+      case PAGES.HOME: return renderHome();
+      case PAGES.STATS: return renderStats();
+      case PAGES.HISTORY: return <HistoryPage activeUserId={user?._id || user?.username} />;
+      case PAGES.PENDING: 
         return (
-          <PendingPage
-            pendingStatus={pendingStatus}
-            onRefresh={fetchPendingStatus}
-            onEdit={(item) => {
-              setEditingGatha(item);
-              setShowGathaModal(true);
-            }}
-            onDelete={(item) =>
-              setConfirmAction({
-                title: 'Delete?',
-                message: 'Do you want to remove this?',
-                handler: () => deletePendingGatha(item.id),
-              })
-            }
+          <PendingPage 
+            pendingStatus={pendingStatus} 
+            onRefresh={fetchPendingStatus} 
+            onEdit={(item) => { setEditingGatha(item); setShowGathaModal(true); }}
+            onDelete={(item) => setConfirmAction({ title: 'Delete?', message: 'Do you want to remove this?', handler: () => deletePendingGatha(item.id) })}
             isSubmitting={isSubmitting}
           />
         );
-      default:
-        return renderHome();
+      default: return renderHome();
     }
   };
 
@@ -2215,12 +1983,12 @@ export default function KidsDashboard({ user, onLogout }) {
               <p className="text-xs text-gray-500">Hi, {user?.name || user?.username}! 👋</p>
             </div>
           </div>
-          <button
+          <button 
             onClick={onLogout}
             className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2.5 rounded-xl font-bold text-sm active:scale-[0.98] transition-transform border border-red-200"
           >
             <LogOut className="w-4 h-4" />
-            Bye!
+            <span className="hidden sm:inline">Logout</span>
           </button>
         </div>
       </div>
@@ -2248,13 +2016,9 @@ export default function KidsDashboard({ user, onLogout }) {
               <span className="text-lg">{tab.emoji}</span>
               {tab.label}
               {tab.badge > 0 && (
-                <span
-                  className={`absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shadow ${
-                    tab.badgeColor === 'red'
-                      ? 'bg-red-500 text-white animate-pulse'
-                      : 'bg-yellow-500 text-white'
-                  }`}
-                >
+                <span className={`absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shadow ${
+                  tab.badgeColor === 'red' ? 'bg-red-500 text-white animate-pulse' : 'bg-yellow-500 text-white'
+                }`}>
                   {tab.badge}
                 </span>
               )}
@@ -2272,10 +2036,7 @@ export default function KidsDashboard({ user, onLogout }) {
       {/* Modals */}
       <GathaEntryModal
         isOpen={showGathaModal}
-        onClose={() => {
-          setShowGathaModal(false);
-          setEditingGatha(null);
-        }}
+        onClose={() => { setShowGathaModal(false); setEditingGatha(null); }}
         onSubmit={submitGatha}
         isSubmitting={isSubmitting}
         editData={editingGatha}
@@ -2294,7 +2055,7 @@ export default function KidsDashboard({ user, onLogout }) {
         onClose={() => setSelectedAchievement(null)}
       />
 
-      <LevelDetailsModal
+      <LevelDetailsModal 
         isOpen={showLevelModal}
         onClose={() => setShowLevelModal(false)}
         currentXP={xpBreakdown.total}
