@@ -7,6 +7,7 @@ import {
   BookOpen,
   Calendar,
   CalendarDays,
+  CalendarRange, // Added for date range
   Check,
   CheckCircle,
   ChevronDown,
@@ -35,6 +36,7 @@ import {
   Sparkles,
   UserCircle,
   ChevronUp,
+  Filter, // Added for filter UI
 } from 'lucide-react';
 
 // Import Achievement Components
@@ -77,7 +79,6 @@ const QUOTES = [
   { text: "મહેનત નો કોઈ વિકલ્પ નથી", meaning: "There is no substitute for hard work", emoji: "⭐", lang: "Gujarati" },
 ];
 
-// Tips icon color classes
 const TIP_ICON_COLORS = {
   blue: 'text-blue-500',
   purple: 'text-purple-500',
@@ -85,7 +86,6 @@ const TIP_ICON_COLORS = {
   orange: 'text-orange-500',
 };
 
-// Tips for new users
 const HELPFUL_TIPS = [
   { icon: Calendar, tipText: "Tap the blue button to mark your attendance daily", color: "blue" },
   { icon: BookOpen, tipText: "Record your gatha learning with the purple button", color: "purple" },
@@ -143,13 +143,151 @@ const getMotivationalMessage = (streak, attendance, gathas) => {
   return { text: "Every journey begins with a single step! 🚀", type: "motivation" };
 };
 
+// --- UPDATED STREAK LOGIC (Handles Sunday Holidays) ---
+const calculateStreakWithHolidays = (attendanceHistory) => {
+  if (!attendanceHistory || attendanceHistory.length === 0) return { current: 0, max: 0 };
+
+  // 1. Extract unique dates, sort descending (newest first)
+  const sortedDates = attendanceHistory
+    .map((r) => {
+      const d = coerceToDate(r.date);
+      d.setHours(0,0,0,0);
+      return d;
+    })
+    .sort((a, b) => b - a)
+    .filter((date, index, self) => 
+      index === 0 || date.getTime() !== self[index - 1].getTime()
+    );
+
+  if (sortedDates.length === 0) return { current: 0, max: 0 };
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  let currentStreak = 0;
+  let maxStreak = 0;
+  let tempStreak = 0;
+
+  // Check if the most recent attendance is today or yesterday
+  // If most recent is older than yesterday, streak might be broken unless holidays cover the gap
+  const lastAttended = sortedDates[0];
+  const diffFromToday = Math.floor((today - lastAttended) / (1000 * 60 * 60 * 24));
+  
+  // Logic to determine if current streak is active
+  let isCurrentStreakActive = diffFromToday <= 1; 
+  if (diffFromToday > 1) {
+    // Check if the gap contains only Sundays
+    let gapValid = true;
+    for(let i = 1; i < diffFromToday; i++) {
+        const gapDay = new Date(today);
+        gapDay.setDate(today.getDate() - i);
+        if (gapDay.getDay() !== 0) { // 0 is Sunday
+            gapValid = false;
+            break;
+        }
+    }
+    isCurrentStreakActive = gapValid;
+  }
+
+  // Iterate through dates to calculate streaks
+  for (let i = 0; i < sortedDates.length; i++) {
+    // Start a new potential streak segment
+    if (tempStreak === 0) tempStreak = 1;
+
+    if (i < sortedDates.length - 1) {
+      const currentDate = sortedDates[i];
+      const nextDate = sortedDates[i + 1]; // Older date
+      const diffDays = Math.floor((currentDate - nextDate) / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 1) {
+        // Consecutive days
+        tempStreak++;
+      } else if (diffDays > 1) {
+        // Gap detected. Check if gap consists ONLY of Sundays.
+        let isHolidayGap = true;
+        for (let j = 1; j < diffDays; j++) {
+           const gapDay = new Date(currentDate);
+           gapDay.setDate(currentDate.getDate() - j);
+           if (gapDay.getDay() !== 0) { // If any day in gap is NOT Sunday
+              isHolidayGap = false;
+              break;
+           }
+        }
+
+        if (isHolidayGap) {
+          tempStreak++; // Gap was just holidays, continue streak
+        } else {
+          // Streak broken
+          if (maxStreak < tempStreak) maxStreak = tempStreak;
+          // If this was the first segment and it's active, set currentStreak
+          if (i === tempStreak - 1 && isCurrentStreakActive) {
+             currentStreak = tempStreak;
+          }
+          tempStreak = 1; // Reset for next segment
+        }
+      }
+    } else {
+      // Last element
+      if (maxStreak < tempStreak) maxStreak = tempStreak;
+      // If we reached the end and it's the first segment
+      if (i === tempStreak - 1 && isCurrentStreakActive) {
+         currentStreak = tempStreak;
+      }
+    }
+  }
+
+  // Final check in case loop ended
+  if (maxStreak < tempStreak) maxStreak = tempStreak;
+
+  return { current: currentStreak, max: maxStreak };
+};
+
+// Helper to get date ranges for stats/leaderboard
+const getDateRange = (type, customRange = {}) => {
+  const now = new Date();
+  const start = new Date(now);
+  const end = new Date(now);
+
+  // Reset hours
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+
+  switch (type) {
+    case 'today':
+      return { start, end };
+    case 'week':
+      // Monday as start of week
+      const day = start.getDay() || 7; // Make Sunday 7
+      if (day !== 1) start.setHours(-24 * (day - 1)); 
+      return { start, end };
+    case 'month':
+      start.setDate(1);
+      // For leaderboard, we usually want the whole month range capability
+      const fullMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      fullMonthEnd.setHours(23, 59, 59, 999);
+      return { start, end: fullMonthEnd }; 
+    case 'year':
+      start.setMonth(0, 1);
+      const fullYearEnd = new Date(now.getFullYear(), 11, 31);
+      fullYearEnd.setHours(23, 59, 59, 999);
+      return { start, end: fullYearEnd };
+    case 'custom':
+      return { 
+        start: customRange.start ? new Date(customRange.start) : start, 
+        end: customRange.end ? new Date(customRange.end) : end 
+      };
+    default:
+      return { start, end };
+  }
+};
+
 // ============================================
 // USER SWITCHER COMPONENT
 // ============================================
 
 const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoading }) => {
   const [isOpen, setIsOpen] = useState(false);
-  
+   
   if (!groupMembers || groupMembers.length <= 1) {
     return null;
   }
@@ -258,11 +396,6 @@ const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoad
                   </button>
                 );
               })}
-            </div>
-            <div className="p-2 bg-gray-50 border-t border-gray-200">
-              <p className="text-xs text-gray-500 text-center">
-                💡 You can add gathas and mark attendance for any member
-              </p>
             </div>
           </div>
         </>
@@ -660,7 +793,7 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
 // LEADERBOARD COMPONENT
 // ============================================
 
-const LeaderboardSection = ({ currentUserId, currentUserName }) => {
+const LeaderboardSection = ({ currentUserId, currentUserName, dateRange }) => {
   const [activeTab, setActiveTab] = useState('attendance');
   const [leaderboardData, setLeaderboardData] = useState({ attendanceLeaders: [], gathaLeaders: [] });
   const [isLoading, setIsLoading] = useState(true);
@@ -672,12 +805,20 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
     setError(null);
     
     try {
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      // Use passed date range or default to current month
+      let startStr, endStr;
+      
+      if (dateRange && dateRange.start && dateRange.end) {
+        startStr = formatLocalDateString(dateRange.start);
+        endStr = formatLocalDateString(dateRange.end);
+      } else {
+        const now = new Date();
+        startStr = formatLocalDateString(new Date(now.getFullYear(), now.getMonth(), 1));
+        endStr = formatLocalDateString(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+      }
       
       let res = await fetch(
-        `${API_BASE}/leaderboard?startDate=${formatLocalDateString(startOfMonth)}&endDate=${formatLocalDateString(endOfMonth)}`,
+        `${API_BASE}/leaderboard?startDate=${startStr}&endDate=${endStr}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
@@ -686,7 +827,7 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
         setLeaderboardData(data);
       } else {
         res = await fetch(
-          `${API_BASE}/analytics/leaderboard?startDate=${formatLocalDateString(startOfMonth)}&endDate=${formatLocalDateString(endOfMonth)}`,
+          `${API_BASE}/analytics/leaderboard?startDate=${startStr}&endDate=${endStr}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         
@@ -706,7 +847,7 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [dateRange]); // Refetch when dateRange changes
 
   useEffect(() => {
     fetchLeaderboard();
@@ -759,7 +900,7 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
-        <p className="text-xs sm:text-sm opacity-80 mt-1">Top performers this month</p>
+        <p className="text-xs sm:text-sm opacity-80 mt-1">Top performers for selected period</p>
       </div>
 
       <div className="flex p-2 bg-gray-100 gap-2">
@@ -802,7 +943,7 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
           attendanceLeaders.length === 0 ? (
             <div className="text-center py-8">
               <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
-              <p className="text-gray-500 font-medium text-sm">No data yet this month</p>
+              <p className="text-gray-500 font-medium text-sm">No data yet for this period</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -847,7 +988,7 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
           gathaLeaders.length === 0 ? (
             <div className="text-center py-8">
               <BookOpen className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
-              <p className="text-gray-500 font-medium text-sm">No data yet this month</p>
+              <p className="text-gray-500 font-medium text-sm">No data yet for this period</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -895,14 +1036,13 @@ const LeaderboardSection = ({ currentUserId, currentUserName }) => {
         <div className="bg-blue-50 rounded-xl p-2 sm:p-3 border border-blue-200">
           <p className="text-xs text-blue-700 text-center">
             <Sparkles className="w-3 h-3 inline mr-1" />
-            Leaderboard resets every month. Keep learning to stay on top! 🌟
+            Keep learning to stay on top! 🌟
           </p>
         </div>
       </div>
     </div>
   );
 };
-
 // ============================================
 // GATHA ENTRY MODAL
 // ============================================
@@ -1103,6 +1243,7 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
     </div>
   );
 };
+
 // ============================================
 // HISTORY PAGE COMPONENT
 // ============================================
@@ -1456,8 +1597,8 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
               <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
               <span className="font-bold text-base sm:text-lg">Pending Approvals</span>
             </div>
-            <button
-              onClick={onRefresh}
+            <button 
+              onClick={onRefresh} 
               disabled={isSubmitting}
               className="p-2 sm:p-2.5 bg-white/20 rounded-xl hover:bg-white/30 transition-colors"
             >
@@ -1487,15 +1628,15 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
           </h3>
           <div className="space-y-2 sm:space-y-3">
             {allPending.map((item, index) => (
-              <div
-                key={index}
+              <div 
+                key={index} 
                 className={`p-3 sm:p-4 rounded-xl border-2 ${
                   item.itemType === 'attendance' ? 'bg-blue-50 border-blue-200' : 'bg-purple-50 border-purple-200'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-start gap-2 sm:gap-3 min-w-0">
-                    <div
+                    <div 
                       className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
                         item.itemType === 'attendance' ? 'bg-blue-200' : 'bg-purple-200'
                       }`}
@@ -1522,14 +1663,14 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
                     <PendingBadge status="pending" size="small" />
                     {item.itemType === 'gatha' && (
                       <div className="flex gap-1">
-                        <button
-                          onClick={() => onEdit(item)}
+                        <button 
+                          onClick={() => onEdit(item)} 
                           className="p-1.5 sm:p-2 bg-blue-100 rounded-lg text-blue-600 active:scale-95 transition-transform"
                         >
                           <Edit2 size={12} className="sm:w-3.5 sm:h-3.5" />
                         </button>
-                        <button
-                          onClick={() => onDelete(item)}
+                        <button 
+                          onClick={() => onDelete(item)} 
                           className="p-1.5 sm:p-2 bg-red-100 rounded-lg text-red-600 active:scale-95 transition-transform"
                         >
                           <Trash2 size={12} className="sm:w-3.5 sm:h-3.5" />
@@ -1670,7 +1811,7 @@ const NextBadges = ({ stats, onBadgeClick }) => {
                 <p className="text-xs text-gray-500 truncate">({achievement.subtitle})</p>
                 <div className="flex items-center gap-2 mt-1">
                   <div className="flex-1 h-1.5 sm:h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
+                    <div 
                       className={`h-full bg-gradient-to-r ${colors.bg} rounded-full`}
                       style={{ width: `${achievement.progress * 100}%` }}
                     />
@@ -1701,6 +1842,11 @@ export default function StudentDashboard({ user, onLogout }) {
   const [activeUser, setActiveUser] = useState(user);
   const [isLoadingSwitch, setIsLoadingSwitch] = useState(false);
 
+  // Stats Date Filtering
+  const [statsFilterType, setStatsFilterType] = useState('month');
+  const [statsDateRange, setStatsDateRange] = useState(getDateRange('month'));
+  const [showDateFilter, setShowDateFilter] = useState(false);
+
   // REF to track current active user (prevents stale closures)
   const activeUserRef = useRef(activeUser);
   useEffect(() => {
@@ -1711,7 +1857,7 @@ export default function StudentDashboard({ user, onLogout }) {
   const [attendanceHistory, setAttendanceHistory] = useState([]);
   const [gathaEntries, setGathaEntries] = useState([]);
   const [pendingStatus, setPendingStatus] = useState({ attendance: [], gatha: [] });
-  
+   
   // Online status
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
@@ -1767,51 +1913,14 @@ export default function StudentDashboard({ user, onLogout }) {
     sutra_name: entry.sutra_name ?? entry.sutraName ?? '',
     which_gatha: entry.which_gatha ?? entry.whichGatha ?? '',
     total_gatha: Number(entry.total_gatha ?? entry.totalGatha ?? 0),
-    created_at: entry.created_at ?? entry.date ?? null,
+    created_at: entry.date ?? entry.created_at ?? null, // Changed priority to 'date' first
   });
 
-  const calculateStreak = (history) => {
-    const sortedDates = history
-      .map((r) => formatLocalDateString(r.date))
-      .filter((v, i, a) => a.indexOf(v) === i)
-      .sort((a, b) => new Date(b) - new Date(a));
-
-    if (sortedDates.length === 0) return { current: 0, max: 0 };
-
-    let current = 0;
-    let max = 0;
-    let tempStreak = 1;
-
-    for (let i = 0; i < sortedDates.length; i++) {
-      if (i === 0) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const date = new Date(sortedDates[i]);
-        const diffDays = Math.floor((today - date) / (1000 * 60 * 60 * 24));
-        if (diffDays > 1) {
-          current = 0;
-        } else {
-          current = 1;
-        }
-      }
-
-      if (i < sortedDates.length - 1) {
-        const currentDate = new Date(sortedDates[i]);
-        const nextDate = new Date(sortedDates[i + 1]);
-        const diffDays = Math.floor((currentDate - nextDate) / (1000 * 60 * 60 * 24));
-
-        if (diffDays === 1) {
-          tempStreak++;
-          if (i === 0 || current > 0) current = tempStreak;
-        } else {
-          max = Math.max(max, tempStreak);
-          tempStreak = 1;
-        }
-      }
-    }
-
-    max = Math.max(max, tempStreak, current);
-    return { current, max };
+  // --- Date Range Handler ---
+  const handleDateFilterChange = (type) => {
+    setStatsFilterType(type);
+    setStatsDateRange(getDateRange(type));
+    setShowDateFilter(false);
   };
 
   // ============================================
@@ -1867,14 +1976,17 @@ export default function StudentDashboard({ user, onLogout }) {
       });
       if (res.ok) {
         const data = await res.json();
-        setAttendanceHistory(Array.isArray(data) ? data : []);
-        const streakData = calculateStreak(data);
+        const history = Array.isArray(data) ? data : [];
+        setAttendanceHistory(history);
+        
+        // Use new holiday-aware streak logic
+        const streakData = calculateStreakWithHolidays(history);
         setCurrentStreak(streakData.current);
         setMaxStreak(streakData.max);
 
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
-        const monthlyCount = data.filter((r) => {
+        const monthlyCount = history.filter((r) => {
           const date = new Date(r.date);
           return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
         }).length;
@@ -1965,10 +2077,13 @@ export default function StudentDashboard({ user, onLogout }) {
         gatha: data.pendingGathas || []
       });
       
-      // Use stats from the response if available
+      // Use streak calculation logic on frontend to ensure consistency with holidays
+      const streakData = calculateStreakWithHolidays(recentAttendance);
+      
+      // Use stats from response but override streak if needed
       const stats = data.stats || {};
-      setCurrentStreak(stats.currentStreak ?? calculateStreak(recentAttendance).current);
-      setMaxStreak(stats.maxStreak ?? calculateStreak(recentAttendance).max);
+      setCurrentStreak(streakData.current);
+      setMaxStreak(streakData.max);
       setMonthlyAttendance(stats.monthlyAttendance ?? 0);
       setMonthlyNewGathas(stats.monthlyNewGathas ?? 0);
       setMonthlyRevisionGathas(stats.monthlyRevisionGathas ?? 0);
@@ -2030,41 +2145,13 @@ export default function StudentDashboard({ user, onLogout }) {
   }, [loggedInUsername, loadUserData, fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
 
   // ============================================
-  // FIXED: Calculate stats from local data (fallback)
-  // ============================================
-  const calculateLocalStats = useCallback((year, month) => {
-    const monthStart = new Date(year, month - 1, 1);
-    const monthEnd = new Date(year, month, 0);
-    
-    const monthlyAtt = attendanceHistory.filter((r) => {
-      const date = new Date(r.date);
-      return date >= monthStart && date <= monthEnd;
-    }).length;
-    setMonthlyAttendance(monthlyAtt);
-    
-    const monthlyNew = gathaEntries
-      .filter((e) => {
-        const date = new Date(e.created_at || e.date);
-        return date >= monthStart && date <= monthEnd && e.type === 'new';
-      })
-      .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
-    setMonthlyNewGathas(monthlyNew);
-    
-    const monthlyRevision = gathaEntries
-      .filter((e) => {
-        const date = new Date(e.created_at || e.date);
-        return date >= monthStart && date <= monthEnd && e.type === 'revision';
-      })
-      .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
-    setMonthlyRevisionGathas(monthlyRevision);
-  }, [attendanceHistory, gathaEntries]);
-
-  // ============================================
   // FIXED: Handle stats month change for both self and family members
   // ============================================
   const handleStatsMonthChange = useCallback(async (year, month) => {
     console.log(`Month changed to: ${year}-${month}`);
     setStatsMonth({ year, month });
+    // Also update range to match if needed, though filtered leaderboard is separate
+    setStatsDateRange(getDateRange('month')); 
     
     const token = localStorage.getItem('jainPathshalaToken');
     const currentActiveUsername = activeUserRef.current?.username || activeUserRef.current?.name;
@@ -2072,40 +2159,26 @@ export default function StudentDashboard({ user, onLogout }) {
     try {
       let url;
       if (currentActiveUsername === loggedInUsername) {
-        // Self - use regular stats endpoint
         url = `${API_BASE}/stats/comprehensive?year=${year}&month=${month}`;
       } else {
-        // Family member - use family member stats endpoint
         url = `${API_BASE}/family-member/${currentActiveUsername}/stats?year=${year}&month=${month}`;
       }
       
-      console.log('Fetching stats from:', url);
-      
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       
       if (res.ok) {
         const data = await res.json();
-        console.log('Stats received:', data);
-        
         setMonthlyAttendance(data.monthlyAttendance ?? 0);
         setMonthlyNewGathas(data.monthlyNewGathas ?? 0);
         setMonthlyRevisionGathas(data.monthlyRevisionGathas ?? 0);
         setCurrentStreak(data.currentStreak ?? 0);
         setMaxStreak(data.maxStreak ?? 0);
         setWorkingDays(data.workingDays ?? DEFAULT_WORKING_DAYS);
-      } else {
-        console.error('Stats fetch failed:', res.status);
-        // Fallback: Calculate from local data
-        calculateLocalStats(year, month);
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
-      // Fallback: Calculate from local data
-      calculateLocalStats(year, month);
     }
-  }, [loggedInUsername, calculateLocalStats]);
+  }, [loggedInUsername]);
 
   // Track online status
   useEffect(() => {
@@ -2146,19 +2219,7 @@ export default function StudentDashboard({ user, onLogout }) {
       }
     }, 30000);
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && navigator.onLine && !isViewingOther) {
-        fetchPendingStatus();
-        fetchAttendance();
-        fetchGathas();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      clearInterval(pollInterval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
+    return () => clearInterval(pollInterval);
   }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats, fetchGroupMembers, isViewingOther]);
 
   // Reset active user when logged in user changes
@@ -2372,7 +2433,7 @@ export default function StudentDashboard({ user, onLogout }) {
               </p>
             </div>
           </div>
-          <button
+          <button 
             onClick={() => handleUserSwitch(user)}
             className="px-3 py-2 bg-blue-500 text-white text-xs font-bold rounded-xl"
           >
@@ -2389,7 +2450,7 @@ export default function StudentDashboard({ user, onLogout }) {
       )}
 
       {/* Welcome Card */}
-      <button
+      <button 
         onClick={() => setShowLevelModal(true)}
         className="w-full text-left bg-gradient-to-br from-orange-400 via-amber-400 to-yellow-400 rounded-3xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden active:scale-[0.99] transition-transform"
       >
@@ -2429,7 +2490,7 @@ export default function StudentDashboard({ user, onLogout }) {
             </div>
             {userLevel.nextLevel && (
               <div className="h-1.5 sm:h-2 bg-white/30 rounded-full overflow-hidden">
-                <div
+                <div 
                   className="h-full bg-white rounded-full transition-all duration-500"
                   style={{ width: `${userLevel.progressToNext * 100}%` }}
                 />
@@ -2547,8 +2608,8 @@ export default function StudentDashboard({ user, onLogout }) {
                 ...todaysApprovedGathas.map((e) => ({ ...e, status: 'approved' })),
                 ...todaysPendingGathas.map((e) => ({ ...e, status: 'pending' })),
               ].map((entry) => (
-                <div
-                  key={entry.id}
+                <div 
+                  key={entry.id} 
                   className={`flex items-center justify-between p-2 sm:p-3 rounded-xl ${
                     entry.status === 'approved' ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'
                   }`}
@@ -2625,19 +2686,47 @@ export default function StudentDashboard({ user, onLogout }) {
         </div>
       )}
 
-      {isViewingOther && (
-        <div className="bg-blue-100 border-2 border-blue-300 rounded-2xl p-3 flex items-center gap-3">
-          <UserCircle className="w-8 h-8 text-blue-600" />
-          <div className="flex-1">
-            <p className="font-bold text-blue-800 text-sm">
-              Viewing stats for: {activeUser?.name || activeUsername}
-            </p>
-            <p className="text-xs text-blue-600">
-              Change month to see different periods
-            </p>
+      <div className="flex items-center justify-between mb-4">
+        {isViewingOther ? (
+          <div className="bg-blue-100 border-2 border-blue-300 rounded-2xl p-2 flex items-center gap-2 flex-1 mr-2">
+            <UserCircle className="w-6 h-6 text-blue-600" />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-blue-800 text-xs truncate">
+                {activeUser?.name || activeUsername}
+              </p>
+            </div>
           </div>
+        ) : <div className="flex-1" />}
+        
+        {/* Date Filter Dropdown */}
+        <div className="relative">
+          <button 
+            onClick={() => setShowDateFilter(!showDateFilter)}
+            className="flex items-center gap-2 bg-white border border-gray-300 px-3 py-2 rounded-xl shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <Filter className="w-4 h-4" />
+            <span className="capitalize">{statsFilterType === 'custom' ? 'Custom' : statsFilterType}</span>
+            <ChevronDown className="w-3 h-3" />
+          </button>
+          
+          {showDateFilter && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowDateFilter(false)} />
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-20 overflow-hidden">
+                {['today', 'week', 'month', 'year'].map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => handleDateFilterChange(type)}
+                    className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 ${statsFilterType === type ? 'bg-orange-50 text-orange-600 font-bold' : 'text-gray-700'}`}
+                  >
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
       
       <StudentAchievementPage 
         stats={userStats} 
@@ -2649,6 +2738,7 @@ export default function StudentDashboard({ user, onLogout }) {
       <LeaderboardSection 
         currentUserId={activeUsername}
         currentUserName={activeUser?.name || activeUsername}
+        dateRange={statsDateRange}
       />
     </div>
   );
@@ -2709,7 +2799,7 @@ export default function StudentDashboard({ user, onLogout }) {
               )}
             </div>
           </div>
-          <button
+          <button 
             onClick={onLogout}
             className="flex items-center gap-1 sm:gap-2 bg-red-50 text-red-600 px-2 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm active:scale-[0.98] transition-transform border border-red-200 flex-shrink-0"
           >
@@ -2778,7 +2868,7 @@ export default function StudentDashboard({ user, onLogout }) {
         onClose={() => setSelectedAchievement(null)}
       />
 
-      <LevelDetailsModal
+      <LevelDetailsModal 
         isOpen={showLevelModal}
         onClose={() => setShowLevelModal(false)}
         currentXP={xpBreakdown.total}
