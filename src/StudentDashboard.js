@@ -2150,8 +2150,12 @@ export default function StudentDashboard({ user, onLogout }) {
   const handleStatsMonthChange = useCallback(async (year, month) => {
     console.log(`Month changed to: ${year}-${month}`);
     setStatsMonth({ year, month });
-    // Also update range to match if needed, though filtered leaderboard is separate
-    setStatsDateRange(getDateRange('month')); 
+    
+    // FIXED: Calculate precise date range for the selected month/year for Leaderboard
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0);
+    end.setHours(23, 59, 59, 999);
+    setStatsDateRange({ start, end });
     
     const token = localStorage.getItem('jainPathshalaToken');
     const currentActiveUsername = activeUserRef.current?.username || activeUserRef.current?.name;
