@@ -1028,6 +1028,645 @@ const KidsLeaderboardSection = ({ currentUserId, currentUserName, dateRange }) =
 };
 
 // ============================================
+// GATHA ENTRY MODAL
+// ============================================
+
+const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData }) => {
+  const [activeTab, setActiveTab] = useState(editData?.type || 'new');
+  const [form, setForm] = useState({
+    sutraName: editData?.sutra_name || '',
+    whichGatha: editData?.which_gatha || '',
+    totalGatha: editData?.total_gatha?.toString() || '',
+  });
+
+  useEffect(() => {
+    if (editData) {
+      setActiveTab(editData.type || 'new');
+      setForm({
+        sutraName: editData.sutra_name || '',
+        whichGatha: editData.which_gatha || '',
+        totalGatha: editData.total_gatha?.toString() || '',
+      });
+    } else {
+      setForm({ sutraName: '', whichGatha: '', totalGatha: '' });
+    }
+  }, [editData]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = () => {
+    onSubmit({
+      type: activeTab,
+      sutra_name: form.sutraName,
+      which_gatha: form.whichGatha,
+      total_gatha: Number(form.totalGatha),
+    });
+  };
+
+  const isValid = form.sutraName && form.whichGatha && form.totalGatha;
+  const commonSutras = ['નવકાર', 'પંચ પરમેષ્ઠી', 'લોગસ્સ', 'ઉવસગ્ગહરં'];
+
+  return (
+    <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className={`p-5 text-white ${activeTab === 'new' ? 'bg-gradient-to-r from-purple-500 to-pink-600' : 'bg-gradient-to-r from-blue-500 to-cyan-600'}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
+                <BookOpen className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold">{editData ? 'Change' : 'I learned!'} 📚</h3>
+                <p className="text-sm opacity-80">Tell us what you learned!</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors">
+              <CloseIcon size={24} />
+            </button>
+          </div>
+        </div>
+
+        {!editData && (
+          <div className="flex p-2 bg-gray-100 gap-2">
+            <button
+              onClick={() => setActiveTab('new')}
+              className={`flex-1 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+                activeTab === 'new' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+              }`}
+            >
+              <Plus className="w-5 h-5" /> New! ✨
+            </button>
+            <button
+              onClick={() => setActiveTab('revision')}
+              className={`flex-1 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+                activeTab === 'revision' ? 'bg-blue-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+              }`}
+            >
+              <RefreshCw className="w-5 h-5" /> Practice 🔄
+            </button>
+          </div>
+        )}
+
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="text-sm font-bold text-gray-700 mb-2 block">
+              📖 Which Sutra?
+            </label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {commonSutras.map((sutra) => (
+                <button
+                  key={sutra}
+                  type="button"
+                  onClick={() => setForm({ ...form, sutraName: sutra })}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                    form.sutraName === sutra
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {sutra}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              value={form.sutraName}
+              onChange={(e) => setForm({ ...form, sutraName: e.target.value })}
+              className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
+              placeholder="Type sutra name..."
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-bold text-gray-700 mb-2 block">
+              📝 Which Gatha numbers?
+            </label>
+            <input
+              type="text"
+              value={form.whichGatha}
+              onChange={(e) => setForm({ ...form, whichGatha: e.target.value })}
+              className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
+              placeholder="Like: 1-5 or 3,4,5"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-bold text-gray-700 mb-2 block">
+              #️⃣ How many?
+            </label>
+            <div className="flex gap-2">
+              {[1, 2, 3, 5].map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => setForm({ ...form, totalGatha: num.toString() })}
+                  className={`flex-1 py-3 rounded-xl font-bold text-lg transition-all ${
+                    form.totalGatha === num.toString()
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {num}
+                </button>
+              ))}
+            </div>
+            <input
+              type="number"
+              value={form.totalGatha}
+              onChange={(e) => setForm({ ...form, totalGatha: e.target.value })}
+              className="w-full mt-2 px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
+              placeholder="Or type a number..."
+              min="1"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={onClose}
+              className="flex-1 py-3.5 bg-gray-100 text-gray-700 font-bold rounded-xl active:scale-[0.98] transition-transform"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting || !isValid}
+              className={`flex-1 py-3.5 font-bold rounded-xl text-white shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform ${
+                activeTab === 'new'
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-600'
+                  : 'bg-gradient-to-r from-blue-500 to-cyan-600'
+              }`}
+            >
+              {isSubmitting ? (
+                <Loader className="w-5 h-5 animate-spin" />
+              ) : (
+                <Check className="w-5 h-5" />
+              )}
+              Done! ✓
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// HISTORY PAGE COMPONENT
+// ============================================
+
+const HistoryPage = ({ activeUserId }) => {
+  const today = new Date();
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
+  const [historyData, setHistoryData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(null);
+
+  const fetchHistory = useCallback(async (year, month) => {
+    setIsLoading(true);
+    setError(null);
+    const token = localStorage.getItem('jainPathshalaToken');
+
+    try {
+      const userParam = activeUserId ? `?studentId=${activeUserId}` : '';
+      const url = `${API_BASE}/history/${year}/${month}${userParam}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+
+      if (!res.ok) throw new Error('Failed to load history.');
+      const data = await res.json();
+      setHistoryData(data);
+    } catch (err) {
+      setError(err.message || 'Failed to load history.');
+      setHistoryData(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeUserId]);
+
+  useEffect(() => {
+    fetchHistory(selectedYear, selectedMonth);
+  }, [selectedYear, selectedMonth, fetchHistory]);
+
+  const handleMonthChange = (direction) => {
+    let newMonth = selectedMonth + direction;
+    let newYear = selectedYear;
+
+    if (newMonth > 12) { newMonth = 1; newYear += 1; }
+    else if (newMonth < 1) { newMonth = 12; newYear -= 1; }
+
+    const currentMonth = today.getMonth() + 1;
+    const currentYear = today.getFullYear();
+
+    if (newYear > currentYear || (newYear === currentYear && newMonth > currentMonth)) return;
+
+    setSelectedYear(newYear);
+    setSelectedMonth(newMonth);
+  };
+
+  const activityData = historyData?.dailyActivity ?? {};
+  const todayIso = formatLocalDateString(today);
+
+  const monthlySummary = useMemo(() => {
+    let presentCount = 0, newGathas = 0, revisionGathas = 0;
+
+    Object.entries(activityData).forEach(([_, activity]) => {
+      const normalized = activity || {};
+      const gathas = normalized.gathas || { new: 0, revision: 0 };
+      if (normalized.present) presentCount += 1;
+      newGathas += Number(gathas.new || 0);
+      revisionGathas += Number(gathas.revision || 0);
+    });
+
+    return { presentDays: presentCount, newGathas, revisionGathas };
+  }, [activityData]);
+
+  const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+  const firstDayOfMonth = new Date(selectedYear, selectedMonth - 1, 1).getDay();
+
+  const renderCalendar = () => {
+    const days = [];
+
+    for (let i = 0; i < firstDayOfMonth; i++) {
+      days.push(<div key={`empty-${i}`} className="h-11" />);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const activity = activityData[dateStr];
+      const isPresent = activity?.present === true;
+      const isToday = dateStr === todayIso;
+      const hasGathas = (activity?.gathas?.new || 0) + (activity?.gathas?.revision || 0) > 0;
+      const isFuture = new Date(dateStr) > today;
+
+      days.push(
+        <button
+          key={day}
+          onClick={() => isPresent && setSelectedDay({ dateStr, activity })}
+          disabled={!isPresent || isFuture}
+          className={`h-11 w-11 rounded-xl flex items-center justify-center text-sm font-bold transition-all ${
+            isPresent
+              ? 'bg-gradient-to-br from-green-400 to-green-600 text-white shadow-md active:scale-95'
+              : isToday
+              ? 'bg-pink-100 text-pink-600 border-2 border-pink-400 ring-2 ring-pink-200'
+              : isFuture
+              ? 'text-gray-200'
+              : 'text-gray-400 hover:bg-gray-100'
+          }`}
+        >
+          <div className="relative">
+            {day}
+            {hasGathas && isPresent && (
+              <span className="absolute -top-1 -right-2 w-2 h-2 bg-purple-500 rounded-full" />
+            )}
+          </div>
+        </button>
+      );
+    }
+
+    return days;
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-pink-50 border border-pink-200 rounded-2xl p-4 flex items-start gap-3">
+        <Info className="w-5 h-5 text-pink-500 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-bold text-pink-800">How to read this! 📅</p>
+          <p className="text-xs text-pink-600 mt-1">
+            Green = You came to class! Tap green days to see what you learned.
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl p-4 border-2 border-pink-200 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => handleMonthChange(-1)}
+            className="p-3 rounded-xl bg-pink-50 active:scale-95 transition-transform"
+          >
+            <ChevronLeft size={24} className="text-pink-600" />
+          </button>
+          <div className="text-center">
+            <h3 className="text-xl font-bold text-gray-800">
+              {monthNames[selectedMonth - 1]} {selectedYear}
+            </h3>
+            <p className="text-xs text-gray-500">{monthNamesGujarati[selectedMonth - 1]}</p>
+          </div>
+          <button
+            onClick={() => handleMonthChange(1)}
+            disabled={selectedMonth === today.getMonth() + 1 && selectedYear === today.getFullYear()}
+            className="p-3 rounded-xl bg-pink-50 active:scale-95 transition-transform disabled:opacity-40"
+          >
+            <ChevronRight size={24} className="text-pink-600" />
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="text-center py-12">
+            <RefreshCw className="w-12 h-12 animate-spin text-pink-500 mx-auto" />
+            <p className="mt-4 text-gray-600 font-medium">Loading...</p>
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-6 text-center">
+            <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+            <p className="text-red-700 font-medium">{error}</p>
+            <button
+              onClick={() => fetchHistory(selectedYear, selectedMonth)}
+              className="mt-3 px-4 py-2 bg-red-100 text-red-700 rounded-xl font-medium"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="bg-gray-50 rounded-xl p-3 mb-4">
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                  <div key={i} className="h-8 flex items-center justify-center text-xs font-bold text-gray-400">
+                    {d}
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {renderCalendar()}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-4 text-xs mb-4 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-md bg-gradient-to-br from-green-400 to-green-600" />
+                <span className="text-gray-600">Present! ({monthlySummary.presentDays})</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-purple-500" />
+                <span className="text-gray-600">Has Gathas</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-green-50 border-2 border-green-200 rounded-xl p-3 text-center">
+                <Calendar className="w-6 h-6 text-green-500 mx-auto mb-1" />
+                <p className="text-2xl font-bold text-green-600">{monthlySummary.presentDays}</p>
+                <p className="text-xs text-gray-500">Days! 🎉</p>
+              </div>
+              <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-3 text-center">
+                <Plus className="w-6 h-6 text-purple-500 mx-auto mb-1" />
+                <p className="text-2xl font-bold text-purple-600">{monthlySummary.newGathas}</p>
+                <p className="text-xs text-gray-500">New! ✨</p>
+              </div>
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-3 text-center">
+                <RefreshCw className="w-6 h-6 text-blue-500 mx-auto mb-1" />
+                <p className="text-2xl font-bold text-blue-600">{monthlySummary.revisionGathas}</p>
+                <p className="text-xs text-gray-500">Practice 🔄</p>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Day Detail Modal */}
+      {selectedDay && (
+        <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setSelectedDay(null)}>
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center">
+                  <Check className="w-7 h-7 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-800 text-lg">
+                    {formatDateIn(selectedDay.dateStr, { weekday: 'short', day: 'numeric', month: 'short' })}
+                  </h3>
+                  <p className="text-green-600 font-medium">You were here! ✓</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedDay(null)} className="p-2 bg-gray-100 rounded-xl">
+                <CloseIcon size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-purple-50 rounded-xl p-4 border-2 border-purple-200">
+                <h4 className="font-bold text-purple-800 mb-3 flex items-center gap-2">
+                  <Plus size={18} className="text-purple-600" />
+                  New Gathas: {selectedDay.activity.gathas?.new || 0}
+                </h4>
+                {(selectedDay.activity.details || []).filter((d) => d.type === 'new').length === 0 ? (
+                  <p className="text-sm text-purple-600 bg-white/50 px-3 py-2 rounded-lg">No new gathas this day</p>
+                ) : (
+                  <div className="space-y-2">
+                    {(selectedDay.activity.details || []).filter((d) => d.type === 'new').map((entry, idx) => (
+                      <div key={idx} className="bg-white rounded-lg p-3 border border-purple-200">
+                        <p className="text-sm"><strong>Sutra:</strong> {entry.sutra_name}</p>
+                        <p className="text-sm"><strong>Gatha:</strong> {entry.which_gatha}</p>
+                        <p className="text-sm font-bold text-purple-700">Count: {entry.total_gatha}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
+                <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2">
+                  <RefreshCw size={18} className="text-blue-600" />
+                  Practice: {selectedDay.activity.gathas?.revision || 0}
+                </h4>
+                {(selectedDay.activity.details || []).filter((d) => d.type === 'revision').length === 0 ? (
+                  <p className="text-sm text-blue-600 bg-white/50 px-3 py-2 rounded-lg">No practice this day</p>
+                ) : (
+                  <div className="space-y-2">
+                    {(selectedDay.activity.details || []).filter((d) => d.type === 'revision').map((entry, idx) => (
+                      <div key={idx} className="bg-white rounded-lg p-3 border border-blue-200">
+                        <p className="text-sm"><strong>Sutra:</strong> {entry.sutra_name}</p>
+                        <p className="text-sm"><strong>Gatha:</strong> {entry.which_gatha}</p>
+                        <p className="text-sm font-bold text-blue-700">Count: {entry.total_gatha}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSelectedDay(null)}
+              className="w-full mt-4 bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold py-3.5 rounded-xl active:scale-[0.98] transition-transform"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// PENDING PAGE COMPONENT
+// ============================================
+
+const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting }) => {
+  const allPending = [
+    ...(pendingStatus.attendance?.filter((p) => p.status === 'pending').map((p) => ({ ...p, itemType: 'attendance' })) || []),
+    ...(pendingStatus.gatha?.filter((p) => p.status === 'pending').map((p) => ({ ...p, itemType: 'gatha' })) || []),
+  ];
+
+  const allRejected = [
+    ...(pendingStatus.attendance?.filter((p) => p.status === 'rejected').map((p) => ({ ...p, itemType: 'attendance' })) || []),
+    ...(pendingStatus.gatha?.filter((p) => p.status === 'rejected').map((p) => ({ ...p, itemType: 'gatha' })) || []),
+  ];
+
+  const totalPendingCount = allPending.length;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
+        <Clock className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-bold text-yellow-800">What is Pending?</p>
+          <p className="text-xs text-yellow-700 mt-1">
+            After you mark attendance or add gathas, your teacher needs to approve them.
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-r from-yellow-400 to-orange-400 rounded-2xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
+
+        <div className="relative z-10">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
+              <span className="font-bold text-base sm:text-lg">Pending Approvals</span>
+            </div>
+            <button 
+              onClick={onRefresh} 
+              disabled={isSubmitting}
+              className="p-2 sm:p-2.5 bg-white/20 rounded-xl hover:bg-white/30 transition-colors"
+            >
+              <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${isSubmitting ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+          <p className="text-4xl sm:text-5xl font-bold">{totalPendingCount}</p>
+          <p className="text-xs sm:text-sm opacity-80 mt-1">
+            {totalPendingCount === 0 ? 'All caught up!' : 'items awaiting approval'}
+          </p>
+        </div>
+      </div>
+
+      {totalPendingCount === 0 ? (
+        <div className="bg-white rounded-2xl p-6 sm:p-8 border-2 border-green-200 text-center shadow-sm">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-8 h-8 sm:w-10 sm:h-10 text-green-500" />
+          </div>
+          <p className="text-lg sm:text-xl font-bold text-gray-800">All Caught Up! 🎉</p>
+          <p className="text-sm text-gray-500 mt-2">No pending approvals</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-yellow-200 shadow-sm">
+          <h3 className="font-bold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
+            <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
+            Awaiting Approval
+          </h3>
+          <div className="space-y-2 sm:space-y-3">
+            {allPending.map((item, index) => (
+              <div 
+                key={index} 
+                className={`p-3 sm:p-4 rounded-xl border-2 ${
+                  item.itemType === 'attendance' ? 'bg-blue-50 border-blue-200' : 'bg-purple-50 border-purple-200'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+                    <div 
+                      className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        item.itemType === 'attendance' ? 'bg-blue-200' : 'bg-purple-200'
+                      }`}
+                    >
+                      {item.itemType === 'attendance' ? (
+                        <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-blue-700" />
+                      ) : (
+                        <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-purple-700" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-800 text-sm">
+                        {item.itemType === 'attendance' ? 'Attendance' : `Gatha - ${item.type === 'new' ? 'New' : 'Revision'}`}
+                      </p>
+                      <p className="text-xs sm:text-sm text-gray-600">{formatDateIn(item.date)}</p>
+                      {item.itemType === 'gatha' && (
+                        <p className="text-xs text-gray-500 mt-1 truncate">
+                          {item.sutra_name} • {item.total_gatha} gathas
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                    <PendingBadge status="pending" size="small" />
+                    {item.itemType === 'gatha' && (
+                      <div className="flex gap-1">
+                        <button 
+                          onClick={() => onEdit(item)} 
+                          className="p-1.5 sm:p-2 bg-blue-100 rounded-lg text-blue-600 active:scale-95 transition-transform"
+                        >
+                          <Edit2 size={12} className="sm:w-3.5 sm:h-3.5" />
+                        </button>
+                        <button 
+                          onClick={() => onDelete(item)} 
+                          className="p-1.5 sm:p-2 bg-red-100 rounded-lg text-red-600 active:scale-95 transition-transform"
+                        >
+                          <Trash2 size={12} className="sm:w-3.5 sm:h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {allRejected.length > 0 && (
+        <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-red-200 shadow-sm">
+          <h3 className="font-bold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
+            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
+            Rejected ({allRejected.length})
+          </h3>
+          <div className="space-y-2 sm:space-y-3">
+            {allRejected.map((item, index) => (
+              <div key={index} className="p-3 sm:p-4 rounded-xl bg-red-50 border-2 border-red-200">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                    {item.itemType === 'attendance' ? (
+                      <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-red-700" />
+                    ) : (
+                      <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-red-700" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-800 text-sm">
+                      {item.itemType === 'attendance' ? 'Attendance' : `Gatha - ${item.type}`}
+                    </p>
+                    <p className="text-xs sm:text-sm text-gray-600">{formatDateIn(item.date)}</p>
+                    {item.rejection_reason && (
+                      <p className="text-xs text-red-600 mt-1 bg-red-100 px-2 py-1 rounded truncate">
+                        Reason: {item.rejection_reason}
+                      </p>
+                    )}
+                  </div>
+                  <PendingBadge status="rejected" size="small" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================
 // RECENT BADGES COMPONENT
 // ============================================
 
