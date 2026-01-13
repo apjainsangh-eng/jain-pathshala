@@ -11,10 +11,13 @@ import {
   CheckCircle,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,   // Added
+  ChevronDown, // Added
   Clock,
   Crown,
   Edit2,
   Flame,
+  Filter,      // Added
   HelpCircle,
   Home,
   Info,
@@ -64,6 +67,17 @@ const PAGES = {
   HISTORY: 'history',
   PENDING: 'pending',
 };
+
+// Global Month Names
+const monthNames = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const monthNamesGujarati = [
+  'જાન્યુઆરી', 'ફેબ્રુઆરી', 'માર્ચ', 'એપ્રિલ', 'મે', 'જૂન',
+  'જુલાઈ', 'ઓગસ્ટ', 'સપ્ટેમ્બર', 'ઓક્ટોબર', 'નવેમ્બર', 'ડિસેમ્બર',
+];
 
 // Kid-friendly Motivational Quotes
 const QUOTES = [
@@ -227,6 +241,168 @@ const calculateStreakWithHolidays = (attendanceHistory) => {
 
   if (maxStreak < tempStreak) maxStreak = tempStreak;
   return { current: currentStreak, max: maxStreak };
+};
+
+// Helper to get date ranges for stats/leaderboard
+const getDateRange = (type, customRange = {}) => {
+  const now = new Date();
+  const start = new Date(now);
+  const end = new Date(now);
+
+  // Reset hours
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+
+  switch (type) {
+    case 'today':
+      return { start, end };
+    case 'week':
+      // Monday as start of week
+      const day = start.getDay() || 7; // Make Sunday 7
+      if (day !== 1) start.setHours(-24 * (day - 1)); 
+      return { start, end };
+    case 'month':
+      start.setDate(1);
+      // For leaderboard, we usually want the whole month range capability
+      const fullMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      fullMonthEnd.setHours(23, 59, 59, 999);
+      return { start, end: fullMonthEnd }; 
+    case 'year':
+      start.setMonth(0, 1);
+      const fullYearEnd = new Date(now.getFullYear(), 11, 31);
+      fullYearEnd.setHours(23, 59, 59, 999);
+      return { start, end: fullYearEnd };
+    case 'custom':
+      return { 
+        start: customRange.start ? new Date(customRange.start) : start, 
+        end: customRange.end ? new Date(customRange.end) : end 
+      };
+    default:
+      return { start, end };
+  }
+};
+
+// ============================================
+// USER SWITCHER COMPONENT
+// ============================================
+
+const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoading }) => {
+  const [isOpen, setIsOpen] = useState(false);
+   
+  if (!groupMembers || groupMembers.length <= 1) {
+    return null;
+  }
+
+  const activeUserData = groupMembers.find(m => m._id === activeUser?._id || m.id === activeUser?.id || m.username === activeUser?.username) || activeUser;
+  const isViewingOther = (activeUser?.username || activeUser?.name) !== (loggedInUser?.username || loggedInUser?.name);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={isLoading}
+        className={`w-full flex items-center justify-between gap-2 p-3 rounded-2xl border-2 transition-all ${
+          isViewingOther 
+            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-300' 
+            : 'bg-white border-orange-200'
+        } shadow-sm active:scale-[0.99]`}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md flex-shrink-0 ${
+            isViewingOther 
+              ? 'bg-gradient-to-br from-blue-400 to-indigo-500' 
+              : 'bg-gradient-to-br from-orange-400 to-amber-500'
+          }`}>
+            {(activeUserData?.name || activeUserData?.username || 'U').charAt(0).toUpperCase()}
+          </div>
+          <div className="text-left min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="font-bold text-gray-800 text-sm truncate">
+                {activeUserData?.name || activeUserData?.username}
+              </p>
+              {isViewingOther && (
+                <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full animate-pulse flex-shrink-0">
+                  Viewing
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500">
+              {groupMembers.length} members in group • Tap to switch
+            </p>
+          </div>
+        </div>
+        <div className={`p-2 rounded-lg transition-colors flex-shrink-0 ${isOpen ? 'bg-orange-100' : 'bg-gray-100'}`}>
+          {isOpen ? (
+            <ChevronUp className="w-4 h-4 text-gray-600" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-gray-600" />
+          )}
+        </div>
+      </button>
+
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setIsOpen(false)} 
+          />
+          <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border-2 border-orange-200 shadow-xl z-50 overflow-hidden animate-in slide-in-from-top-2 duration-200">
+            <div className="p-2 bg-orange-50 border-b border-orange-200">
+              <p className="text-xs font-bold text-orange-800 flex items-center gap-2">
+                <Users className="w-3 h-3" />
+                Switch Account
+              </p>
+            </div>
+            <div className="max-h-60 overflow-y-auto">
+              {groupMembers.map((member) => {
+                const memberUsername = member.username || member.name;
+                const activeUsername = activeUser?.username || activeUser?.name;
+                const loggedInUsername = loggedInUser?.username || loggedInUser?.name;
+                const isActive = memberUsername === activeUsername;
+                const isLoggedIn = memberUsername === loggedInUsername;
+                
+                return (
+                  <button
+                    key={memberUsername}
+                    onClick={() => {
+                      onSwitch(member);
+                      setIsOpen(false);
+                    }}
+                    disabled={isLoading}
+                    className={`w-full flex items-center gap-3 p-3 transition-all ${
+                      isActive 
+                        ? 'bg-orange-100' 
+                        : 'hover:bg-gray-50 active:bg-gray-100'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md flex-shrink-0 ${
+                      isActive 
+                        ? 'bg-gradient-to-br from-orange-400 to-amber-500' 
+                        : 'bg-gradient-to-br from-gray-400 to-gray-500'
+                    }`}>
+                      {(member.name || member.username || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 text-left min-w-0">
+                      <p className="font-bold text-gray-800 text-sm truncate">
+                        {member.name || member.username}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {member.username}
+                        {isLoggedIn && ' • (You)'}
+                      </p>
+                    </div>
+                    {isActive && (
+                      <CheckCircle className="w-5 h-5 text-orange-500 flex-shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 };
 
 // ============================================
@@ -1047,16 +1223,6 @@ const HistoryPage = ({ activeUserId }) => {
   const [error, setError] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null);
 
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-
-  const monthNamesGujarati = [
-    'જાન્યુઆરી', 'ફેબ્રુઆરી', 'માર્ચ', 'એપ્રિલ', 'મે', 'જૂન',
-    'જુલાઈ', 'ઓગસ્ટ', 'સપ્ટેમ્બર', 'ઓક્ટોબર', 'નવેમ્બર', 'ડિસેમ્બર',
-  ];
-
   const fetchHistory = useCallback(async (year, month) => {
     setIsLoading(true);
     setError(null);
@@ -1185,6 +1351,7 @@ const HistoryPage = ({ activeUserId }) => {
             <h3 className="text-xl font-bold text-gray-800">
               {monthNames[selectedMonth - 1]} {selectedYear}
             </h3>
+            <p className="text-xs text-gray-500">{monthNamesGujarati[selectedMonth - 1]}</p>
           </div>
           <button
             onClick={() => handleMonthChange(1)}
@@ -1605,6 +1772,129 @@ const NextBadges = ({ stats, onBadgeClick }) => {
 };
 
 // ============================================
+// USER SWITCHER COMPONENT
+// ============================================
+
+const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoading }) => {
+  const [isOpen, setIsOpen] = useState(false);
+   
+  if (!groupMembers || groupMembers.length <= 1) {
+    return null;
+  }
+
+  const activeUserData = groupMembers.find(m => m._id === activeUser?._id || m.id === activeUser?.id || m.username === activeUser?.username) || activeUser;
+  const isViewingOther = (activeUser?.username || activeUser?.name) !== (loggedInUser?.username || loggedInUser?.name);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={isLoading}
+        className={`w-full flex items-center justify-between gap-2 p-3 rounded-2xl border-2 transition-all ${
+          isViewingOther 
+            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-300' 
+            : 'bg-white border-orange-200'
+        } shadow-sm active:scale-[0.99]`}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md flex-shrink-0 ${
+            isViewingOther 
+              ? 'bg-gradient-to-br from-blue-400 to-indigo-500' 
+              : 'bg-gradient-to-br from-orange-400 to-amber-500'
+          }`}>
+            {(activeUserData?.name || activeUserData?.username || 'U').charAt(0).toUpperCase()}
+          </div>
+          <div className="text-left min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="font-bold text-gray-800 text-sm truncate">
+                {activeUserData?.name || activeUserData?.username}
+              </p>
+              {isViewingOther && (
+                <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full animate-pulse flex-shrink-0">
+                  Viewing
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500">
+              {groupMembers.length} members in group • Tap to switch
+            </p>
+          </div>
+        </div>
+        <div className={`p-2 rounded-lg transition-colors flex-shrink-0 ${isOpen ? 'bg-orange-100' : 'bg-gray-100'}`}>
+          {isOpen ? (
+            <ChevronUp className="w-4 h-4 text-gray-600" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-gray-600" />
+          )}
+        </div>
+      </button>
+
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setIsOpen(false)} 
+          />
+          <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border-2 border-orange-200 shadow-xl z-50 overflow-hidden animate-in slide-in-from-top-2 duration-200">
+            <div className="p-2 bg-orange-50 border-b border-orange-200">
+              <p className="text-xs font-bold text-orange-800 flex items-center gap-2">
+                <Users className="w-3 h-3" />
+                Switch Account
+              </p>
+            </div>
+            <div className="max-h-60 overflow-y-auto">
+              {groupMembers.map((member) => {
+                const memberUsername = member.username || member.name;
+                const activeUsername = activeUser?.username || activeUser?.name;
+                const loggedInUsername = loggedInUser?.username || loggedInUser?.name;
+                const isActive = memberUsername === activeUsername;
+                const isLoggedIn = memberUsername === loggedInUsername;
+                
+                return (
+                  <button
+                    key={memberUsername}
+                    onClick={() => {
+                      onSwitch(member);
+                      setIsOpen(false);
+                    }}
+                    disabled={isLoading}
+                    className={`w-full flex items-center gap-3 p-3 transition-all ${
+                      isActive 
+                        ? 'bg-orange-100' 
+                        : 'hover:bg-gray-50 active:bg-gray-100'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md flex-shrink-0 ${
+                      isActive 
+                        ? 'bg-gradient-to-br from-orange-400 to-amber-500' 
+                        : 'bg-gradient-to-br from-gray-400 to-gray-500'
+                    }`}>
+                      {(member.name || member.username || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 text-left min-w-0">
+                      <p className="font-bold text-gray-800 text-sm truncate">
+                        {member.name || member.username}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {member.username}
+                        {isLoggedIn && ' • (You)'}
+                      </p>
+                    </div>
+                    {isActive && (
+                      <CheckCircle className="w-5 h-5 text-orange-500 flex-shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// ============================================
 // MAIN STUDENT DASHBOARD COMPONENT - FIXED
 // ============================================
 
@@ -1618,13 +1908,9 @@ export default function KidsDashboard({ user, onLogout }) {
   const [isLoadingSwitch, setIsLoadingSwitch] = useState(false);
 
   // Stats Date Filtering
-  const [statsDateRange, setStatsDateRange] = useState(() => {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    end.setHours(23, 59, 59, 999);
-    return { start, end };
-  });
+  const [statsFilterType, setStatsFilterType] = useState('month');
+  const [statsDateRange, setStatsDateRange] = useState(getDateRange('month'));
+  const [showDateFilter, setShowDateFilter] = useState(false);
 
   // REF to track current active user (prevents stale closures)
   const activeUserRef = useRef(activeUser);
@@ -1643,6 +1929,7 @@ export default function KidsDashboard({ user, onLogout }) {
   // Stats (Monthly focused)
   const [monthlyAttendance, setMonthlyAttendance] = useState(0);
   const [monthlyNewGathas, setMonthlyNewGathas] = useState(0);
+  const [monthlyRevisionGathas, setMonthlyRevisionGathas] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
   const [maxStreak, setMaxStreak] = useState(0);
   const [workingDays, setWorkingDays] = useState(DEFAULT_WORKING_DAYS);
@@ -1693,6 +1980,13 @@ export default function KidsDashboard({ user, onLogout }) {
     total_gatha: Number(entry.total_gatha ?? entry.totalGatha ?? 0),
     created_at: entry.date ?? entry.created_at ?? null, // Changed priority to 'date' first
   });
+
+  // --- Date Range Handler ---
+  const handleDateFilterChange = (type) => {
+    setStatsFilterType(type);
+    setStatsDateRange(getDateRange(type));
+    setShowDateFilter(false);
+  };
 
   // ============================================
   // API CALLS
@@ -1804,6 +2098,7 @@ export default function KidsDashboard({ user, onLogout }) {
         const data = await res.json();
         setMonthlyAttendance(data.monthlyAttendance ?? 0);
         setMonthlyNewGathas(data.monthlyNewGathas ?? 0);
+        setMonthlyRevisionGathas(data.monthlyRevisionGathas ?? 0);
         setCurrentStreak(data.currentStreak ?? 0);
         setMaxStreak(data.maxStreak ?? 0);
         setWorkingDays(data.workingDays ?? DEFAULT_WORKING_DAYS);
@@ -1856,6 +2151,7 @@ export default function KidsDashboard({ user, onLogout }) {
       setMaxStreak(streakData.max);
       setMonthlyAttendance(stats.monthlyAttendance ?? 0);
       setMonthlyNewGathas(stats.monthlyNewGathas ?? 0);
+      setMonthlyRevisionGathas(stats.monthlyRevisionGathas ?? 0);
       setWorkingDays(stats.workingDays ?? DEFAULT_WORKING_DAYS);
       
       return true;
@@ -1943,6 +2239,7 @@ export default function KidsDashboard({ user, onLogout }) {
         const data = await res.json();
         setMonthlyAttendance(data.monthlyAttendance ?? 0);
         setMonthlyNewGathas(data.monthlyNewGathas ?? 0);
+        setMonthlyRevisionGathas(data.monthlyRevisionGathas ?? 0);
         setCurrentStreak(data.currentStreak ?? 0);
         setMaxStreak(data.maxStreak ?? 0);
         setWorkingDays(data.workingDays ?? DEFAULT_WORKING_DAYS);
