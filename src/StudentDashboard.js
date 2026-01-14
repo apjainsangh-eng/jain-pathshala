@@ -881,6 +881,7 @@ const LeaderboardSection = ({ currentUserId, currentUserName, year, month }) => 
     </div>
   );
 };
+
 // ============================================
 // GATHA ENTRY MODAL
 // ============================================
@@ -1697,8 +1698,8 @@ export default function StudentDashboard({ user, onLogout }) {
   const [monthlyAttendance, setMonthlyAttendance] = useState(0);
   const [monthlyNewGathas, setMonthlyNewGathas] = useState(0);
   const [monthlyRevisionGathas, setMonthlyRevisionGathas] = useState(0);
-  const [currentStreak, setCurrentStreak] = useState(0);
-  const [maxStreak, setMaxStreak] = useState(0);
+  const [currentStreak, setCurrentStreak] = useState(0); // Global
+  const [maxStreak, setMaxStreak] = useState(0); // Global
   const [workingDays, setWorkingDays] = useState(DEFAULT_WORKING_DAYS);
 
   // Selected period for stats
@@ -1765,20 +1766,15 @@ export default function StudentDashboard({ user, onLogout }) {
     lastDate.setHours(0, 0, 0, 0);
     const diffFromToday = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
 
-    // Streak is active if:
-    // - Last attendance was today (diff = 0)
-    // - Last attendance was yesterday (diff = 1)
-    // - Last attendance was Saturday and today is Monday (diff = 2, but Sunday gap is okay)
     if (diffFromToday === 0) {
       streakBroken = false;
     } else if (diffFromToday === 1) {
       streakBroken = false;
     } else if (diffFromToday === 2) {
-      // Check if yesterday was Sunday
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
       if (yesterday.getDay() === 0) {
-        streakBroken = false; // Sunday gap is allowed
+        streakBroken = false; 
       } else {
         streakBroken = true;
       }
@@ -1799,25 +1795,20 @@ export default function StudentDashboard({ user, onLogout }) {
       const diff = Math.floor((currentDate - prevDate) / (1000 * 60 * 60 * 24));
 
       if (diff === 1) {
-        // Consecutive day
         tempStreak++;
         if (!streakBroken) current = tempStreak;
       } else if (diff === 2) {
-        // Check if the gap day is Sunday
         const gapDay = new Date(prevDate);
         gapDay.setDate(gapDay.getDate() + 1);
         if (gapDay.getDay() === 0) {
-          // Sunday gap - streak continues
           tempStreak++;
           if (!streakBroken) current = tempStreak;
         } else {
-          // Non-Sunday gap - streak breaks
           max = Math.max(max, tempStreak);
           tempStreak = 1;
           streakBroken = true;
         }
       } else {
-        // Gap more than 2 days - streak breaks
         max = Math.max(max, tempStreak);
         tempStreak = 1;
         streakBroken = true;
@@ -1829,6 +1820,64 @@ export default function StudentDashboard({ user, onLogout }) {
 
     return { current, max };
   }, []);
+
+  // NEW: Calculate streak ONLY within a specific month
+  const calculateMonthlyStats = useCallback((year, month, history, gathas) => {
+    // 1. Filter dates for this month
+    const monthDates = history
+      .map(r => new Date(r.date))
+      .filter(d => d.getFullYear() === year && d.getMonth() + 1 === month)
+      .map(d => d.getDate())
+      .sort((a, b) => b - a); // Descending
+
+    const monthlyAttendance = monthDates.length;
+
+    // 2. Calculate max streak within this month
+    let maxMonthStreak = 0;
+    let tempMonthStreak = 0;
+    
+    if (monthDates.length > 0) {
+        tempMonthStreak = 1;
+        maxMonthStreak = 1;
+        for (let i = 0; i < monthDates.length - 1; i++) {
+            const currentDay = monthDates[i];
+            const nextDay = monthDates[i+1]; // Note: iterating backwards effectively
+            const diff = currentDay - nextDay;
+            
+            if (diff === 1) {
+                tempMonthStreak++;
+            } else if (diff === 2) {
+               // Check if gap was Sunday
+               // Need full date for Sunday check
+               const d = new Date(year, month - 1, currentDay - 1);
+               if (d.getDay() === 0) {
+                   tempMonthStreak++;
+               } else {
+                   maxMonthStreak = Math.max(maxMonthStreak, tempMonthStreak);
+                   tempMonthStreak = 1;
+               }
+            } else {
+                maxMonthStreak = Math.max(maxMonthStreak, tempMonthStreak);
+                tempMonthStreak = 1;
+            }
+        }
+        maxMonthStreak = Math.max(maxMonthStreak, tempMonthStreak);
+    }
+
+    // 3. Filter gathas
+    const monthlyNewGathas = gathaEntries
+      .filter(e => {
+        const d = new Date(e.created_at);
+        return d.getFullYear() === year && d.getMonth() + 1 === month && e.type === 'new';
+      })
+      .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
+
+    return {
+        monthlyAttendance,
+        monthlyNewGathas,
+        maxStreak: maxMonthStreak // This is monthly scoped!
+    };
+  }, [gathaEntries]);
 
   // ============================================
   // API CALLS
@@ -1882,10 +1931,12 @@ export default function StudentDashboard({ user, onLogout }) {
       if (res.ok) {
         const data = await res.json();
         setAttendanceHistory(Array.isArray(data) ? data : []);
+        // Global streak calculation
         const streakData = calculateStreak(data);
         setCurrentStreak(streakData.current);
         setMaxStreak(streakData.max);
 
+        // Initial monthly stats for current month
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
         const monthlyCount = data.filter((r) => {
@@ -1926,23 +1977,7 @@ export default function StudentDashboard({ user, onLogout }) {
   }, []);
 
   const fetchMonthlyStats = useCallback(async (year, month) => {
-    const token = localStorage.getItem('jainPathshalaToken');
-    try {
-      const res = await fetch(`${API_BASE}/stats/comprehensive?year=${year}&month=${month}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setMonthlyAttendance(data.monthlyAttendance ?? 0);
-        setMonthlyNewGathas(data.monthlyNewGathas ?? 0);
-        setMonthlyRevisionGathas(data.monthlyRevisionGathas ?? 0);
-        setCurrentStreak(data.currentStreak ?? 0);
-        setMaxStreak(data.maxStreak ?? 0);
-        setWorkingDays(data.workingDays ?? DEFAULT_WORKING_DAYS);
-      }
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
+    // We rely on local calculation now for accuracy on switch
   }, []);
 
   const loadUserData = useCallback(async (username) => {
@@ -1971,15 +2006,11 @@ export default function StudentDashboard({ user, onLogout }) {
         gatha: data.pendingGathas || []
       });
 
-      const stats = data.stats || {};
+      // Recalculate everything locally
       const streakData = calculateStreak(recentAttendance);
-      setCurrentStreak(stats.currentStreak ?? streakData.current);
-      setMaxStreak(stats.maxStreak ?? streakData.max);
-      setMonthlyAttendance(stats.monthlyAttendance ?? 0);
-      setMonthlyNewGathas(stats.monthlyNewGathas ?? 0);
-      setMonthlyRevisionGathas(stats.monthlyRevisionGathas ?? 0);
-      setWorkingDays(stats.workingDays ?? DEFAULT_WORKING_DAYS);
-
+      setCurrentStreak(streakData.current);
+      setMaxStreak(streakData.max);
+      
       return true;
     } catch (error) {
       console.error('Error loading user data:', error);
@@ -2006,7 +2037,6 @@ export default function StudentDashboard({ user, onLogout }) {
           fetchAttendance(),
           fetchGathas(),
           fetchPendingStatus(),
-          fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1),
         ]);
         showSuccess('Switched back to your dashboard');
       } finally {
@@ -2020,38 +2050,11 @@ export default function StudentDashboard({ user, onLogout }) {
         setActiveUser(activeUserRef.current);
       }
     }
-  }, [loggedInUsername, loadUserData, fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
+  }, [loggedInUsername, loadUserData, fetchAttendance, fetchGathas, fetchPendingStatus]);
 
-  const handleStatsMonthChange = useCallback(async (year, month) => {
+  const handleStatsMonthChange = useCallback((year, month) => {
     setStatsMonth({ year, month });
-    const token = localStorage.getItem('jainPathshalaToken');
-    const currentActiveUsername = activeUserRef.current?.username || activeUserRef.current?.name;
-
-    try {
-      let url;
-      if (currentActiveUsername === loggedInUsername) {
-        url = `${API_BASE}/stats/comprehensive?year=${year}&month=${month}`;
-      } else {
-        url = `${API_BASE}/family-member/${currentActiveUsername}/stats?year=${year}&month=${month}`;
-      }
-
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setMonthlyAttendance(data.monthlyAttendance ?? 0);
-        setMonthlyNewGathas(data.monthlyNewGathas ?? 0);
-        setMonthlyRevisionGathas(data.monthlyRevisionGathas ?? 0);
-        setCurrentStreak(data.currentStreak ?? 0);
-        setMaxStreak(data.maxStreak ?? 0);
-        setWorkingDays(data.workingDays ?? DEFAULT_WORKING_DAYS);
-      }
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  }, [loggedInUsername]);
+  }, []);
 
   // Track online status
   useEffect(() => {
@@ -2075,7 +2078,6 @@ export default function StudentDashboard({ user, onLogout }) {
         fetchAttendance(),
         fetchGathas(),
         fetchPendingStatus(),
-        fetchMonthlyStats(now.getFullYear(), now.getMonth() + 1),
       ]);
       setIsLoading(false);
     };
@@ -2102,7 +2104,7 @@ export default function StudentDashboard({ user, onLogout }) {
       clearInterval(pollInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats, fetchGroupMembers, isViewingOther]);
+  }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchGroupMembers, isViewingOther]);
 
   useEffect(() => {
     setActiveUser(user);
@@ -2111,6 +2113,26 @@ export default function StudentDashboard({ user, onLogout }) {
   // ============================================
   // DERIVED DATA
   // ============================================
+
+  // Calculate monthly specific stats for the Achievements Page
+  const statsForSelectedMonth = useMemo(() => {
+    const { year, month } = statsMonth;
+    return {
+        ...calculateMonthlyStats(year, month, attendanceHistory, gathaEntries),
+        workingDays
+    };
+  }, [statsMonth, attendanceHistory, gathaEntries, workingDays, calculateMonthlyStats]);
+
+  // For homepage display (current month)
+  const statsForCurrentMonth = useMemo(() => {
+    const now = new Date();
+    return {
+        ...calculateMonthlyStats(now.getFullYear(), now.getMonth() + 1, attendanceHistory, gathaEntries),
+        workingDays,
+        currentStreak, // Global current streak for flame icon
+        maxStreak      // Global max streak
+    };
+  }, [attendanceHistory, gathaEntries, workingDays, currentStreak, maxStreak, calculateMonthlyStats]);
 
   const todayAttendanceMarked = useMemo(
     () => attendanceHistory.some((r) => formatLocalDateString(r.date) === todayIso),
@@ -2144,29 +2166,21 @@ export default function StudentDashboard({ user, onLogout }) {
     return att + gatha;
   }, [pendingStatus]);
 
-  const userStats = useMemo(() => ({
-    monthlyAttendance,
-    monthlyNewGathas,
-    currentStreak,
-    maxStreak,
-    workingDays,
-  }), [monthlyAttendance, monthlyNewGathas, currentStreak, maxStreak, workingDays]);
-
   const xpBreakdown = useMemo(
-    () => calculateTotalXP(userStats, MONTHLY_ACHIEVEMENTS),
-    [userStats]
+    () => calculateTotalXP(statsForCurrentMonth, MONTHLY_ACHIEVEMENTS),
+    [statsForCurrentMonth]
   );
 
   const userLevel = useMemo(() => getUserLevel(xpBreakdown.total), [xpBreakdown.total]);
 
   const unlockedBadgesCount = useMemo(
-    () => MONTHLY_ACHIEVEMENTS.filter((a) => calculateAchievementProgress(a, userStats).unlocked).length,
-    [userStats]
+    () => MONTHLY_ACHIEVEMENTS.filter((a) => calculateAchievementProgress(a, statsForCurrentMonth).unlocked).length,
+    [statsForCurrentMonth]
   );
 
   const motivationalMessage = useMemo(
-    () => getMotivationalMessage(currentStreak, monthlyAttendance, monthlyNewGathas),
-    [currentStreak, monthlyAttendance, monthlyNewGathas]
+    () => getMotivationalMessage(currentStreak, statsForCurrentMonth.monthlyAttendance, statsForCurrentMonth.monthlyNewGathas),
+    [currentStreak, statsForCurrentMonth]
   );
 
   // ============================================
@@ -2408,6 +2422,7 @@ export default function StudentDashboard({ user, onLogout }) {
         </div>
       )}
 
+      {/* Global Streak Display */}
       <StreakDisplay streak={currentStreak} maxStreak={maxStreak} />
 
       {/* Today's Quick Actions */}
@@ -2546,10 +2561,10 @@ export default function StudentDashboard({ user, onLogout }) {
             View All <ChevronRight className="w-3 h-3" />
           </button>
         </div>
-        <RecentBadges stats={userStats} onBadgeClick={setSelectedAchievement} />
+        <RecentBadges stats={statsForCurrentMonth} onBadgeClick={setSelectedAchievement} />
       </div>
 
-      <NextBadges stats={userStats} onBadgeClick={setSelectedAchievement} />
+      <NextBadges stats={statsForCurrentMonth} onBadgeClick={setSelectedAchievement} />
 
       <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-3 sm:p-4 text-white shadow-lg relative overflow-hidden">
         <div className="absolute top-0 right-0 w-20 sm:w-24 h-20 sm:h-24 bg-white/10 rounded-full -mr-10 sm:-mr-12 -mt-10 sm:-mt-12" />
@@ -2589,7 +2604,7 @@ export default function StudentDashboard({ user, onLogout }) {
       )}
 
       <StudentAchievementPage
-        stats={userStats}
+        stats={statsForSelectedMonth}
         onMonthChange={handleStatsMonthChange}
         workingDays={workingDays}
         key={`stats-${activeUsername}-${statsMonth.year}-${statsMonth.month}`}
@@ -2725,7 +2740,7 @@ export default function StudentDashboard({ user, onLogout }) {
 
       <AchievementDetailModal
         achievement={selectedAchievement}
-        stats={userStats}
+        stats={statsForCurrentMonth}
         onClose={() => setSelectedAchievement(null)}
       />
 
@@ -2735,7 +2750,7 @@ export default function StudentDashboard({ user, onLogout }) {
         currentXP={xpBreakdown.total}
         xpBreakdown={xpBreakdown}
         userLevel={userLevel}
-        stats={userStats}
+        stats={statsForCurrentMonth}
       />
     </div>
   );
