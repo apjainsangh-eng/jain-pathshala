@@ -7,7 +7,6 @@ import {
   BookOpen,
   Calendar,
   CalendarDays,
-  CalendarRange, // Added for date range
   Check,
   CheckCircle,
   ChevronDown,
@@ -36,7 +35,6 @@ import {
   Sparkles,
   UserCircle,
   ChevronUp,
-  Filter, // Added for filter UI
 } from 'lucide-react';
 
 // Import Achievement Components
@@ -79,6 +77,7 @@ const QUOTES = [
   { text: "મહેનત નો કોઈ વિકલ્પ નથી", meaning: "There is no substitute for hard work", emoji: "⭐", lang: "Gujarati" },
 ];
 
+// Tips icon color classes
 const TIP_ICON_COLORS = {
   blue: 'text-blue-500',
   purple: 'text-purple-500',
@@ -86,6 +85,7 @@ const TIP_ICON_COLORS = {
   orange: 'text-orange-500',
 };
 
+// Tips for new users
 const HELPFUL_TIPS = [
   { icon: Calendar, tipText: "Tap the blue button to mark your attendance daily", color: "blue" },
   { icon: BookOpen, tipText: "Record your gatha learning with the purple button", color: "purple" },
@@ -143,151 +143,13 @@ const getMotivationalMessage = (streak, attendance, gathas) => {
   return { text: "Every journey begins with a single step! 🚀", type: "motivation" };
 };
 
-// --- UPDATED STREAK LOGIC (Handles Sunday Holidays) ---
-const calculateStreakWithHolidays = (attendanceHistory) => {
-  if (!attendanceHistory || attendanceHistory.length === 0) return { current: 0, max: 0 };
-
-  // 1. Extract unique dates, sort descending (newest first)
-  const sortedDates = attendanceHistory
-    .map((r) => {
-      const d = coerceToDate(r.date);
-      d.setHours(0,0,0,0);
-      return d;
-    })
-    .sort((a, b) => b - a)
-    .filter((date, index, self) => 
-      index === 0 || date.getTime() !== self[index - 1].getTime()
-    );
-
-  if (sortedDates.length === 0) return { current: 0, max: 0 };
-
-  const today = new Date();
-  today.setHours(0,0,0,0);
-
-  let currentStreak = 0;
-  let maxStreak = 0;
-  let tempStreak = 0;
-
-  // Check if the most recent attendance is today or yesterday
-  // If most recent is older than yesterday, streak might be broken unless holidays cover the gap
-  const lastAttended = sortedDates[0];
-  const diffFromToday = Math.floor((today - lastAttended) / (1000 * 60 * 60 * 24));
-  
-  // Logic to determine if current streak is active
-  let isCurrentStreakActive = diffFromToday <= 1; 
-  if (diffFromToday > 1) {
-    // Check if the gap contains only Sundays
-    let gapValid = true;
-    for(let i = 1; i < diffFromToday; i++) {
-        const gapDay = new Date(today);
-        gapDay.setDate(today.getDate() - i);
-        if (gapDay.getDay() !== 0) { // 0 is Sunday
-            gapValid = false;
-            break;
-        }
-    }
-    isCurrentStreakActive = gapValid;
-  }
-
-  // Iterate through dates to calculate streaks
-  for (let i = 0; i < sortedDates.length; i++) {
-    // Start a new potential streak segment
-    if (tempStreak === 0) tempStreak = 1;
-
-    if (i < sortedDates.length - 1) {
-      const currentDate = sortedDates[i];
-      const nextDate = sortedDates[i + 1]; // Older date
-      const diffDays = Math.floor((currentDate - nextDate) / (1000 * 60 * 60 * 24));
-
-      if (diffDays === 1) {
-        // Consecutive days
-        tempStreak++;
-      } else if (diffDays > 1) {
-        // Gap detected. Check if gap consists ONLY of Sundays.
-        let isHolidayGap = true;
-        for (let j = 1; j < diffDays; j++) {
-           const gapDay = new Date(currentDate);
-           gapDay.setDate(currentDate.getDate() - j);
-           if (gapDay.getDay() !== 0) { // If any day in gap is NOT Sunday
-              isHolidayGap = false;
-              break;
-           }
-        }
-
-        if (isHolidayGap) {
-          tempStreak++; // Gap was just holidays, continue streak
-        } else {
-          // Streak broken
-          if (maxStreak < tempStreak) maxStreak = tempStreak;
-          // If this was the first segment and it's active, set currentStreak
-          if (i === tempStreak - 1 && isCurrentStreakActive) {
-             currentStreak = tempStreak;
-          }
-          tempStreak = 1; // Reset for next segment
-        }
-      }
-    } else {
-      // Last element
-      if (maxStreak < tempStreak) maxStreak = tempStreak;
-      // If we reached the end and it's the first segment
-      if (i === tempStreak - 1 && isCurrentStreakActive) {
-         currentStreak = tempStreak;
-      }
-    }
-  }
-
-  // Final check in case loop ended
-  if (maxStreak < tempStreak) maxStreak = tempStreak;
-
-  return { current: currentStreak, max: maxStreak };
-};
-
-// Helper to get date ranges for stats/leaderboard
-const getDateRange = (type, customRange = {}) => {
-  const now = new Date();
-  const start = new Date(now);
-  const end = new Date(now);
-
-  // Reset hours
-  start.setHours(0, 0, 0, 0);
-  end.setHours(23, 59, 59, 999);
-
-  switch (type) {
-    case 'today':
-      return { start, end };
-    case 'week':
-      // Monday as start of week
-      const day = start.getDay() || 7; // Make Sunday 7
-      if (day !== 1) start.setHours(-24 * (day - 1)); 
-      return { start, end };
-    case 'month':
-      start.setDate(1);
-      // For leaderboard, we usually want the whole month range capability
-      const fullMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      fullMonthEnd.setHours(23, 59, 59, 999);
-      return { start, end: fullMonthEnd }; 
-    case 'year':
-      start.setMonth(0, 1);
-      const fullYearEnd = new Date(now.getFullYear(), 11, 31);
-      fullYearEnd.setHours(23, 59, 59, 999);
-      return { start, end: fullYearEnd };
-    case 'custom':
-      return { 
-        start: customRange.start ? new Date(customRange.start) : start, 
-        end: customRange.end ? new Date(customRange.end) : end 
-      };
-    default:
-      return { start, end };
-  }
-};
-
 // ============================================
 // USER SWITCHER COMPONENT
 // ============================================
 
 const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoading }) => {
   const [isOpen, setIsOpen] = useState(false);
-   
+
   if (!groupMembers || groupMembers.length <= 1) {
     return null;
   }
@@ -301,15 +163,15 @@ const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoad
         onClick={() => setIsOpen(!isOpen)}
         disabled={isLoading}
         className={`w-full flex items-center justify-between gap-2 p-3 rounded-2xl border-2 transition-all ${
-          isViewingOther 
-            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-300' 
+          isViewingOther
+            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-300'
             : 'bg-white border-orange-200'
         } shadow-sm active:scale-[0.99]`}
       >
         <div className="flex items-center gap-3 min-w-0">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md flex-shrink-0 ${
-            isViewingOther 
-              ? 'bg-gradient-to-br from-blue-400 to-indigo-500' 
+            isViewingOther
+              ? 'bg-gradient-to-br from-blue-400 to-indigo-500'
               : 'bg-gradient-to-br from-orange-400 to-amber-500'
           }`}>
             {(activeUserData?.name || activeUserData?.username || 'U').charAt(0).toUpperCase()}
@@ -341,9 +203,9 @@ const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoad
 
       {isOpen && (
         <>
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setIsOpen(false)} 
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setIsOpen(false)}
           />
           <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border-2 border-orange-200 shadow-xl z-50 overflow-hidden animate-in slide-in-from-top-2 duration-200">
             <div className="p-2 bg-orange-50 border-b border-orange-200">
@@ -359,7 +221,7 @@ const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoad
                 const loggedInUsername = loggedInUser?.username || loggedInUser?.name;
                 const isActive = memberUsername === activeUsername;
                 const isLoggedIn = memberUsername === loggedInUsername;
-                
+
                 return (
                   <button
                     key={memberUsername}
@@ -369,14 +231,14 @@ const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoad
                     }}
                     disabled={isLoading}
                     className={`w-full flex items-center gap-3 p-3 transition-all ${
-                      isActive 
-                        ? 'bg-orange-100' 
+                      isActive
+                        ? 'bg-orange-100'
                         : 'hover:bg-gray-50 active:bg-gray-100'
                     }`}
                   >
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md flex-shrink-0 ${
-                      isActive 
-                        ? 'bg-gradient-to-br from-orange-400 to-amber-500' 
+                      isActive
+                        ? 'bg-gradient-to-br from-orange-400 to-amber-500'
                         : 'bg-gradient-to-br from-gray-400 to-gray-500'
                     }`}>
                       {(member.name || member.username || 'U').charAt(0).toUpperCase()}
@@ -396,6 +258,11 @@ const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoad
                   </button>
                 );
               })}
+            </div>
+            <div className="p-2 bg-gray-50 border-t border-gray-200">
+              <p className="text-xs text-gray-500 text-center">
+                💡 You can add gathas and mark attendance for any member
+              </p>
             </div>
           </div>
         </>
@@ -425,8 +292,8 @@ const ConfirmationModal = ({ title, message, onConfirm, onCancel, confirmText = 
         </div>
         <p className="text-gray-600 mb-4 sm:mb-6 text-sm bg-gray-50 p-3 rounded-xl">{message}</p>
         <div className="flex gap-2 sm:gap-3">
-          <button 
-            onClick={onCancel} 
+          <button
+            onClick={onCancel}
             className="flex-1 px-3 sm:px-4 py-3 bg-gray-100 text-gray-700 font-bold rounded-2xl active:scale-[0.98] transition-transform text-sm sm:text-base"
           >
             Cancel
@@ -440,27 +307,6 @@ const ConfirmationModal = ({ title, message, onConfirm, onCancel, confirmText = 
         </div>
       </div>
     </div>
-  );
-};
-
-const PendingBadge = ({ status, size = 'normal' }) => {
-  const badges = {
-    pending: { className: 'text-yellow-700 bg-yellow-100 border-yellow-200', icon: Clock, label: 'Pending' },
-    approved: { className: 'text-green-700 bg-green-100 border-green-200', icon: Check, label: 'Approved' },
-    rejected: { className: 'text-red-700 bg-red-100 border-red-200', icon: CloseIcon, label: 'Rejected' },
-  };
-
-  const badge = badges[status];
-  if (!badge) return null;
-  const Icon = badge.icon;
-
-  const sizeClasses = size === 'small' ? 'text-xs px-2 py-0.5' : 'text-xs px-2.5 py-1';
-
-  return (
-    <span className={`inline-flex items-center gap-1 font-bold rounded-full border ${sizeClasses} ${badge.className}`}>
-      <Icon className={`${size === 'small' ? 'w-3 h-3' : 'w-3.5 h-3.5'} ${status === 'pending' ? 'animate-pulse' : ''}`} />
-      {badge.label}
-    </span>
   );
 };
 
@@ -606,12 +452,12 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
   ];
 
   return (
-    <div 
-      className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 overflow-y-auto" 
+    <div
+      className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 overflow-y-auto"
       onClick={onClose}
     >
       <div className="min-h-full flex items-center justify-center p-4 py-8">
-        <div 
+        <div
           className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in duration-200"
           onClick={(e) => e.stopPropagation()}
         >
@@ -626,10 +472,1430 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
                   <p className="text-sm opacity-80">Your XP Journey</p>
                 </div>
               </div>
-              <button 
-                onClick={onClose} 
+              <button
+                onClick={onClose}
                 className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors flex-shrink-0"
               >
+                <CloseIcon size={24} />
+              </button>
+            </div>
+          </div>
+
+          <div className="max-h-[60vh] overflow-y-auto">
+            <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 border-b">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-sm text-gray-600">Current Level</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center gap-2">
+                    <span className="text-2xl sm:text-3xl">{userLevel.icon}</span>
+                    {userLevel.name}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-600">Total XP</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-indigo-600">{currentXP}</p>
+                </div>
+              </div>
+
+              {userLevel.nextLevel && (
+                <div className="bg-white rounded-xl p-3 border border-indigo-200">
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="text-gray-600">Next: {userLevel.nextLevel.name} {userLevel.nextLevel.icon}</span>
+                    <span className="font-bold text-indigo-600">{userLevel.xpToNextLevel - userLevel.xpInCurrentLevel} XP needed</span>
+                  </div>
+                  <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full transition-all duration-500"
+                      style={{ width: `${userLevel.progressToNext * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-b">
+              <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
+                <Zap className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+                How You Earned XP This Month
+              </h4>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 bg-green-50 rounded-xl border border-green-200">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-green-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-green-700" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-800 text-sm">Attendance</p>
+                      <p className="text-xs text-gray-500">{stats?.monthlyAttendance || 0} days × {XP_VALUES.attendance} XP</p>
+                    </div>
+                  </div>
+                  <p className="font-bold text-green-600 text-sm flex-shrink-0">+{(stats?.monthlyAttendance || 0) * XP_VALUES.attendance} XP</p>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-purple-50 rounded-xl border border-purple-200">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-purple-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-purple-700" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-800 text-sm">New Gathas</p>
+                      <p className="text-xs text-gray-500">{stats?.monthlyNewGathas || 0} × {XP_VALUES.new_gatha || 2} XP</p>
+                    </div>
+                  </div>
+                  <p className="font-bold text-purple-600 text-sm flex-shrink-0">+{(stats?.monthlyNewGathas || 0) * (XP_VALUES.new_gatha || 2)} XP</p>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-xl border border-yellow-200">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-yellow-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-700" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-800 text-sm">Achievements</p>
+                      <p className="text-xs text-gray-500">Badges unlocked</p>
+                    </div>
+                  </div>
+                  <p className="font-bold text-yellow-600 text-sm flex-shrink-0">+{xpBreakdown?.achievements || 0} XP</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4">
+              <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
+                <TrendingUp className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                All Levels
+              </h4>
+              <div className="space-y-2">
+                {allLevels.map((level, index) => {
+                  const isCurrentLevel = level.level === userLevel.level;
+                  const isUnlocked = currentXP >= level.minXP;
+                  const isNext = !isUnlocked && (index === 0 || currentXP >= allLevels[index - 1].minXP);
+
+                  return (
+                    <div
+                      key={level.level}
+                      className={`flex items-center justify-between p-2 sm:p-3 rounded-xl border-2 transition-all ${
+                        isCurrentLevel
+                          ? 'bg-gradient-to-r from-indigo-100 to-purple-100 border-indigo-400 shadow-md'
+                          : isUnlocked
+                          ? 'bg-green-50 border-green-200'
+                          : isNext
+                          ? 'bg-blue-50 border-blue-300 border-dashed'
+                          : 'bg-gray-50 border-gray-200 opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-xl sm:text-2xl flex-shrink-0 ${
+                          isCurrentLevel ? 'bg-indigo-200' : isUnlocked ? 'bg-green-200' : 'bg-gray-200'
+                        }`}>
+                          {level.icon}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                            <p className="font-bold text-gray-800 text-sm">Lv.{level.level} {level.name}</p>
+                            {isCurrentLevel && (
+                              <span className="text-xs bg-indigo-500 text-white px-1.5 py-0.5 rounded">YOU</span>
+                            )}
+                            {isNext && (
+                              <span className="text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded">NEXT</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            {level.minXP === 0 ? 'Starting level' : `${level.minXP} XP required`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        {isUnlocked ? (
+                          <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-500" />
+                        ) : (
+                          <p className="text-xs sm:text-sm font-bold text-gray-400">
+                            {level.minXP - currentXP} XP
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-gray-50 border-t rounded-b-3xl">
+            <button
+              onClick={onClose}
+              className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold py-3 sm:py-3.5 rounded-xl active:scale-[0.98] transition-transform shadow-lg text-sm sm:text-base"
+            >
+              Got it! 💪
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// LEADERBOARD COMPONENT (WITH YEAR/MONTH PROPS)
+// ============================================
+
+const LeaderboardSection = ({ currentUserId, currentUserName, year, month }) => {
+  const [activeTab, setActiveTab] = useState('attendance');
+  const [leaderboardData, setLeaderboardData] = useState({ attendanceLeaders: [], gathaLeaders: [] });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchLeaderboard = useCallback(async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const startOfMonth = new Date(year, month - 1, 1);
+      const endOfMonth = new Date(year, month, 0);
+
+      let res = await fetch(
+        `${API_BASE}/leaderboard?startDate=${formatLocalDateString(startOfMonth)}&endDate=${formatLocalDateString(endOfMonth)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        setLeaderboardData(data);
+      } else {
+        res = await fetch(
+          `${API_BASE}/analytics/leaderboard?startDate=${formatLocalDateString(startOfMonth)}&endDate=${formatLocalDateString(endOfMonth)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        if (res.ok) {
+          const data = await res.json();
+          setLeaderboardData({
+            attendanceLeaders: data.attendanceLeaders || data.topAttendance || [],
+            gathaLeaders: data.gathaLeaders || data.topGathas || [],
+          });
+        } else {
+          throw new Error('Could not load leaderboard data');
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching leaderboard:', err);
+      setError('Unable to load leaderboard');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [year, month]);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
+
+  const getRankIcon = (rank) => {
+    switch (rank) {
+      case 1: return <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />;
+      case 2: return <Medal className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />;
+      case 3: return <Medal className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />;
+      default: return <span className="w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-xs sm:text-sm font-bold text-gray-500">#{rank}</span>;
+    }
+  };
+
+  const getRankBg = (rank, isCurrentUser) => {
+    if (isCurrentUser) return 'bg-gradient-to-r from-orange-100 to-amber-100 border-orange-400';
+    switch (rank) {
+      case 1: return 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-300';
+      case 2: return 'bg-gray-50 border-gray-300';
+      case 3: return 'bg-amber-50 border-amber-300';
+      default: return 'bg-white border-gray-200';
+    }
+  };
+
+  const getRankEmoji = (rank) => {
+    switch (rank) {
+      case 1: return '🥇';
+      case 2: return '🥈';
+      case 3: return '🥉';
+      default: return '';
+    }
+  };
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const attendanceLeaders = leaderboardData?.attendanceLeaders || [];
+  const gathaLeaders = leaderboardData?.gathaLeaders || [];
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-blue-200 shadow-sm overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-3 sm:p-4 text-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 sm:w-6 sm:h-6" />
+            <h3 className="text-base sm:text-lg font-bold">🏆 Leaderboard</h3>
+          </div>
+          <button
+            onClick={fetchLeaderboard}
+            disabled={isLoading}
+            className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+        <p className="text-xs sm:text-sm opacity-80 mt-1">{monthNames[month - 1]} {year}</p>
+      </div>
+
+      <div className="flex p-2 bg-gray-100 gap-2">
+        <button
+          onClick={() => setActiveTab('attendance')}
+          className={`flex-1 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
+            activeTab === 'attendance' ? 'bg-green-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+          }`}
+        >
+          <Calendar className="w-3 h-3 sm:w-4 sm:h-4" /> Attendance
+        </button>
+        <button
+          onClick={() => setActiveTab('gatha')}
+          className={`flex-1 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
+            activeTab === 'gatha' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+          }`}
+        >
+          <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" /> New Gathas
+        </button>
+      </div>
+
+      <div className="p-3 sm:p-4">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-8">
+            <RefreshCw className="w-8 h-8 sm:w-10 sm:h-10 animate-spin text-blue-500 mb-3" />
+            <p className="text-gray-500 text-sm">Loading leaderboard...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
+            <p className="text-gray-500 text-sm">{error}</p>
+            <button
+              onClick={fetchLeaderboard}
+              className="mt-3 px-4 py-2 bg-blue-100 text-blue-700 rounded-xl font-medium text-sm"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : activeTab === 'attendance' ? (
+          attendanceLeaders.length === 0 ? (
+            <div className="text-center py-8">
+              <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
+              <p className="text-gray-500 font-medium text-sm">No data for {monthNames[month - 1]} {year}</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {attendanceLeaders.slice(0, 5).map((user, index) => {
+                const odometer = user.userId || user._id || user.id || user.username;
+                const isCurrentUser = odometer === currentUserId || user.name === currentUserName || user.username === currentUserId;
+                const rank = index + 1;
+
+                return (
+                  <div
+                    key={odometer || index}
+                    className={`flex items-center justify-between p-2 sm:p-3 rounded-xl border-2 transition-all ${getRankBg(rank, isCurrentUser)}`}
+                  >
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {getRankIcon(rank)}
+                        <span className="text-base sm:text-lg">{getRankEmoji(rank)}</span>
+                      </div>
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold shadow-md flex-shrink-0 text-sm">
+                        {(user.name || user.username || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-800 text-sm flex items-center gap-1 sm:gap-2 flex-wrap">
+                          <span className="truncate">{user.name || user.username}</span>
+                          {isCurrentUser && (
+                            <span className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded animate-pulse flex-shrink-0">You</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500">{user.totalAttendance || user.count || 0} days present</p>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xl sm:text-2xl font-bold text-green-600">{user.totalAttendance || user.count || 0}</p>
+                      <p className="text-xs text-gray-400">days</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ) : (
+          gathaLeaders.length === 0 ? (
+            <div className="text-center py-8">
+              <BookOpen className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
+              <p className="text-gray-500 font-medium text-sm">No data for {monthNames[month - 1]} {year}</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {gathaLeaders.slice(0, 5).map((user, index) => {
+                const odometer = user.userId || user._id || user.id || user.username;
+                const isCurrentUser = odometer === currentUserId || user.name === currentUserName || user.username === currentUserId;
+                const rank = index + 1;
+
+                return (
+                  <div
+                    key={odometer || index}
+                    className={`flex items-center justify-between p-2 sm:p-3 rounded-xl border-2 transition-all ${getRankBg(rank, isCurrentUser)}`}
+                  >
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {getRankIcon(rank)}
+                        <span className="text-base sm:text-lg">{getRankEmoji(rank)}</span>
+                      </div>
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white font-bold shadow-md flex-shrink-0 text-sm">
+                        {(user.name || user.username || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-800 text-sm flex items-center gap-1 sm:gap-2 flex-wrap">
+                          <span className="truncate">{user.name || user.username}</span>
+                          {isCurrentUser && (
+                            <span className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded animate-pulse flex-shrink-0">You</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500">{user.totalGathas || user.count || 0} new gathas</p>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xl sm:text-2xl font-bold text-purple-600">{user.totalGathas || user.count || 0}</p>
+                      <p className="text-xs text-gray-400">gathas</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        )}
+      </div>
+
+      <div className="px-3 sm:px-4 pb-3 sm:pb-4">
+        <div className="bg-blue-50 rounded-xl p-2 sm:p-3 border border-blue-200">
+          <p className="text-xs text-blue-700 text-center">
+            <Sparkles className="w-3 h-3 inline mr-1" />
+            Leaderboard updates when you change month/year 🌟
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// GATHA ENTRY MODAL
+// ============================================
+
+const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, activeUserName }) => {
+  const [activeTab, setActiveTab] = useState(editData?.type || 'new');
+  const [form, setForm] = useState({
+    sutraName: editData?.sutra_name || '',
+    whichGatha: editData?.which_gatha || '',
+    totalGatha: editData?.total_gatha?.toString() || '',
+  });
+
+  useEffect(() => {
+    if (editData) {
+      setActiveTab(editData.type || 'new');
+      setForm({
+        sutraName: editData.sutra_name || '',
+        whichGatha: editData.which_gatha || '',
+        totalGatha: editData.total_gatha?.toString() || '',
+      });
+    } else {
+      setForm({ sutraName: '', whichGatha: '', totalGatha: '' });
+    }
+  }, [editData]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = () => {
+    onSubmit({
+      type: activeTab,
+      sutra_name: form.sutraName,
+      which_gatha: form.whichGatha,
+      total_gatha: Number(form.totalGatha),
+    });
+  };
+
+  const isValid = form.sutraName && form.whichGatha && form.totalGatha;
+  const commonSutras = ['નવકાર', 'પંચ પરમેષ્ઠી', 'લોગસ્સ', 'ઉવસગ્ગહરં', 'ભક્તામર'];
+
+  return (
+    <div
+      className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div className="min-h-full flex items-center justify-center p-4 py-8">
+        <div
+          className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in duration-200"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className={`p-4 sm:p-5 text-white rounded-t-3xl ${activeTab === 'new' ? 'bg-gradient-to-r from-purple-500 to-indigo-600' : 'bg-gradient-to-r from-blue-500 to-cyan-600'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-lg sm:text-xl font-bold">{editData ? 'Edit Entry' : 'Add Gatha'}</h3>
+                  <p className="text-xs sm:text-sm opacity-80">
+                    {activeUserName ? `For: ${activeUserName}` : 'Record your learning progress'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors flex-shrink-0"
+              >
+                <CloseIcon size={24} />
+              </button>
+            </div>
+          </div>
+
+          {!editData && (
+            <div className="flex p-2 bg-gray-100 gap-2">
+              <button
+                onClick={() => setActiveTab('new')}
+                className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
+                  activeTab === 'new' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+                }`}
+              >
+                <Plus className="w-4 h-4 sm:w-5 sm:h-5" /> New Learning
+              </button>
+              <button
+                onClick={() => setActiveTab('revision')}
+                className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
+                  activeTab === 'revision' ? 'bg-blue-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+                }`}
+              >
+                <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" /> Revision
+              </button>
+            </div>
+          )}
+
+          <div className="max-h-[50vh] overflow-y-auto p-4 sm:p-5 space-y-4">
+            <div>
+              <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
+                📖 Sutra Name
+                <HelpTooltip text="Enter the name of the sutra you learned or revised" />
+              </label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {commonSutras.map((sutra) => (
+                  <button
+                    key={sutra}
+                    type="button"
+                    onClick={() => setForm({ ...form, sutraName: sutra })}
+                    className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all ${
+                      form.sutraName === sutra
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {sutra}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                value={form.sutraName}
+                onChange={(e) => setForm({ ...form, sutraName: e.target.value })}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
+                placeholder="Enter sutra name or select above"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
+                📝 Which Gatha
+                <HelpTooltip text="Enter the gatha numbers you completed (e.g., 1-5 or 3,4,5)" />
+              </label>
+              <input
+                type="text"
+                value={form.whichGatha}
+                onChange={(e) => setForm({ ...form, whichGatha: e.target.value })}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
+                placeholder="e.g., Gatha 1-5 or 3,4,5"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
+                #️⃣ Total Count
+                <HelpTooltip text="How many gathas did you complete in total?" />
+              </label>
+              <div className="flex gap-2">
+                {[1, 3, 5, 10].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setForm({ ...form, totalGatha: num.toString() })}
+                    className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all ${
+                      form.totalGatha === num.toString()
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                value={form.totalGatha}
+                onChange={(e) => setForm({ ...form, totalGatha: e.target.value })}
+                className="w-full mt-2 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
+                placeholder="Or enter custom count"
+                min="1"
+              />
+            </div>
+          </div>
+
+          <div className="p-4 sm:p-5 border-t bg-gray-50 rounded-b-3xl">
+            <div className="flex gap-2 sm:gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl active:scale-[0.98] transition-transform text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting || !isValid}
+                className={`flex-1 py-3 font-bold rounded-xl text-white shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform text-sm ${
+                  activeTab === 'new'
+                    ? 'bg-gradient-to-r from-purple-500 to-purple-600'
+                    : 'bg-gradient-to-r from-blue-500 to-blue-600'
+                }`}
+              >
+                {isSubmitting ? (
+                  <Loader className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                ) : (
+                  <Check className="w-4 h-4 sm:w-5 sm:h-5" />
+                )}
+                {editData ? 'Save' : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// HISTORY PAGE COMPONENT
+// ============================================
+
+const HistoryPage = ({ activeUserId }) => {
+  const today = new Date();
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
+  const [historyData, setHistoryData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(null);
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  const fetchHistory = useCallback(async (year, month) => {
+    setIsLoading(true);
+    setError(null);
+    const token = localStorage.getItem('jainPathshalaToken');
+
+    try {
+      const userParam = activeUserId ? `?studentId=${activeUserId}` : '';
+      const url = `${API_BASE}/history/${year}/${month}${userParam}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+
+      if (!res.ok) throw new Error('Failed to load history.');
+      const data = await res.json();
+      setHistoryData(data);
+    } catch (err) {
+      setError(err.message || 'Failed to load history.');
+      setHistoryData(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeUserId]);
+
+  useEffect(() => {
+    fetchHistory(selectedYear, selectedMonth);
+  }, [selectedYear, selectedMonth, fetchHistory]);
+
+  const handleMonthChange = (direction) => {
+    let newMonth = selectedMonth + direction;
+    let newYear = selectedYear;
+
+    if (newMonth > 12) { newMonth = 1; newYear += 1; }
+    else if (newMonth < 1) { newMonth = 12; newYear -= 1; }
+
+    const currentMonth = today.getMonth() + 1;
+    const currentYear = today.getFullYear();
+
+    if (newYear > currentYear || (newYear === currentYear && newMonth > currentMonth)) return;
+
+    setSelectedYear(newYear);
+    setSelectedMonth(newMonth);
+  };
+
+  const activityData = historyData?.dailyActivity ?? {};
+  const todayIso = formatLocalDateString(today);
+
+  const monthlySummary = useMemo(() => {
+    let presentCount = 0, newGathas = 0, revisionGathas = 0;
+
+    Object.entries(activityData).forEach(([_, activity]) => {
+      const normalized = activity || {};
+      const gathas = normalized.gathas || { new: 0, revision: 0 };
+      if (normalized.present) presentCount += 1;
+      newGathas += Number(gathas.new || 0);
+      revisionGathas += Number(gathas.revision || 0);
+    });
+
+    return { presentDays: presentCount, newGathas, revisionGathas };
+  }, [activityData]);
+
+  const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+  const firstDayOfMonth = new Date(selectedYear, selectedMonth - 1, 1).getDay();
+
+  const renderCalendar = () => {
+    const days = [];
+
+    for (let i = 0; i < firstDayOfMonth; i++) {
+      days.push(<div key={`empty-${i}`} className="h-9 sm:h-11" />);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const activity = activityData[dateStr];
+      const isPresent = activity?.present === true;
+      const isToday = dateStr === todayIso;
+      const hasGathas = (activity?.gathas?.new || 0) + (activity?.gathas?.revision || 0) > 0;
+      const isFuture = new Date(dateStr) > today;
+      const isSunday = new Date(dateStr).getDay() === 0;
+
+      days.push(
+        <button
+          key={day}
+          onClick={() => isPresent && setSelectedDay({ dateStr, activity })}
+          disabled={!isPresent || isFuture}
+          className={`h-9 w-9 sm:h-11 sm:w-11 rounded-lg sm:rounded-xl flex items-center justify-center text-xs sm:text-sm font-bold transition-all ${
+            isPresent
+              ? 'bg-gradient-to-br from-green-400 to-green-600 text-white shadow-md active:scale-95'
+              : isToday
+              ? 'bg-orange-100 text-orange-600 border-2 border-orange-400 ring-2 ring-orange-200'
+              : isSunday
+              ? 'bg-red-50 text-red-300'
+              : isFuture
+              ? 'text-gray-200'
+              : 'text-gray-400 hover:bg-gray-100'
+          }`}
+        >
+          <div className="relative">
+            {day}
+            {hasGathas && isPresent && (
+              <span className="absolute -top-1 -right-2 w-2 h-2 bg-purple-500 rounded-full" />
+            )}
+          </div>
+        </button>
+      );
+    }
+
+    return days;
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
+        <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-bold text-blue-800">
+            {activeUserId ? `Viewing ${activeUserId}'s History` : "My Personal History"}
+          </p>
+          <p className="text-xs text-blue-600 mt-1">
+            Green = Present • Red tint = Sunday (Holiday) • Tap green days for details
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-orange-200 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => handleMonthChange(-1)}
+            className="p-2 sm:p-3 rounded-xl bg-orange-50 active:scale-95 transition-transform"
+          >
+            <ChevronLeft size={20} className="text-orange-600 sm:w-6 sm:h-6" />
+          </button>
+          <div className="text-center">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-800">{monthNames[selectedMonth - 1]} {selectedYear}</h3>
+          </div>
+          <button
+            onClick={() => handleMonthChange(1)}
+            disabled={selectedMonth === today.getMonth() + 1 && selectedYear === today.getFullYear()}
+            className="p-2 sm:p-3 rounded-xl bg-orange-50 active:scale-95 transition-transform disabled:opacity-40"
+          >
+            <ChevronRight size={20} className="text-orange-600 sm:w-6 sm:h-6" />
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="text-center py-12">
+            <RefreshCw className="w-10 h-10 sm:w-12 sm:h-12 animate-spin text-orange-500 mx-auto" />
+            <p className="mt-4 text-gray-600 font-medium text-sm sm:text-base">Loading history...</p>
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 sm:p-6 text-center">
+            <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-red-400 mx-auto mb-3" />
+            <p className="text-red-700 font-medium text-sm">{error}</p>
+            <button
+              onClick={() => fetchHistory(selectedYear, selectedMonth)}
+              className="mt-3 px-4 py-2 bg-red-100 text-red-700 rounded-xl font-medium text-sm"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="bg-gray-50 rounded-xl p-2 sm:p-3 mb-4">
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                  <div key={i} className={`h-6 sm:h-8 flex items-center justify-center text-xs font-bold ${i === 0 ? 'text-red-400' : 'text-gray-400'}`}>
+                    {d}
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-1">{renderCalendar()}</div>
+            </div>
+
+            <div className="flex items-center justify-center gap-3 sm:gap-4 text-xs mb-4 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-md bg-gradient-to-br from-green-400 to-green-600" />
+                <span className="text-gray-600">Present ({monthlySummary.presentDays})</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-md bg-red-50 border border-red-200" />
+                <span className="text-gray-600">Sunday</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              <div className="bg-green-50 border-2 border-green-200 rounded-xl p-2 sm:p-3 text-center">
+                <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 mx-auto mb-1" />
+                <p className="text-xl sm:text-2xl font-bold text-green-600">{monthlySummary.presentDays}</p>
+                <p className="text-xs text-gray-500">Days Present</p>
+              </div>
+              <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-2 sm:p-3 text-center">
+                <Plus className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500 mx-auto mb-1" />
+                <p className="text-xl sm:text-2xl font-bold text-purple-600">{monthlySummary.newGathas}</p>
+                <p className="text-xs text-gray-500">New Gathas</p>
+              </div>
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-2 sm:p-3 text-center">
+                <RefreshCw className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 mx-auto mb-1" />
+                <p className="text-xl sm:text-2xl font-bold text-blue-600">{monthlySummary.revisionGathas}</p>
+                <p className="text-xs text-gray-500">Revisions</p>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Day Detail Modal */}
+      {selectedDay && (
+        <div
+          className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 overflow-y-auto"
+          onClick={() => setSelectedDay(null)}
+        >
+          <div className="min-h-full flex items-center justify-center p-4 py-8">
+            <div
+              className="bg-white rounded-3xl p-4 sm:p-6 w-full max-w-md shadow-2xl animate-in zoom-in duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-green-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+                    <Check className="w-6 h-6 sm:w-7 sm:h-7 text-green-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-gray-800 text-base sm:text-lg">
+                      {formatDateIn(selectedDay.dateStr, { weekday: 'short', day: 'numeric', month: 'short' })}
+                    </h3>
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Present ✓</span>
+                  </div>
+                </div>
+                <button onClick={() => setSelectedDay(null)} className="p-2 bg-gray-100 rounded-xl flex-shrink-0">
+                  <CloseIcon size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4 max-h-[50vh] overflow-y-auto">
+                <div className="bg-purple-50 rounded-xl p-3 sm:p-4 border-2 border-purple-200">
+                  <h4 className="font-bold text-purple-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
+                    <Plus size={18} className="text-purple-600 flex-shrink-0" />
+                    New Gathas: {selectedDay.activity.gathas?.new || 0}
+                  </h4>
+                  {(selectedDay.activity.details || []).filter((d) => d.type === 'new').length === 0 ? (
+                    <p className="text-sm text-purple-600 bg-white/50 px-3 py-2 rounded-lg">No new gathas recorded</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {(selectedDay.activity.details || []).filter((d) => d.type === 'new').map((entry, idx) => (
+                        <div key={idx} className="bg-white rounded-lg p-3 border border-purple-200">
+                          <p className="text-sm"><strong>Sutra:</strong> {entry.sutra_name}</p>
+                          <p className="text-sm"><strong>Gatha:</strong> {entry.which_gatha}</p>
+                          <p className="text-sm font-bold text-purple-700">Count: {entry.total_gatha}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-blue-50 rounded-xl p-3 sm:p-4 border-2 border-blue-200">
+                  <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
+                    <RefreshCw size={18} className="text-blue-600 flex-shrink-0" />
+                    Revisions: {selectedDay.activity.gathas?.revision || 0}
+                  </h4>
+                  {(selectedDay.activity.details || []).filter((d) => d.type === 'revision').length === 0 ? (
+                    <p className="text-sm text-blue-600 bg-white/50 px-3 py-2 rounded-lg">No revisions recorded</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {(selectedDay.activity.details || []).filter((d) => d.type === 'revision').map((entry, idx) => (
+                        <div key={idx} className="bg-white rounded-lg p-3 border border-blue-200">
+                          <p className="text-sm"><strong>Sutra:</strong> {entry.sutra_name}</p>
+                          <p className="text-sm"><strong>Gatha:</strong> {entry.which_gatha}</p>
+                          <p className="text-sm font-bold text-blue-700">Count: {entry.total_gatha}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedDay(null)}
+                className="w-full mt-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold py-3 rounded-xl active:scale-[0.98] transition-transform text-sm sm:text-base"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// PENDING PAGE COMPONENT
+// ============================================
+
+const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting }) => {
+  const PendingBadge = ({ status }) => {
+    const badges = {
+      pending: { className: 'text-yellow-700 bg-yellow-100 border-yellow-200', icon: Clock, label: 'Pending' },
+      approved: { className: 'text-green-700 bg-green-100 border-green-200', icon: Check, label: 'Approved' },
+      rejected: { className: 'text-red-700 bg-red-100 border-red-200', icon: CloseIcon, label: 'Rejected' },
+    };
+    const badge = badges[status];
+    if (!badge) return null;
+    const Icon = badge.icon;
+    return (
+      <span className={`inline-flex items-center gap-1 font-bold rounded-full border text-xs px-2 py-0.5 ${badge.className}`}>
+        <Icon className={`w-3 h-3 ${status === 'pending' ? 'animate-pulse' : ''}`} />
+        {badge.label}
+      </span>
+    );
+  };
+
+  const allPending = [
+    ...(pendingStatus.attendance?.filter((p) => p.status === 'pending').map((p) => ({ ...p, itemType: 'attendance' })) || []),
+    ...(pendingStatus.gatha?.filter((p) => p.status === 'pending').map((p) => ({ ...p, itemType: 'gatha' })) || []),
+  ];
+
+  const allRejected = [
+    ...(pendingStatus.attendance?.filter((p) => p.status === 'rejected').map((p) => ({ ...p, itemType: 'attendance' })) || []),
+    ...(pendingStatus.gatha?.filter((p) => p.status === 'rejected').map((p) => ({ ...p, itemType: 'gatha' })) || []),
+  ];
+
+  const totalPendingCount = allPending.length;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
+        <Clock className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-bold text-yellow-800">What is Pending?</p>
+          <p className="text-xs text-yellow-700 mt-1">
+            After you mark attendance or add gathas, your teacher needs to approve them.
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-r from-yellow-400 to-orange-400 rounded-2xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
+        <div className="relative z-10">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
+              <span className="font-bold text-base sm:text-lg">Pending Approvals</span>
+            </div>
+            <button
+              onClick={onRefresh}
+              disabled={isSubmitting}
+              className="p-2 sm:p-2.5 bg-white/20 rounded-xl hover:bg-white/30 transition-colors"
+            >
+              <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${isSubmitting ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+          <p className="text-4xl sm:text-5xl font-bold">{totalPendingCount}</p>
+          <p className="text-xs sm:text-sm opacity-80 mt-1">
+            {totalPendingCount === 0 ? 'All caught up!' : 'items awaiting approval'}
+          </p>
+        </div>
+      </div>
+
+      {totalPendingCount === 0 ? (
+        <div className="bg-white rounded-2xl p-6 sm:p-8 border-2 border-green-200 text-center shadow-sm">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-8 h-8 sm:w-10 sm:h-10 text-green-500" />
+          </div>
+          <p className="text-lg sm:text-xl font-bold text-gray-800">All Caught Up! 🎉</p>
+          <p className="text-sm text-gray-500 mt-2">No pending approvals</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-yellow-200 shadow-sm">
+          <h3 className="font-bold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
+            <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
+            Awaiting Approval
+          </h3>
+          <div className="space-y-2 sm:space-y-3">
+            {allPending.map((item, index) => (
+              <div
+                key={index}
+                className={`p-3 sm:p-4 rounded-xl border-2 ${
+                  item.itemType === 'attendance' ? 'bg-blue-50 border-blue-200' : 'bg-purple-50 border-purple-200'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      item.itemType === 'attendance' ? 'bg-blue-200' : 'bg-purple-200'
+                    }`}>
+                      {item.itemType === 'attendance' ? (
+                        <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-blue-700" />
+                      ) : (
+                        <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-purple-700" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-800 text-sm">
+                        {item.itemType === 'attendance' ? 'Attendance' : `Gatha - ${item.type === 'new' ? 'New' : 'Revision'}`}
+                      </p>
+                      <p className="text-xs sm:text-sm text-gray-600">{formatDateIn(item.date)}</p>
+                      {item.itemType === 'gatha' && (
+                        <p className="text-xs text-gray-500 mt-1 truncate">
+                          {item.sutra_name} • {item.total_gatha} gathas
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                    <PendingBadge status="pending" />
+                    {item.itemType === 'gatha' && onEdit && onDelete && (
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => onEdit(item)}
+                          className="p-1.5 sm:p-2 bg-blue-100 rounded-lg text-blue-600 active:scale-95 transition-transform"
+                        >
+                          <Edit2 size={12} className="sm:w-3.5 sm:h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => onDelete(item)}
+                          className="p-1.5 sm:p-2 bg-red-100 rounded-lg text-red-600 active:scale-95 transition-transform"
+                        >
+                          <Trash2 size={12} className="sm:w-3.5 sm:h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {allRejected.length > 0 && (
+        <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-red-200 shadow-sm">
+          <h3 className="font-bold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
+            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
+            Rejected ({allRejected.length})
+          </h3>
+          <div className="space-y-2 sm:space-y-3">
+            {allRejected.map((item, index) => (
+              <div key={index} className="p-3 sm:p-4 rounded-xl bg-red-50 border-2 border-red-200">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                    {item.itemType === 'attendance' ? (
+                      <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-red-700" />
+                    ) : (
+                      <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-red-700" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-800 text-sm">
+                      {item.itemType === 'attendance' ? 'Attendance' : `Gatha - ${item.type}`}
+                    </p>
+                    <p className="text-xs sm:text-sm text-gray-600">{formatDateIn(item.date)}</p>
+                    {item.rejection_reason && (
+                      <p className="text-xs text-red-600 mt-1 bg-red-100 px-2 py-1 rounded truncate">
+                        Reason: {item.rejection_reason}
+                      </p>
+                    )}
+                  </div>
+                  <span className="inline-flex items-center gap-1 font-bold rounded-full border text-xs px-2 py-0.5 text-red-700 bg-red-100 border-red-200">
+                    <CloseIcon className="w-3 h-3" />
+                    Rejected
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// RECENT BADGES COMPONENT
+// ============================================
+
+const RecentBadges = ({ stats, onBadgeClick }) => {
+  const recentlyUnlocked = useMemo(() => {
+    return MONTHLY_ACHIEVEMENTS
+      .filter((a) => calculateAchievementProgress(a, stats).unlocked)
+      .slice(0, 4);
+  }, [stats]);
+
+  if (recentlyUnlocked.length === 0) {
+    return (
+      <div className="bg-gray-50 rounded-xl p-4 sm:p-6 text-center border-2 border-gray-200">
+        <Award className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
+        <p className="text-gray-500 text-sm">No badges yet this month</p>
+        <p className="text-gray-400 text-xs mt-1">Keep learning to unlock!</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2">
+      {recentlyUnlocked.map((achievement) => {
+        const Icon = achievement.icon;
+        const colors = ACHIEVEMENT_COLORS[achievement.color];
+
+        return (
+          <button
+            key={achievement.id}
+            onClick={() => onBadgeClick?.(achievement)}
+            className="flex-shrink-0 w-16 sm:w-20 p-2 bg-white rounded-xl border-2 border-gray-200 shadow-sm active:scale-95 transition-transform"
+          >
+            <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full mx-auto mb-1 flex items-center justify-center bg-gradient-to-br ${colors.bg}`}>
+              <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+            </div>
+            <p className="text-xs font-bold text-gray-800 text-center truncate">{achievement.title}</p>
+            <p className="text-xs text-center">{colors.icon}</p>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+// ============================================
+// NEXT BADGES COMPONENT
+// ============================================
+
+const NextBadges = ({ stats, onBadgeClick }) => {
+  const nextAchievements = useMemo(() => {
+    return MONTHLY_ACHIEVEMENTS
+      .map((a) => ({ ...a, ...calculateAchievementProgress(a, stats) }))
+      .filter((a) => !a.unlocked && a.progress > 0)
+      .sort((a, b) => b.progress - a.progress)
+      .slice(0, 2);
+  }, [stats]);
+
+  if (nextAchievements.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 sm:p-4 border-2 border-green-200">
+      <h4 className="font-bold text-green-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
+        <Target className="w-4 h-4 sm:w-5 sm:h-5" />
+        Almost There! Keep Going!
+      </h4>
+      <div className="space-y-2 sm:space-y-3">
+        {nextAchievements.map((achievement) => {
+          const Icon = achievement.icon;
+          const colors = ACHIEVEMENT_COLORS[achievement.color];
+
+          return (
+            <button
+              key={achievement.id}
+              onClick={() => onBadgeClick?.(achievement)}
+              className="w-full flex items-center gap-2 sm:gap-3 bg-white rounded-xl p-2 sm:p-3 border border-green-200 text-left active:scale-[0.98] transition-transform"
+            >
+              <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-gradient-to-br ${colors.bg} flex-shrink-0`}>
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-800 text-xs sm:text-sm truncate">{achievement.title}</p>
+                <p className="text-xs text-gray-500 truncate">({achievement.subtitle})</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex-1 h-1.5 sm:h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full bg-gradient-to-r ${colors.bg} rounded-full`}
+                      style={{ width: `${achievement.progress * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-bold text-gray-500 flex-shrink-0">
+                    {achievement.current}/{achievement.target}
+                  </span>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+// ============================================
+// GATHA ENTRY MODAL
+// ============================================
+
+const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, activeUserName }) => {
+  const [activeTab, setActiveTab] = useState(editData?.type || 'new');
+  const [form, setForm] = useState({
+    sutraName: editData?.sutra_name || '',
+    whichGatha: editData?.which_gatha || '',
+    totalGatha: editData?.total_gatha?.toString() || '',
+  });
+
+  useEffect(() => {
+    if (editData) {
+      setActiveTab(editData.type || 'new');
+      setForm({
+        sutraName: editData.sutra_name || '',
+        whichGatha: editData.which_gatha || '',
+        totalGatha: editData.total_gatha?.toString() || '',
+      });
+    } else {
+      setForm({ sutraName: '', whichGatha: '', totalGatha: '' });
+    }
+  }, [editData]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = () => {
+    onSubmit({
+      type: activeTab,
+      sutra_name: form.sutraName,
+      which_gatha: form.whichGatha,
+      total_gatha: Number(form.totalGatha),
+    });
+  };
+
+  const isValid = form.sutraName && form.whichGatha && form.totalGatha;
+  const commonSutras = ['નવકાર', 'પંચ પરમેષ્ઠી', 'લોગસ્સ', 'ઉવસગ્ગહરં', 'ભક્તામર'];
+
+  return (
+    <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 overflow-y-auto" onClick={onClose}>
+      <div className="min-h-full flex items-center justify-center p-4 py-8">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
+          <div className={`p-4 sm:p-5 text-white rounded-t-3xl ${activeTab === 'new' ? 'bg-gradient-to-r from-purple-500 to-indigo-600' : 'bg-gradient-to-r from-blue-500 to-cyan-600'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-lg sm:text-xl font-bold">{editData ? 'Edit Entry' : 'Add Gatha'}</h3>
+                  <p className="text-xs sm:text-sm opacity-80">
+                    {activeUserName ? `For: ${activeUserName}` : 'Record your learning progress'}
+                  </p>
+                </div>
+              </div>
+              <button onClick={onClose} className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors flex-shrink-0">
+                <CloseIcon size={24} />
+              </button>
+            </div>
+          </div>
+
+          {!editData && (
+            <div className="flex p-2 bg-gray-100 gap-2">
+              <button
+                onClick={() => setActiveTab('new')}
+                className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
+                  activeTab === 'new' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+                }`}
+              >
+                <Plus className="w-4 h-4 sm:w-5 sm:h-5" /> New Learning
+              </button>
+              <button
+                onClick={() => setActiveTab('revision')}
+                className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
+                  activeTab === 'revision' ? 'bg-blue-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+                }`}
+              >
+                <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" /> Revision
+              </button>
+            </div>
+          )}
+
+          <div className="max-h-[50vh] overflow-y-auto p-4 sm:p-5 space-y-4">
+            <div>
+              <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
+                📖 Sutra Name
+                <HelpTooltip text="Enter the name of the sutra you learned or revised" />
+              </label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {commonSutras.map((sutra) => (
+                  <button
+                    key={sutra}
+                    type="button"
+                    onClick={() => setForm({ ...form, sutraName: sutra })}
+                    className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all ${
+                      form.sutraName === sutra
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {sutra}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                value={form.sutraName}
+                onChange={(e) => setForm({ ...form, sutraName: e.target.value })}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
+                placeholder="Enter sutra name or select above"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
+                📝 Which Gatha
+                <HelpTooltip text="Enter the gatha numbers you completed (e.g., 1-5 or 3,4,5)" />
+              </label>
+              <input
+                type="text"
+                value={form.whichGatha}
+                onChange={(e) => setForm({ ...form, whichGatha: e.target.value })}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
+                placeholder="e.g., Gatha 1-5 or 3,4,5"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
+                #️⃣ Total Count
+                <HelpTooltip text="How many gathas did you complete in total?" />
+              </label>
+              <div className="flex gap-2">
+                {[1, 3, 5, 10].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setForm({ ...form, totalGatha: num.toString() })}
+                    className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all ${
+                      form.totalGatha === num.toString()
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                value={form.totalGatha}
+                onChange={(e) => setForm({ ...form, totalGatha: e.target.value })}
+                className="w-full mt-2 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
+                placeholder="Or enter custom count"
+                min="1"
+              />
+            </div>
+          </div>
+
+          <div className="p-4 sm:p-5 border-t bg-gray-50 rounded-b-3xl">
+            <div className="flex gap-2 sm:gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl active:scale-[0.98] transition-transform text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting || !isValid}
+                className={`flex-1 py-3 font-bold rounded-xl text-white shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform text-sm ${
+                  activeTab === 'new'
+                    ? 'bg-gradient-to-r from-purple-500 to-purple-600'
+                    : 'bg-gradient-to-r from-blue-500 to-blue-600'
+                }`}
+              >
+                {isSubmitting ? (
+                  <Loader className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                ) : (
+                  <Check className="w-4 h-4 sm:w-5 sm:h-5" />
+                )}
+                {editData ? 'Save' : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// LEVEL DETAILS MODAL
+// ============================================
+
+const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel, stats }) => {
+  if (!isOpen) return null;
+
+  const allLevels = LEVELS || [
+    { level: 1, name: 'Beginner', minXP: 0, icon: '🌱' },
+    { level: 2, name: 'Learner', minXP: 50, icon: '📚' },
+    { level: 3, name: 'Student', minXP: 150, icon: '✨' },
+    { level: 4, name: 'Scholar', minXP: 300, icon: '⭐' },
+    { level: 5, name: 'Expert', minXP: 500, icon: '🏆' },
+    { level: 6, name: 'Master', minXP: 800, icon: '👑' },
+    { level: 7, name: 'Guru', minXP: 1200, icon: '🔱' },
+    { level: 8, name: 'Legend', minXP: 2000, icon: '💎' },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 overflow-y-auto" onClick={onClose}>
+      <div className="min-h-full flex items-center justify-center p-4 py-8">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
+          <div className="p-4 sm:p-5 text-white bg-gradient-to-r from-indigo-500 to-purple-600 rounded-t-3xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white/20 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl flex-shrink-0">
+                  {userLevel.icon}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-lg sm:text-xl font-bold">Level Progress</h3>
+                  <p className="text-sm opacity-80">Your XP Journey</p>
+                </div>
+              </div>
+              <button onClick={onClose} className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors flex-shrink-0">
                 <CloseIcon size={24} />
               </button>
             </div>
@@ -790,461 +2056,6 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
 };
 
 // ============================================
-// LEADERBOARD COMPONENT
-// ============================================
-
-const LeaderboardSection = ({ currentUserId, currentUserName, dateRange }) => {
-  const [activeTab, setActiveTab] = useState('attendance');
-  const [leaderboardData, setLeaderboardData] = useState({ attendanceLeaders: [], gathaLeaders: [] });
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const fetchLeaderboard = useCallback(async () => {
-    const token = localStorage.getItem('jainPathshalaToken');
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // Use passed date range or default to current month
-      let startStr, endStr;
-      
-      if (dateRange && dateRange.start && dateRange.end) {
-        startStr = formatLocalDateString(dateRange.start);
-        endStr = formatLocalDateString(dateRange.end);
-      } else {
-        const now = new Date();
-        startStr = formatLocalDateString(new Date(now.getFullYear(), now.getMonth(), 1));
-        endStr = formatLocalDateString(new Date(now.getFullYear(), now.getMonth() + 1, 0));
-      }
-      
-      let res = await fetch(
-        `${API_BASE}/leaderboard?startDate=${startStr}&endDate=${endStr}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      if (res.ok) {
-        const data = await res.json();
-        setLeaderboardData(data);
-      } else {
-        res = await fetch(
-          `${API_BASE}/analytics/leaderboard?startDate=${startStr}&endDate=${endStr}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        
-        if (res.ok) {
-          const data = await res.json();
-          setLeaderboardData({
-            attendanceLeaders: data.attendanceLeaders || data.topAttendance || [],
-            gathaLeaders: data.gathaLeaders || data.topGathas || [],
-          });
-        } else {
-          throw new Error('Could not load leaderboard data');
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching leaderboard:', err);
-      setError('Unable to load leaderboard');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [dateRange]); // Refetch when dateRange changes
-
-  useEffect(() => {
-    fetchLeaderboard();
-  }, [fetchLeaderboard]);
-
-  const getRankIcon = (rank) => {
-    switch (rank) {
-      case 1: return <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />;
-      case 2: return <Medal className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />;
-      case 3: return <Medal className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />;
-      default: return <span className="w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-xs sm:text-sm font-bold text-gray-500">#{rank}</span>;
-    }
-  };
-
-  const getRankBg = (rank, isCurrentUser) => {
-    if (isCurrentUser) return 'bg-gradient-to-r from-orange-100 to-amber-100 border-orange-400';
-    switch (rank) {
-      case 1: return 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-300';
-      case 2: return 'bg-gray-50 border-gray-300';
-      case 3: return 'bg-amber-50 border-amber-300';
-      default: return 'bg-white border-gray-200';
-    }
-  };
-
-  const getRankEmoji = (rank) => {
-    switch (rank) {
-      case 1: return '🥇';
-      case 2: return '🥈';
-      case 3: return '🥉';
-      default: return '';
-    }
-  };
-
-  const attendanceLeaders = leaderboardData?.attendanceLeaders || [];
-  const gathaLeaders = leaderboardData?.gathaLeaders || [];
-
-  return (
-    <div className="bg-white rounded-2xl border-2 border-blue-200 shadow-sm overflow-hidden">
-      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-3 sm:p-4 text-white">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 sm:w-6 sm:h-6" />
-            <h3 className="text-base sm:text-lg font-bold">🏆 Leaderboard</h3>
-          </div>
-          <button
-            onClick={fetchLeaderboard}
-            disabled={isLoading}
-            className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-        <p className="text-xs sm:text-sm opacity-80 mt-1">Top performers for selected period</p>
-      </div>
-
-      <div className="flex p-2 bg-gray-100 gap-2">
-        <button
-          onClick={() => setActiveTab('attendance')}
-          className={`flex-1 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
-            activeTab === 'attendance' ? 'bg-green-500 text-white shadow-lg' : 'text-gray-600 bg-white'
-          }`}
-        >
-          <Calendar className="w-3 h-3 sm:w-4 sm:h-4" /> Attendance
-        </button>
-        <button
-          onClick={() => setActiveTab('gatha')}
-          className={`flex-1 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
-            activeTab === 'gatha' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-600 bg-white'
-          }`}
-        >
-          <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" /> New Gathas
-        </button>
-      </div>
-
-      <div className="p-3 sm:p-4">
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-8">
-            <RefreshCw className="w-8 h-8 sm:w-10 sm:h-10 animate-spin text-blue-500 mb-3" />
-            <p className="text-gray-500 text-sm">Loading leaderboard...</p>
-          </div>
-        ) : error ? (
-          <div className="text-center py-8">
-            <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-500 text-sm">{error}</p>
-            <button
-              onClick={fetchLeaderboard}
-              className="mt-3 px-4 py-2 bg-blue-100 text-blue-700 rounded-xl font-medium text-sm"
-            >
-              Try Again
-            </button>
-          </div>
-        ) : activeTab === 'attendance' ? (
-          attendanceLeaders.length === 0 ? (
-            <div className="text-center py-8">
-              <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
-              <p className="text-gray-500 font-medium text-sm">No data yet for this period</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {attendanceLeaders.slice(0, 5).map((user, index) => {
-                const odometer = user.userId || user._id || user.id || user.username;
-                const isCurrentUser = odometer === currentUserId || user.name === currentUserName || user.username === currentUserId;
-                const rank = index + 1;
-                
-                return (
-                  <div 
-                    key={odometer || index}
-                    className={`flex items-center justify-between p-2 sm:p-3 rounded-xl border-2 transition-all ${getRankBg(rank, isCurrentUser)}`}
-                  >
-                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        {getRankIcon(rank)}
-                        <span className="text-base sm:text-lg">{getRankEmoji(rank)}</span>
-                      </div>
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold shadow-md flex-shrink-0 text-sm">
-                        {(user.name || user.username || 'U').charAt(0).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-bold text-gray-800 text-sm flex items-center gap-1 sm:gap-2 flex-wrap">
-                          <span className="truncate">{user.name || user.username}</span>
-                          {isCurrentUser && (
-                            <span className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded animate-pulse flex-shrink-0">You</span>
-                          )}
-                        </p>
-                        <p className="text-xs text-gray-500">{user.totalAttendance || user.count || 0} days present</p>
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-xl sm:text-2xl font-bold text-green-600">{user.totalAttendance || user.count || 0}</p>
-                      <p className="text-xs text-gray-400">days</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )
-        ) : (
-          gathaLeaders.length === 0 ? (
-            <div className="text-center py-8">
-              <BookOpen className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
-              <p className="text-gray-500 font-medium text-sm">No data yet for this period</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {gathaLeaders.slice(0, 5).map((user, index) => {
-                const odometer = user.userId || user._id || user.id || user.username;
-                const isCurrentUser = odometer === currentUserId || user.name === currentUserName || user.username === currentUserId;
-                const rank = index + 1;
-                
-                return (
-                  <div 
-                    key={odometer || index}
-                    className={`flex items-center justify-between p-2 sm:p-3 rounded-xl border-2 transition-all ${getRankBg(rank, isCurrentUser)}`}
-                  >
-                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        {getRankIcon(rank)}
-                        <span className="text-base sm:text-lg">{getRankEmoji(rank)}</span>
-                      </div>
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white font-bold shadow-md flex-shrink-0 text-sm">
-                        {(user.name || user.username || 'U').charAt(0).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-bold text-gray-800 text-sm flex items-center gap-1 sm:gap-2 flex-wrap">
-                          <span className="truncate">{user.name || user.username}</span>
-                          {isCurrentUser && (
-                            <span className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded animate-pulse flex-shrink-0">You</span>
-                          )}
-                        </p>
-                        <p className="text-xs text-gray-500">{user.totalGathas || user.count || 0} new gathas</p>
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-xl sm:text-2xl font-bold text-purple-600">{user.totalGathas || user.count || 0}</p>
-                      <p className="text-xs text-gray-400">gathas</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )
-        )}
-      </div>
-
-      <div className="px-3 sm:px-4 pb-3 sm:pb-4">
-        <div className="bg-blue-50 rounded-xl p-2 sm:p-3 border border-blue-200">
-          <p className="text-xs text-blue-700 text-center">
-            <Sparkles className="w-3 h-3 inline mr-1" />
-            Keep learning to stay on top! 🌟
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-};
-// ============================================
-// GATHA ENTRY MODAL
-// ============================================
-
-const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, activeUserName }) => {
-  const [activeTab, setActiveTab] = useState(editData?.type || 'new');
-  const [form, setForm] = useState({
-    sutraName: editData?.sutra_name || '',
-    whichGatha: editData?.which_gatha || '',
-    totalGatha: editData?.total_gatha?.toString() || '',
-  });
-
-  useEffect(() => {
-    if (editData) {
-      setActiveTab(editData.type || 'new');
-      setForm({
-        sutraName: editData.sutra_name || '',
-        whichGatha: editData.which_gatha || '',
-        totalGatha: editData.total_gatha?.toString() || '',
-      });
-    } else {
-      setForm({ sutraName: '', whichGatha: '', totalGatha: '' });
-    }
-  }, [editData]);
-
-  if (!isOpen) return null;
-
-  const handleSubmit = () => {
-    onSubmit({
-      type: activeTab,
-      sutra_name: form.sutraName,
-      which_gatha: form.whichGatha,
-      total_gatha: Number(form.totalGatha),
-    });
-  };
-
-  const isValid = form.sutraName && form.whichGatha && form.totalGatha;
-  const commonSutras = ['નવકાર', 'પંચ પરમેષ્ઠી', 'લોગસ્સ', 'ઉવસગ્ગહરં'];
-
-  return (
-    <div 
-      className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 overflow-y-auto" 
-      onClick={onClose}
-    >
-      <div className="min-h-full flex items-center justify-center p-4 py-8">
-        <div 
-          className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in duration-200" 
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className={`p-4 sm:p-5 text-white rounded-t-3xl ${activeTab === 'new' ? 'bg-gradient-to-r from-purple-500 to-indigo-600' : 'bg-gradient-to-r from-blue-500 to-cyan-600'}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 rounded-2xl flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-lg sm:text-xl font-bold">{editData ? 'Edit Entry' : 'Add Gatha'}</h3>
-                  <p className="text-xs sm:text-sm opacity-80">
-                    {activeUserName ? `For: ${activeUserName}` : 'Record your learning progress'}
-                  </p>
-                </div>
-              </div>
-              <button 
-                onClick={onClose} 
-                className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors flex-shrink-0"
-              >
-                <CloseIcon size={24} />
-              </button>
-            </div>
-          </div>
-
-          {!editData && (
-            <div className="flex p-2 bg-gray-100 gap-2">
-              <button
-                onClick={() => setActiveTab('new')}
-                className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
-                  activeTab === 'new' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-600 bg-white'
-                }`}
-              >
-                <Plus className="w-4 h-4 sm:w-5 sm:h-5" /> New Learning
-              </button>
-              <button
-                onClick={() => setActiveTab('revision')}
-                className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
-                  activeTab === 'revision' ? 'bg-blue-500 text-white shadow-lg' : 'text-gray-600 bg-white'
-                }`}
-              >
-                <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" /> Revision
-              </button>
-            </div>
-          )}
-
-          <div className="max-h-[50vh] overflow-y-auto p-4 sm:p-5 space-y-4">
-            <div>
-              <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
-                📖 Sutra Name
-                <HelpTooltip text="Enter the name of the sutra you learned or revised" />
-              </label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {commonSutras.map((sutra) => (
-                  <button
-                    key={sutra}
-                    type="button"
-                    onClick={() => setForm({ ...form, sutraName: sutra })}
-                    className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all ${
-                      form.sutraName === sutra
-                        ? 'bg-purple-500 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {sutra}
-                  </button>
-                ))}
-              </div>
-              <input
-                type="text"
-                value={form.sutraName}
-                onChange={(e) => setForm({ ...form, sutraName: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
-                placeholder="Enter sutra name or select above"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
-                📝 Which Gatha
-                <HelpTooltip text="Enter the gatha numbers you completed (e.g., 1-5 or 3,4,5)" />
-              </label>
-              <input
-                type="text"
-                value={form.whichGatha}
-                onChange={(e) => setForm({ ...form, whichGatha: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
-                placeholder="e.g., Gatha 1-5 or 3,4,5"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
-                #️⃣ Total Count
-                <HelpTooltip text="How many gathas did you complete in total?" />
-              </label>
-              <div className="flex gap-2">
-                {[1, 3, 5, 10].map((num) => (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => setForm({ ...form, totalGatha: num.toString() })}
-                    className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all ${
-                      form.totalGatha === num.toString()
-                        ? 'bg-purple-500 text-white'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}
-                  >
-                    {num}
-                  </button>
-                ))}
-              </div>
-              <input
-                type="number"
-                value={form.totalGatha}
-                onChange={(e) => setForm({ ...form, totalGatha: e.target.value })}
-                className="w-full mt-2 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
-                placeholder="Or enter custom count"
-                min="1"
-              />
-            </div>
-          </div>
-
-          <div className="p-4 sm:p-5 border-t bg-gray-50 rounded-b-3xl">
-            <div className="flex gap-2 sm:gap-3">
-              <button
-                onClick={onClose}
-                className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl active:scale-[0.98] transition-transform text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting || !isValid}
-                className={`flex-1 py-3 font-bold rounded-xl text-white shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform text-sm ${
-                  activeTab === 'new'
-                    ? 'bg-gradient-to-r from-purple-500 to-purple-600'
-                    : 'bg-gradient-to-r from-blue-500 to-blue-600'
-                }`}
-              >
-                {isSubmitting ? (
-                  <Loader className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
-                ) : (
-                  <Check className="w-4 h-4 sm:w-5 sm:h-5" />
-                )}
-                {editData ? 'Save' : 'Submit'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ============================================
 // HISTORY PAGE COMPONENT
 // ============================================
 
@@ -1257,15 +2068,7 @@ const HistoryPage = ({ activeUserId }) => {
   const [error, setError] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null);
 
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-
-  const monthNamesGujarati = [
-    'જાન્યુઆરી', 'ફેબ્રુઆરી', 'માર્ચ', 'એપ્રિલ', 'મે', 'જૂન',
-    'જુલાઈ', 'ઓગસ્ટ', 'સપ્ટેમ્બર', 'ઓક્ટોબર', 'નવેમ્બર', 'ડિસેમ્બર',
-  ];
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   const fetchHistory = useCallback(async (year, month) => {
     setIsLoading(true);
@@ -1342,6 +2145,7 @@ const HistoryPage = ({ activeUserId }) => {
       const isToday = dateStr === todayIso;
       const hasGathas = (activity?.gathas?.new || 0) + (activity?.gathas?.revision || 0) > 0;
       const isFuture = new Date(dateStr) > today;
+      const isSunday = new Date(dateStr).getDay() === 0;
 
       days.push(
         <button
@@ -1353,6 +2157,8 @@ const HistoryPage = ({ activeUserId }) => {
               ? 'bg-gradient-to-br from-green-400 to-green-600 text-white shadow-md active:scale-95'
               : isToday
               ? 'bg-orange-100 text-orange-600 border-2 border-orange-400 ring-2 ring-orange-200'
+              : isSunday
+              ? 'bg-red-50 text-red-300'
               : isFuture
               ? 'text-gray-200'
               : 'text-gray-400 hover:bg-gray-100'
@@ -1377,27 +2183,21 @@ const HistoryPage = ({ activeUserId }) => {
         <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
         <div>
           <p className="text-sm font-bold text-blue-800">
-             {activeUserId ? `Viewing ${activeUserId}'s History` : "My Personal History"}
+            {activeUserId ? `Viewing ${activeUserId}'s History` : "My Personal History"}
           </p>
           <p className="text-xs text-blue-600 mt-1">
-            Green days = Present. Tap on green days to see gatha details.
+            Green = Present • Red tint = Sunday (Holiday) • Tap green days for details
           </p>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-orange-200 shadow-sm">
         <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={() => handleMonthChange(-1)}
-            className="p-2 sm:p-3 rounded-xl bg-orange-50 active:scale-95 transition-transform"
-          >
+          <button onClick={() => handleMonthChange(-1)} className="p-2 sm:p-3 rounded-xl bg-orange-50 active:scale-95 transition-transform">
             <ChevronLeft size={20} className="text-orange-600 sm:w-6 sm:h-6" />
           </button>
           <div className="text-center">
-            <h3 className="text-lg sm:text-xl font-bold text-gray-800">
-              {monthNames[selectedMonth - 1]} {selectedYear}
-            </h3>
-            <p className="text-xs text-gray-500">{monthNamesGujarati[selectedMonth - 1]}</p>
+            <h3 className="text-lg sm:text-xl font-bold text-gray-800">{monthNames[selectedMonth - 1]} {selectedYear}</h3>
           </div>
           <button
             onClick={() => handleMonthChange(1)}
@@ -1417,10 +2217,7 @@ const HistoryPage = ({ activeUserId }) => {
           <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 sm:p-6 text-center">
             <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-red-400 mx-auto mb-3" />
             <p className="text-red-700 font-medium text-sm">{error}</p>
-            <button
-              onClick={() => fetchHistory(selectedYear, selectedMonth)}
-              className="mt-3 px-4 py-2 bg-red-100 text-red-700 rounded-xl font-medium text-sm"
-            >
+            <button onClick={() => fetchHistory(selectedYear, selectedMonth)} className="mt-3 px-4 py-2 bg-red-100 text-red-700 rounded-xl font-medium text-sm">
               Try Again
             </button>
           </div>
@@ -1429,14 +2226,12 @@ const HistoryPage = ({ activeUserId }) => {
             <div className="bg-gray-50 rounded-xl p-2 sm:p-3 mb-4">
               <div className="grid grid-cols-7 gap-1 mb-2">
                 {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                  <div key={i} className="h-6 sm:h-8 flex items-center justify-center text-xs font-bold text-gray-400">
+                  <div key={i} className={`h-6 sm:h-8 flex items-center justify-center text-xs font-bold ${i === 0 ? 'text-red-400' : 'text-gray-400'}`}>
                     {d}
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-7 gap-1">
-                {renderCalendar()}
-              </div>
+              <div className="grid grid-cols-7 gap-1">{renderCalendar()}</div>
             </div>
 
             <div className="flex items-center justify-center gap-3 sm:gap-4 text-xs mb-4 flex-wrap">
@@ -1445,12 +2240,8 @@ const HistoryPage = ({ activeUserId }) => {
                 <span className="text-gray-600">Present ({monthlySummary.presentDays})</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-purple-500" />
-                <span className="text-gray-600">Has Gathas</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-md border-2 border-orange-400 bg-orange-100" />
-                <span className="text-gray-600">Today</span>
+                <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-md bg-red-50 border border-red-200" />
+                <span className="text-gray-600">Sunday</span>
               </div>
             </div>
 
@@ -1477,15 +2268,9 @@ const HistoryPage = ({ activeUserId }) => {
 
       {/* Day Detail Modal */}
       {selectedDay && (
-        <div 
-          className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 overflow-y-auto" 
-          onClick={() => setSelectedDay(null)}
-        >
+        <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 overflow-y-auto" onClick={() => setSelectedDay(null)}>
           <div className="min-h-full flex items-center justify-center p-4 py-8">
-            <div 
-              className="bg-white rounded-3xl p-4 sm:p-6 w-full max-w-md shadow-2xl animate-in zoom-in duration-200" 
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className="bg-white rounded-3xl p-4 sm:p-6 w-full max-w-md shadow-2xl animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 sm:w-14 sm:h-14 bg-green-100 rounded-2xl flex items-center justify-center flex-shrink-0">
@@ -1495,7 +2280,7 @@ const HistoryPage = ({ activeUserId }) => {
                     <h3 className="font-bold text-gray-800 text-base sm:text-lg">
                       {formatDateIn(selectedDay.dateStr, { weekday: 'short', day: 'numeric', month: 'short' })}
                     </h3>
-                    <PendingBadge status="approved" />
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Present ✓</span>
                   </div>
                 </div>
                 <button onClick={() => setSelectedDay(null)} className="p-2 bg-gray-100 rounded-xl flex-shrink-0">
@@ -1564,6 +2349,23 @@ const HistoryPage = ({ activeUserId }) => {
 // ============================================
 
 const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting }) => {
+  const PendingBadge = ({ status }) => {
+    const badges = {
+      pending: { className: 'text-yellow-700 bg-yellow-100 border-yellow-200', icon: Clock, label: 'Pending' },
+      approved: { className: 'text-green-700 bg-green-100 border-green-200', icon: Check, label: 'Approved' },
+      rejected: { className: 'text-red-700 bg-red-100 border-red-200', icon: CloseIcon, label: 'Rejected' },
+    };
+    const badge = badges[status];
+    if (!badge) return null;
+    const Icon = badge.icon;
+    return (
+      <span className={`inline-flex items-center gap-1 font-bold rounded-full border text-xs px-2 py-0.5 ${badge.className}`}>
+        <Icon className={`w-3 h-3 ${status === 'pending' ? 'animate-pulse' : ''}`} />
+        {badge.label}
+      </span>
+    );
+  };
+
   const allPending = [
     ...(pendingStatus.attendance?.filter((p) => p.status === 'pending').map((p) => ({ ...p, itemType: 'attendance' })) || []),
     ...(pendingStatus.gatha?.filter((p) => p.status === 'pending').map((p) => ({ ...p, itemType: 'gatha' })) || []),
@@ -1590,18 +2392,13 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
 
       <div className="bg-gradient-to-r from-yellow-400 to-orange-400 rounded-2xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
-
         <div className="relative z-10">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
               <span className="font-bold text-base sm:text-lg">Pending Approvals</span>
             </div>
-            <button 
-              onClick={onRefresh} 
-              disabled={isSubmitting}
-              className="p-2 sm:p-2.5 bg-white/20 rounded-xl hover:bg-white/30 transition-colors"
-            >
+            <button onClick={onRefresh} disabled={isSubmitting} className="p-2 sm:p-2.5 bg-white/20 rounded-xl hover:bg-white/30 transition-colors">
               <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${isSubmitting ? 'animate-spin' : ''}`} />
             </button>
           </div>
@@ -1628,19 +2425,17 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
           </h3>
           <div className="space-y-2 sm:space-y-3">
             {allPending.map((item, index) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className={`p-3 sm:p-4 rounded-xl border-2 ${
                   item.itemType === 'attendance' ? 'bg-blue-50 border-blue-200' : 'bg-purple-50 border-purple-200'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-start gap-2 sm:gap-3 min-w-0">
-                    <div 
-                      className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                        item.itemType === 'attendance' ? 'bg-blue-200' : 'bg-purple-200'
-                      }`}
-                    >
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      item.itemType === 'attendance' ? 'bg-blue-200' : 'bg-purple-200'
+                    }`}>
                       {item.itemType === 'attendance' ? (
                         <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-blue-700" />
                       ) : (
@@ -1660,19 +2455,13 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                    <PendingBadge status="pending" size="small" />
-                    {item.itemType === 'gatha' && (
+                    <PendingBadge status="pending" />
+                    {item.itemType === 'gatha' && onEdit && onDelete && (
                       <div className="flex gap-1">
-                        <button 
-                          onClick={() => onEdit(item)} 
-                          className="p-1.5 sm:p-2 bg-blue-100 rounded-lg text-blue-600 active:scale-95 transition-transform"
-                        >
+                        <button onClick={() => onEdit(item)} className="p-1.5 sm:p-2 bg-blue-100 rounded-lg text-blue-600 active:scale-95 transition-transform">
                           <Edit2 size={12} className="sm:w-3.5 sm:h-3.5" />
                         </button>
-                        <button 
-                          onClick={() => onDelete(item)} 
-                          className="p-1.5 sm:p-2 bg-red-100 rounded-lg text-red-600 active:scale-95 transition-transform"
-                        >
+                        <button onClick={() => onDelete(item)} className="p-1.5 sm:p-2 bg-red-100 rounded-lg text-red-600 active:scale-95 transition-transform">
                           <Trash2 size={12} className="sm:w-3.5 sm:h-3.5" />
                         </button>
                       </div>
@@ -1713,7 +2502,7 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
                       </p>
                     )}
                   </div>
-                  <PendingBadge status="rejected" size="small" />
+                  <PendingBadge status="rejected" />
                 </div>
               </div>
             ))}
@@ -1750,7 +2539,6 @@ const RecentBadges = ({ stats, onBadgeClick }) => {
       {recentlyUnlocked.map((achievement) => {
         const Icon = achievement.icon;
         const colors = ACHIEVEMENT_COLORS[achievement.color];
-
         return (
           <button
             key={achievement.id}
@@ -1782,9 +2570,7 @@ const NextBadges = ({ stats, onBadgeClick }) => {
       .slice(0, 2);
   }, [stats]);
 
-  if (nextAchievements.length === 0) {
-    return null;
-  }
+  if (nextAchievements.length === 0) return null;
 
   return (
     <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 sm:p-4 border-2 border-green-200">
@@ -1796,7 +2582,6 @@ const NextBadges = ({ stats, onBadgeClick }) => {
         {nextAchievements.map((achievement) => {
           const Icon = achievement.icon;
           const colors = ACHIEVEMENT_COLORS[achievement.color];
-
           return (
             <button
               key={achievement.id}
@@ -1811,14 +2596,9 @@ const NextBadges = ({ stats, onBadgeClick }) => {
                 <p className="text-xs text-gray-500 truncate">({achievement.subtitle})</p>
                 <div className="flex items-center gap-2 mt-1">
                   <div className="flex-1 h-1.5 sm:h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full bg-gradient-to-r ${colors.bg} rounded-full`}
-                      style={{ width: `${achievement.progress * 100}%` }}
-                    />
+                    <div className={`h-full bg-gradient-to-r ${colors.bg} rounded-full`} style={{ width: `${achievement.progress * 100}%` }} />
                   </div>
-                  <span className="text-xs font-bold text-gray-500 flex-shrink-0">
-                    {achievement.current}/{achievement.target}
-                  </span>
+                  <span className="text-xs font-bold text-gray-500 flex-shrink-0">{achievement.current}/{achievement.target}</span>
                 </div>
               </div>
             </button>
@@ -1830,7 +2610,236 @@ const NextBadges = ({ stats, onBadgeClick }) => {
 };
 
 // ============================================
-// MAIN STUDENT DASHBOARD COMPONENT - FIXED
+// LEADERBOARD COMPONENT (UPDATED WITH YEAR/MONTH)
+// ============================================
+
+const LeaderboardSection = ({ currentUserId, currentUserName, year, month }) => {
+  const [activeTab, setActiveTab] = useState('attendance');
+  const [leaderboardData, setLeaderboardData] = useState({ attendanceLeaders: [], gathaLeaders: [] });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchLeaderboard = useCallback(async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const startOfMonth = new Date(year, month - 1, 1);
+      const endOfMonth = new Date(year, month, 0);
+
+      let res = await fetch(
+        `${API_BASE}/leaderboard?startDate=${formatLocalDateString(startOfMonth)}&endDate=${formatLocalDateString(endOfMonth)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        setLeaderboardData(data);
+      } else {
+        res = await fetch(
+          `${API_BASE}/analytics/leaderboard?startDate=${formatLocalDateString(startOfMonth)}&endDate=${formatLocalDateString(endOfMonth)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setLeaderboardData({
+            attendanceLeaders: data.attendanceLeaders || data.topAttendance || [],
+            gathaLeaders: data.gathaLeaders || data.topGathas || [],
+          });
+        } else {
+          throw new Error('Could not load leaderboard data');
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching leaderboard:', err);
+      setError('Unable to load leaderboard');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [year, month]);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
+
+  const getRankIcon = (rank) => {
+    switch (rank) {
+      case 1: return <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />;
+      case 2: return <Medal className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />;
+      case 3: return <Medal className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />;
+      default: return <span className="w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-xs sm:text-sm font-bold text-gray-500">#{rank}</span>;
+    }
+  };
+
+  const getRankBg = (rank, isCurrentUser) => {
+    if (isCurrentUser) return 'bg-gradient-to-r from-orange-100 to-amber-100 border-orange-400';
+    switch (rank) {
+      case 1: return 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-300';
+      case 2: return 'bg-gray-50 border-gray-300';
+      case 3: return 'bg-amber-50 border-amber-300';
+      default: return 'bg-white border-gray-200';
+    }
+  };
+
+  const getRankEmoji = (rank) => {
+    switch (rank) {
+      case 1: return '🥇';
+      case 2: return '🥈';
+      case 3: return '🥉';
+      default: return '';
+    }
+  };
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const attendanceLeaders = leaderboardData?.attendanceLeaders || [];
+  const gathaLeaders = leaderboardData?.gathaLeaders || [];
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-blue-200 shadow-sm overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-3 sm:p-4 text-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 sm:w-6 sm:h-6" />
+            <h3 className="text-base sm:text-lg font-bold">🏆 Leaderboard</h3>
+          </div>
+          <button onClick={fetchLeaderboard} disabled={isLoading} className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors">
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+        <p className="text-xs sm:text-sm opacity-80 mt-1">{monthNames[month - 1]} {year}</p>
+      </div>
+
+      <div className="flex p-2 bg-gray-100 gap-2">
+        <button
+          onClick={() => setActiveTab('attendance')}
+          className={`flex-1 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
+            activeTab === 'attendance' ? 'bg-green-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+          }`}
+        >
+          <Calendar className="w-3 h-3 sm:w-4 sm:h-4" /> Attendance
+        </button>
+        <button
+          onClick={() => setActiveTab('gatha')}
+          className={`flex-1 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
+            activeTab === 'gatha' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+          }`}
+        >
+          <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" /> New Gathas
+        </button>
+      </div>
+
+      <div className="p-3 sm:p-4">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-8">
+            <RefreshCw className="w-8 h-8 sm:w-10 sm:h-10 animate-spin text-blue-500 mb-3" />
+            <p className="text-gray-500 text-sm">Loading leaderboard...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
+            <p className="text-gray-500 text-sm">{error}</p>
+            <button onClick={fetchLeaderboard} className="mt-3 px-4 py-2 bg-blue-100 text-blue-700 rounded-xl font-medium text-sm">
+              Try Again
+            </button>
+          </div>
+        ) : activeTab === 'attendance' ? (
+          attendanceLeaders.length === 0 ? (
+            <div className="text-center py-8">
+              <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
+              <p className="text-gray-500 font-medium text-sm">No data for {monthNames[month - 1]} {year}</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {attendanceLeaders.slice(0, 5).map((user, index) => {
+                const odometer = user.userId || user._id || user.id || user.username;
+                const isCurrentUser = odometer === currentUserId || user.name === currentUserName || user.username === currentUserId;
+                const rank = index + 1;
+
+                return (
+                  <div key={odometer || index} className={`flex items-center justify-between p-2 sm:p-3 rounded-xl border-2 transition-all ${getRankBg(rank, isCurrentUser)}`}>
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {getRankIcon(rank)}
+                        <span className="text-base sm:text-lg">{getRankEmoji(rank)}</span>
+                      </div>
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold shadow-md flex-shrink-0 text-sm">
+                        {(user.name || user.username || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-800 text-sm flex items-center gap-1 sm:gap-2 flex-wrap">
+                          <span className="truncate">{user.name || user.username}</span>
+                          {isCurrentUser && <span className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded animate-pulse flex-shrink-0">You</span>}
+                        </p>
+                        <p className="text-xs text-gray-500">{user.totalAttendance || user.count || 0} days present</p>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xl sm:text-2xl font-bold text-green-600">{user.totalAttendance || user.count || 0}</p>
+                      <p className="text-xs text-gray-400">days</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ) : (
+          gathaLeaders.length === 0 ? (
+            <div className="text-center py-8">
+              <BookOpen className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
+              <p className="text-gray-500 font-medium text-sm">No data for {monthNames[month - 1]} {year}</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {gathaLeaders.slice(0, 5).map((user, index) => {
+                const odometer = user.userId || user._id || user.id || user.username;
+                const isCurrentUser = odometer === currentUserId || user.name === currentUserName || user.username === currentUserId;
+                const rank = index + 1;
+
+                return (
+                  <div key={odometer || index} className={`flex items-center justify-between p-2 sm:p-3 rounded-xl border-2 transition-all ${getRankBg(rank, isCurrentUser)}`}>
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {getRankIcon(rank)}
+                        <span className="text-base sm:text-lg">{getRankEmoji(rank)}</span>
+                      </div>
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white font-bold shadow-md flex-shrink-0 text-sm">
+                        {(user.name || user.username || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-800 text-sm flex items-center gap-1 sm:gap-2 flex-wrap">
+                          <span className="truncate">{user.name || user.username}</span>
+                          {isCurrentUser && <span className="text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded animate-pulse flex-shrink-0">You</span>}
+                        </p>
+                        <p className="text-xs text-gray-500">{user.totalGathas || user.count || 0} new gathas</p>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xl sm:text-2xl font-bold text-purple-600">{user.totalGathas || user.count || 0}</p>
+                      <p className="text-xs text-gray-400">gathas</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        )}
+      </div>
+
+      <div className="px-3 sm:px-4 pb-3 sm:pb-4">
+        <div className="bg-blue-50 rounded-xl p-2 sm:p-3 border border-blue-200">
+          <p className="text-xs text-blue-700 text-center">
+            <Sparkles className="w-3 h-3 inline mr-1" />
+            Leaderboard updates when you change month/year 🌟
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// MAIN STUDENT DASHBOARD COMPONENT
 // ============================================
 
 export default function StudentDashboard({ user, onLogout }) {
@@ -1838,17 +2847,10 @@ export default function StudentDashboard({ user, onLogout }) {
 
   // Group/Account Switching States
   const [groupMembers, setGroupMembers] = useState([]);
-  const [groupName, setGroupName] = useState(null);
   const [activeUser, setActiveUser] = useState(user);
   const [isLoadingSwitch, setIsLoadingSwitch] = useState(false);
-
-  // Stats Date Filtering
-  const [statsFilterType, setStatsFilterType] = useState('month');
-  const [statsDateRange, setStatsDateRange] = useState(getDateRange('month'));
-  const [showDateFilter, setShowDateFilter] = useState(false);
-
-  // REF to track current active user (prevents stale closures)
   const activeUserRef = useRef(activeUser);
+
   useEffect(() => {
     activeUserRef.current = activeUser;
   }, [activeUser]);
@@ -1857,11 +2859,9 @@ export default function StudentDashboard({ user, onLogout }) {
   const [attendanceHistory, setAttendanceHistory] = useState([]);
   const [gathaEntries, setGathaEntries] = useState([]);
   const [pendingStatus, setPendingStatus] = useState({ attendance: [], gatha: [] });
-   
-  // Online status
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // Stats (Monthly focused)
+  // Stats
   const [monthlyAttendance, setMonthlyAttendance] = useState(0);
   const [monthlyNewGathas, setMonthlyNewGathas] = useState(0);
   const [monthlyRevisionGathas, setMonthlyRevisionGathas] = useState(0);
@@ -1869,13 +2869,10 @@ export default function StudentDashboard({ user, onLogout }) {
   const [maxStreak, setMaxStreak] = useState(0);
   const [workingDays, setWorkingDays] = useState(DEFAULT_WORKING_DAYS);
 
-  // Selected month for stats page
+  // Selected period for stats
   const [statsMonth, setStatsMonth] = useState(() => {
     const now = new Date();
-    return {
-      year: now.getFullYear(),
-      month: now.getMonth() + 1,
-    };
+    return { year: now.getFullYear(), month: now.getMonth() + 1 };
   });
 
   // UI states
@@ -1885,8 +2882,6 @@ export default function StudentDashboard({ user, onLogout }) {
   const [successMessage, setSuccessMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState(null);
   const [showTips, setShowTips] = useState(true);
-
-  // Modals
   const [showGathaModal, setShowGathaModal] = useState(false);
   const [editingGatha, setEditingGatha] = useState(null);
   const [selectedAchievement, setSelectedAchievement] = useState(null);
@@ -1896,12 +2891,10 @@ export default function StudentDashboard({ user, onLogout }) {
   const greeting = getGreeting();
   const [dailyQuote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)]);
 
-  // Get active user info
   const activeUsername = activeUser?.username || activeUser?.name;
   const loggedInUsername = user?.username || user?.name;
   const isViewingOther = activeUsername !== loggedInUsername;
 
-  // Helpers
   const showSuccess = (msg) => {
     setSuccessMessage(msg);
     setTimeout(() => setSuccessMessage(''), 3000);
@@ -1913,15 +2906,97 @@ export default function StudentDashboard({ user, onLogout }) {
     sutra_name: entry.sutra_name ?? entry.sutraName ?? '',
     which_gatha: entry.which_gatha ?? entry.whichGatha ?? '',
     total_gatha: Number(entry.total_gatha ?? entry.totalGatha ?? 0),
-    created_at: entry.date ?? entry.created_at ?? null, // Changed priority to 'date' first
+    created_at: entry.created_at ?? entry.date ?? null,
   });
 
-  // --- Date Range Handler ---
-  const handleDateFilterChange = (type) => {
-    setStatsFilterType(type);
-    setStatsDateRange(getDateRange(type));
-    setShowDateFilter(false);
-  };
+  // ============================================
+  // FIXED STREAK CALCULATION (SUNDAY-SAFE)
+  // ============================================
+  const calculateStreak = useCallback((history) => {
+    const sortedDates = history
+      .map((r) => formatLocalDateString(r.date))
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .sort((a, b) => new Date(b) - new Date(a));
+
+    if (sortedDates.length === 0) return { current: 0, max: 0 };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let current = 0;
+    let max = 0;
+    let tempStreak = 1;
+    let streakBroken = false;
+
+    // Check if streak is still active from today
+    const lastDate = new Date(sortedDates[0]);
+    lastDate.setHours(0, 0, 0, 0);
+    const diffFromToday = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
+
+    // Streak is active if:
+    // - Last attendance was today (diff = 0)
+    // - Last attendance was yesterday (diff = 1)
+    // - Last attendance was Saturday and today is Monday (diff = 2, but Sunday gap is okay)
+    if (diffFromToday === 0) {
+      streakBroken = false;
+    } else if (diffFromToday === 1) {
+      streakBroken = false;
+    } else if (diffFromToday === 2) {
+      // Check if yesterday was Sunday
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      if (yesterday.getDay() === 0) {
+        streakBroken = false; // Sunday gap is allowed
+      } else {
+        streakBroken = true;
+      }
+    } else {
+      streakBroken = true;
+    }
+
+    // Count the streak
+    for (let i = 0; i < sortedDates.length; i++) {
+      if (i === 0) {
+        tempStreak = 1;
+        if (!streakBroken) current = 1;
+        continue;
+      }
+
+      const currentDate = new Date(sortedDates[i - 1]);
+      const prevDate = new Date(sortedDates[i]);
+      const diff = Math.floor((currentDate - prevDate) / (1000 * 60 * 60 * 24));
+
+      if (diff === 1) {
+        // Consecutive day
+        tempStreak++;
+        if (!streakBroken) current = tempStreak;
+      } else if (diff === 2) {
+        // Check if the gap day is Sunday
+        const gapDay = new Date(prevDate);
+        gapDay.setDate(gapDay.getDate() + 1);
+        if (gapDay.getDay() === 0) {
+          // Sunday gap - streak continues
+          tempStreak++;
+          if (!streakBroken) current = tempStreak;
+        } else {
+          // Non-Sunday gap - streak breaks
+          max = Math.max(max, tempStreak);
+          tempStreak = 1;
+          streakBroken = true;
+        }
+      } else {
+        // Gap more than 2 days - streak breaks
+        max = Math.max(max, tempStreak);
+        tempStreak = 1;
+        streakBroken = true;
+      }
+    }
+
+    max = Math.max(max, tempStreak);
+    if (streakBroken) current = 0;
+
+    return { current, max };
+  }, []);
 
   // ============================================
   // API CALLS
@@ -1936,8 +3011,6 @@ export default function StudentDashboard({ user, onLogout }) {
       if (res.ok) {
         const data = await res.json();
         const members = data.familyMembers || [];
-        setGroupName(data.groupName || null);
-        
         if (members.length > 0) {
           const formattedMembers = members.map(m => ({
             _id: m.username,
@@ -1971,22 +3044,19 @@ export default function StudentDashboard({ user, onLogout }) {
   const fetchAttendance = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
-      const res = await fetch(`${API_BASE}/attendance`, { 
-        headers: { Authorization: `Bearer ${token}` } 
+      const res = await fetch(`${API_BASE}/attendance`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
-        const history = Array.isArray(data) ? data : [];
-        setAttendanceHistory(history);
-        
-        // Use new holiday-aware streak logic
-        const streakData = calculateStreakWithHolidays(history);
+        setAttendanceHistory(Array.isArray(data) ? data : []);
+        const streakData = calculateStreak(data);
         setCurrentStreak(streakData.current);
         setMaxStreak(streakData.max);
 
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
-        const monthlyCount = history.filter((r) => {
+        const monthlyCount = data.filter((r) => {
           const date = new Date(r.date);
           return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
         }).length;
@@ -1995,13 +3065,13 @@ export default function StudentDashboard({ user, onLogout }) {
     } catch (error) {
       console.error('Error fetching attendance:', error);
     }
-  }, []);
+  }, [calculateStreak]);
 
   const fetchGathas = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
     try {
-      const res = await fetch(`${API_BASE}/gatha`, { 
-        headers: { Authorization: `Bearer ${token}` } 
+      const res = await fetch(`${API_BASE}/gatha`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
@@ -2043,52 +3113,41 @@ export default function StudentDashboard({ user, onLogout }) {
     }
   }, []);
 
-  // ============================================
-  // FIXED: Load data for a switched user
-  // ============================================
   const loadUserData = useCallback(async (username) => {
     setIsLoadingSwitch(true);
     setGlobalError('');
     const token = localStorage.getItem('jainPathshalaToken');
-    
+
     try {
-      console.log('Loading data for user:', username);
-      
       const res = await fetch(`${API_BASE}/family-member/${username}/data`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || `Failed to load data (${res.status})`);
       }
-      
+
       const data = await res.json();
-      console.log('Family member data received:', data);
-      
-      // Update state with family member's data
       const recentAttendance = data.recentAttendance || [];
       const recentGathas = (data.recentGathas || []).map(normalizeEntry);
-      
+
       setAttendanceHistory(recentAttendance);
       setGathaEntries(recentGathas);
       setPendingStatus({
         attendance: data.pendingAttendance || [],
         gatha: data.pendingGathas || []
       });
-      
-      // Use streak calculation logic on frontend to ensure consistency with holidays
-      const streakData = calculateStreakWithHolidays(recentAttendance);
-      
-      // Use stats from response but override streak if needed
+
       const stats = data.stats || {};
-      setCurrentStreak(streakData.current);
-      setMaxStreak(streakData.max);
+      const streakData = calculateStreak(recentAttendance);
+      setCurrentStreak(stats.currentStreak ?? streakData.current);
+      setMaxStreak(stats.maxStreak ?? streakData.max);
       setMonthlyAttendance(stats.monthlyAttendance ?? 0);
       setMonthlyNewGathas(stats.monthlyNewGathas ?? 0);
       setMonthlyRevisionGathas(stats.monthlyRevisionGathas ?? 0);
       setWorkingDays(stats.workingDays ?? DEFAULT_WORKING_DAYS);
-      
+
       return true;
     } catch (error) {
       console.error('Error loading user data:', error);
@@ -2097,28 +3156,17 @@ export default function StudentDashboard({ user, onLogout }) {
     } finally {
       setIsLoadingSwitch(false);
     }
-  }, []);
+  }, [calculateStreak]);
 
-  // ============================================
-  // FIXED: Handle user switch
-  // ============================================
   const handleUserSwitch = useCallback(async (newUser) => {
     const newUsername = newUser.username || newUser.name;
     const currentActiveUsername = activeUserRef.current?.username || activeUserRef.current?.name;
-    
-    // Don't switch if it's the same user
-    if (newUsername === currentActiveUsername) {
-      console.log('Same user, skipping switch');
-      return;
-    }
-    
-    console.log(`Switching from ${currentActiveUsername} to ${newUsername}`);
-    
-    // Set active user first to update UI immediately
+
+    if (newUsername === currentActiveUsername) return;
+
     setActiveUser(newUser);
-    
+
     if (newUsername === loggedInUsername) {
-      // Switching back to self - reload own data
       setIsLoadingSwitch(true);
       try {
         const now = new Date();
@@ -2133,33 +3181,20 @@ export default function StudentDashboard({ user, onLogout }) {
         setIsLoadingSwitch(false);
       }
     } else {
-      // Load family member's data
       const success = await loadUserData(newUsername);
       if (success) {
         showSuccess(`Switched to ${newUser.name || newUsername}'s dashboard`);
       } else {
-        // Revert to previous user on failure
         setActiveUser(activeUserRef.current);
       }
     }
   }, [loggedInUsername, loadUserData, fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats]);
 
-  // ============================================
-  // FIXED: Handle stats month change for both self and family members
-  // ============================================
   const handleStatsMonthChange = useCallback(async (year, month) => {
-    console.log(`Month changed to: ${year}-${month}`);
     setStatsMonth({ year, month });
-    
-    // FIXED: Calculate precise date range for the selected month/year for Leaderboard
-    const start = new Date(year, month - 1, 1);
-    const end = new Date(year, month, 0);
-    end.setHours(23, 59, 59, 999);
-    setStatsDateRange({ start, end });
-    
     const token = localStorage.getItem('jainPathshalaToken');
     const currentActiveUsername = activeUserRef.current?.username || activeUserRef.current?.name;
-    
+
     try {
       let url;
       if (currentActiveUsername === loggedInUsername) {
@@ -2167,9 +3202,11 @@ export default function StudentDashboard({ user, onLogout }) {
       } else {
         url = `${API_BASE}/family-member/${currentActiveUsername}/stats?year=${year}&month=${month}`;
       }
-      
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
       if (res.ok) {
         const data = await res.json();
         setMonthlyAttendance(data.monthlyAttendance ?? 0);
@@ -2188,10 +3225,8 @@ export default function StudentDashboard({ user, onLogout }) {
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
@@ -2214,7 +3249,6 @@ export default function StudentDashboard({ user, onLogout }) {
     };
     loadData();
 
-    // Poll every 30 seconds
     const pollInterval = setInterval(() => {
       if (navigator.onLine && !isViewingOther) {
         fetchPendingStatus();
@@ -2223,10 +3257,21 @@ export default function StudentDashboard({ user, onLogout }) {
       }
     }, 30000);
 
-    return () => clearInterval(pollInterval);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine && !isViewingOther) {
+        fetchPendingStatus();
+        fetchAttendance();
+        fetchGathas();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(pollInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchAttendance, fetchGathas, fetchPendingStatus, fetchMonthlyStats, fetchGroupMembers, isViewingOther]);
 
-  // Reset active user when logged in user changes
   useEffect(() => {
     setActiveUser(user);
   }, [user]);
@@ -2304,11 +3349,11 @@ export default function StudentDashboard({ user, onLogout }) {
     const token = localStorage.getItem('jainPathshalaToken');
 
     try {
-      const endpoint = isViewingOther 
+      const endpoint = isViewingOther
         ? `${API_BASE}/attendance/mark-for`
         : `${API_BASE}/attendance/mark`;
-      
-      const body = isViewingOther 
+
+      const body = isViewingOther
         ? { forUsername: activeUsername }
         : {};
 
@@ -2317,12 +3362,12 @@ export default function StudentDashboard({ user, onLogout }) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       });
-      
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to mark attendance');
-      
+
       showSuccess(data.message || '✅ Attendance submitted! Waiting for approval.');
-      
+
       if (isViewingOther) {
         await loadUserData(activeUsername);
       } else {
@@ -2343,7 +3388,7 @@ export default function StudentDashboard({ user, onLogout }) {
 
     try {
       let url, bodyData;
-      
+
       if (editingGatha) {
         url = `${API_BASE}/gatha/pending/${editingGatha.id}`;
         bodyData = formData;
@@ -2370,7 +3415,7 @@ export default function StudentDashboard({ user, onLogout }) {
       showSuccess(data.message || (editingGatha ? '✅ Gatha updated!' : '✅ Gatha submitted!'));
       setShowGathaModal(false);
       setEditingGatha(null);
-      
+
       if (isViewingOther) {
         await loadUserData(activeUsername);
       } else {
@@ -2429,7 +3474,7 @@ export default function StudentDashboard({ user, onLogout }) {
               {(activeUser?.name || activeUsername || 'U').charAt(0).toUpperCase()}
             </div>
             <div>
-              <p className="font-bold text-blue-800 text-sm">
+                            <p className="font-bold text-blue-800 text-sm">
                 Viewing: {activeUser?.name || activeUsername}
               </p>
               <p className="text-xs text-blue-600">
@@ -2437,7 +3482,7 @@ export default function StudentDashboard({ user, onLogout }) {
               </p>
             </div>
           </div>
-          <button 
+          <button
             onClick={() => handleUserSwitch(user)}
             className="px-3 py-2 bg-blue-500 text-white text-xs font-bold rounded-xl"
           >
@@ -2454,7 +3499,7 @@ export default function StudentDashboard({ user, onLogout }) {
       )}
 
       {/* Welcome Card */}
-      <button 
+      <button
         onClick={() => setShowLevelModal(true)}
         className="w-full text-left bg-gradient-to-br from-orange-400 via-amber-400 to-yellow-400 rounded-3xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden active:scale-[0.99] transition-transform"
       >
@@ -2494,7 +3539,7 @@ export default function StudentDashboard({ user, onLogout }) {
             </div>
             {userLevel.nextLevel && (
               <div className="h-1.5 sm:h-2 bg-white/30 rounded-full overflow-hidden">
-                <div 
+                <div
                   className="h-full bg-white rounded-full transition-all duration-500"
                   style={{ width: `${userLevel.progressToNext * 100}%` }}
                 />
@@ -2612,8 +3657,8 @@ export default function StudentDashboard({ user, onLogout }) {
                 ...todaysApprovedGathas.map((e) => ({ ...e, status: 'approved' })),
                 ...todaysPendingGathas.map((e) => ({ ...e, status: 'pending' })),
               ].map((entry) => (
-                <div 
-                  key={entry.id} 
+                <div
+                  key={entry.id}
                   className={`flex items-center justify-between p-2 sm:p-3 rounded-xl ${
                     entry.status === 'approved' ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'
                   }`}
@@ -2628,7 +3673,14 @@ export default function StudentDashboard({ user, onLogout }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                    <PendingBadge status={entry.status} size="small" />
+                    <span className={`inline-flex items-center gap-1 font-bold rounded-full border text-xs px-2 py-0.5 ${
+                      entry.status === 'approved' 
+                        ? 'text-green-700 bg-green-100 border-green-200' 
+                        : 'text-yellow-700 bg-yellow-100 border-yellow-200'
+                    }`}>
+                      {entry.status === 'approved' ? <Check className="w-3 h-3" /> : <Clock className="w-3 h-3 animate-pulse" />}
+                      {entry.status === 'approved' ? 'Approved' : 'Pending'}
+                    </span>
                     {entry.status === 'pending' && !isViewingOther && (
                       <div className="flex gap-1">
                         <button onClick={() => { setEditingGatha(entry); setShowGathaModal(true); }} className="p-1 sm:p-1.5 bg-blue-100 rounded-lg text-blue-600">
@@ -2681,7 +3733,7 @@ export default function StudentDashboard({ user, onLogout }) {
     </div>
   );
 
-  // ==================== RENDER STATS PAGE (FIXED) ====================
+  // ==================== RENDER STATS PAGE ====================
   const renderStats = () => (
     <div className="space-y-4">
       {!isOnline && (
@@ -2690,59 +3742,32 @@ export default function StudentDashboard({ user, onLogout }) {
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-4">
-        {isViewingOther ? (
-          <div className="bg-blue-100 border-2 border-blue-300 rounded-2xl p-2 flex items-center gap-2 flex-1 mr-2">
-            <UserCircle className="w-6 h-6 text-blue-600" />
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-blue-800 text-xs truncate">
-                {activeUser?.name || activeUsername}
-              </p>
-            </div>
+      {isViewingOther && (
+        <div className="bg-blue-100 border-2 border-blue-300 rounded-2xl p-3 flex items-center gap-3">
+          <UserCircle className="w-8 h-8 text-blue-600" />
+          <div className="flex-1">
+            <p className="font-bold text-blue-800 text-sm">
+              Viewing stats for: {activeUser?.name || activeUsername}
+            </p>
+            <p className="text-xs text-blue-600">
+              Change month to see different periods
+            </p>
           </div>
-        ) : <div className="flex-1" />}
-        
-        {/* Date Filter Dropdown */}
-        <div className="relative">
-          <button 
-            onClick={() => setShowDateFilter(!showDateFilter)}
-            className="flex items-center gap-2 bg-white border border-gray-300 px-3 py-2 rounded-xl shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            <Filter className="w-4 h-4" />
-            <span className="capitalize">{statsFilterType === 'custom' ? 'Custom' : statsFilterType}</span>
-            <ChevronDown className="w-3 h-3" />
-          </button>
-          
-          {showDateFilter && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowDateFilter(false)} />
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-20 overflow-hidden">
-                {['today', 'week', 'month', 'year'].map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => handleDateFilterChange(type)}
-                    className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 ${statsFilterType === type ? 'bg-orange-50 text-orange-600 font-bold' : 'text-gray-700'}`}
-                  >
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
         </div>
-      </div>
-      
-      <StudentAchievementPage 
-        stats={userStats} 
-        onMonthChange={handleStatsMonthChange} 
+      )}
+
+      <StudentAchievementPage
+        stats={userStats}
+        onMonthChange={handleStatsMonthChange}
         workingDays={workingDays}
         key={`stats-${activeUsername}-${statsMonth.year}-${statsMonth.month}`}
       />
-      
-      <LeaderboardSection 
+
+      <LeaderboardSection
         currentUserId={activeUsername}
         currentUserName={activeUser?.name || activeUsername}
-        dateRange={statsDateRange}
+        year={statsMonth.year}
+        month={statsMonth.month}
       />
     </div>
   );
@@ -2803,7 +3828,7 @@ export default function StudentDashboard({ user, onLogout }) {
               )}
             </div>
           </div>
-          <button 
+          <button
             onClick={onLogout}
             className="flex items-center gap-1 sm:gap-2 bg-red-50 text-red-600 px-2 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm active:scale-[0.98] transition-transform border border-red-200 flex-shrink-0"
           >
@@ -2872,7 +3897,7 @@ export default function StudentDashboard({ user, onLogout }) {
         onClose={() => setSelectedAchievement(null)}
       />
 
-      <LevelDetailsModal 
+      <LevelDetailsModal
         isOpen={showLevelModal}
         onClose={() => setShowLevelModal(false)}
         currentXP={xpBreakdown.total}
@@ -2882,4 +3907,4 @@ export default function StudentDashboard({ user, onLogout }) {
       />
     </div>
   );
-}
+}  
