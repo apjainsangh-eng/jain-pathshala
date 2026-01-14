@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Award,
   BookOpen,
@@ -18,23 +18,29 @@ import {
   HelpCircle,
   Info,
   BookMarked,
+  X as CloseIcon,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 // ============================================
 // CONFIGURATION
 // ============================================
 
-// Default working days per month (excluding Sundays)
-// Admin can change this from settings
 export const DEFAULT_WORKING_DAYS = 25;
+
+export const XP_VALUES = {
+  attendance: 10,
+  new_gatha: 2,
+  revision_gatha: 0,
+};
 
 // ============================================
 // MONTHLY ACHIEVEMENTS
-// All achievements reset each month
 // ============================================
 
 export const MONTHLY_ACHIEVEMENTS = [
-  // ===== Attendance Achievements =====
+  // ===== Attendance =====
   {
     id: 'attendance_1',
     title: 'First Step',
@@ -49,7 +55,7 @@ export const MONTHLY_ACHIEVEMENTS = [
     id: 'attendance_4',
     title: 'Week Regular',
     subtitle: '4 Days Present',
-    description: 'Attend 4 days this month (1 week)',
+    description: 'Attend 4 days this month',
     icon: Calendar,
     requirement: { type: 'monthly_attendance', count: 4 },
     color: 'bronze',
@@ -78,15 +84,15 @@ export const MONTHLY_ACHIEVEMENTS = [
   {
     id: 'attendance_full',
     title: 'Perfect Month!',
-    subtitle: 'All 25 Days Present',
-    description: 'Attend all working days this month (25 days)',
+    subtitle: 'All Days Present',
+    description: 'Attend all working days this month',
     icon: Crown,
     requirement: { type: 'monthly_attendance', count: 'full' },
     color: 'diamond',
     xp: 150,
   },
 
-  // ===== Gatha Achievements (New Gathas Only) =====
+  // ===== Gatha =====
   {
     id: 'gatha_5',
     title: 'Gatha Starter',
@@ -128,12 +134,12 @@ export const MONTHLY_ACHIEVEMENTS = [
     xp: 150,
   },
 
-  // ===== Streak Achievements =====
+  // ===== Streak (Monthly Scoped) =====
   {
     id: 'streak_3',
     title: 'Getting Started',
     subtitle: '3 Days Streak',
-    description: 'Attend 3 days in a row',
+    description: 'Attend 3 days in a row within this month',
     icon: Zap,
     requirement: { type: 'streak', count: 3 },
     color: 'bronze',
@@ -143,7 +149,7 @@ export const MONTHLY_ACHIEVEMENTS = [
     id: 'streak_7',
     title: 'On Fire!',
     subtitle: '7 Days Streak',
-    description: 'Attend 7 days in a row',
+    description: 'Attend 7 days in a row within this month',
     icon: Flame,
     requirement: { type: 'streak', count: 7 },
     color: 'silver',
@@ -153,7 +159,7 @@ export const MONTHLY_ACHIEVEMENTS = [
     id: 'streak_14',
     title: 'Unstoppable',
     subtitle: '14 Days Streak',
-    description: 'Attend 14 days in a row',
+    description: 'Attend 14 days in a row within this month',
     icon: Rocket,
     requirement: { type: 'streak', count: 14 },
     color: 'gold',
@@ -161,56 +167,13 @@ export const MONTHLY_ACHIEVEMENTS = [
   },
 ];
 
-// ============================================
-// COLOR SCHEMES
-// ============================================
-
 export const ACHIEVEMENT_COLORS = {
-  bronze: {
-    bg: 'from-orange-300 to-orange-500',
-    border: 'border-orange-300',
-    text: 'text-orange-700',
-    light: 'bg-orange-50',
-    badge: 'bg-orange-100 text-orange-700',
-    icon: '🥉',
-  },
-  silver: {
-    bg: 'from-gray-300 to-gray-500',
-    border: 'border-gray-400',
-    text: 'text-gray-700',
-    light: 'bg-gray-50',
-    badge: 'bg-gray-100 text-gray-700',
-    icon: '🥈',
-  },
-  gold: {
-    bg: 'from-yellow-300 to-yellow-500',
-    border: 'border-yellow-400',
-    text: 'text-yellow-700',
-    light: 'bg-yellow-50',
-    badge: 'bg-yellow-100 text-yellow-700',
-    icon: '🥇',
-  },
-  diamond: {
-    bg: 'from-cyan-300 to-blue-500',
-    border: 'border-cyan-400',
-    text: 'text-cyan-700',
-    light: 'bg-cyan-50',
-    badge: 'bg-cyan-100 text-cyan-700',
-    icon: '💎',
-  },
+  bronze: { bg: 'from-orange-300 to-orange-500', border: 'border-orange-300', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700', light: 'bg-orange-50', icon: '🥉' },
+  silver: { bg: 'from-gray-300 to-gray-500', border: 'border-gray-400', text: 'text-gray-700', badge: 'bg-gray-100 text-gray-700', light: 'bg-gray-50', icon: '🥈' },
+  gold: { bg: 'from-yellow-300 to-yellow-500', border: 'border-yellow-400', text: 'text-yellow-700', badge: 'bg-yellow-100 text-yellow-700', light: 'bg-yellow-50', icon: '🥇' },
+  diamond: { bg: 'from-cyan-300 to-blue-500', border: 'border-cyan-400', text: 'text-cyan-700', badge: 'bg-cyan-100 text-cyan-700', light: 'bg-cyan-50', icon: '💎' },
 };
 
-// ============================================
-// XP SYSTEM - How students earn XP
-// ============================================
-
-export const XP_VALUES = {
-  attendance: 10,      // 10 XP per day present
-  new_gatha: 2,        // 2 XP per new gatha learned
-  revision_gatha: 0,   // No XP for revision (only new learning counts)
-};
-
-// Level definitions - students progress through these
 export const LEVELS = [
   { level: 1, name: 'Beginner', minXP: 0, icon: '🌱' },
   { level: 2, name: 'Learner', minXP: 50, icon: '📚' },
@@ -226,15 +189,11 @@ export const LEVELS = [
 // UTILITY FUNCTIONS
 // ============================================
 
-/**
- * Calculate achievement progress based on monthly stats
- */
 export const calculateAchievementProgress = (achievement, stats = {}) => {
   const {
     monthlyAttendance = 0,
     monthlyNewGathas = 0,
-    currentStreak = 0,
-    maxStreak = 0,
+    maxStreak = 0, // Should be monthly max streak passed from Dashboard
     workingDays = DEFAULT_WORKING_DAYS,
   } = stats;
 
@@ -245,59 +204,38 @@ export const calculateAchievementProgress = (achievement, stats = {}) => {
 
   switch (achievement.requirement.type) {
     case 'monthly_attendance':
-      if (achievement.requirement.count === 'full') {
-        target = workingDays;
-        current = monthlyAttendance;
-        progress = Math.min(current / target, 1);
-        unlocked = current >= target;
-      } else {
-        target = achievement.requirement.count;
-        current = monthlyAttendance;
-        progress = Math.min(current / target, 1);
-        unlocked = current >= target;
-      }
+      target = achievement.requirement.count === 'full' ? workingDays : achievement.requirement.count;
+      current = monthlyAttendance;
       break;
-
     case 'monthly_gatha':
       target = achievement.requirement.count;
       current = monthlyNewGathas;
-      progress = Math.min(current / target, 1);
-      unlocked = current >= target;
       break;
-
     case 'streak':
       target = achievement.requirement.count;
-      current = Math.max(currentStreak, maxStreak);
-      progress = Math.min(current / target, 1);
-      unlocked = current >= target;
+      // Use maxStreak passed in stats (which must be filtered for that month)
+      current = maxStreak; 
       break;
-
     default:
       break;
+  }
+
+  if (target > 0) {
+    progress = Math.min(current / target, 1);
+    unlocked = current >= target;
   }
 
   return { unlocked, progress, current, target };
 };
 
-/**
- * Calculate total XP from:
- * 1. Daily attendance (10 XP each)
- * 2. New gathas (2 XP each)
- * 3. Unlocked achievements (bonus XP)
- */
 export const calculateTotalXP = (stats = {}, achievements = MONTHLY_ACHIEVEMENTS) => {
-  const {
-    monthlyAttendance = 0,
-    monthlyNewGathas = 0,
-  } = stats;
-
-  // XP from attendance
+  const { monthlyAttendance = 0, monthlyNewGathas = 0 } = stats;
+  
+  // Basic XP from activities
   const attendanceXP = monthlyAttendance * XP_VALUES.attendance;
-
-  // XP from new gathas only
   const gathaXP = monthlyNewGathas * XP_VALUES.new_gatha;
-
-  // XP from achievements
+  
+  // Bonus XP from Unlocked Achievements
   const achievementXP = achievements.reduce((total, ach) => {
     const { unlocked } = calculateAchievementProgress(ach, stats);
     return total + (unlocked ? ach.xp : 0);
@@ -311,9 +249,6 @@ export const calculateTotalXP = (stats = {}, achievements = MONTHLY_ACHIEVEMENTS
   };
 };
 
-/**
- * Get user level based on total XP
- */
 export const getUserLevel = (xp) => {
   let currentLevel = LEVELS[0];
   let nextLevel = LEVELS[1];
@@ -330,107 +265,59 @@ export const getUserLevel = (xp) => {
   const xpToNextLevel = nextLevel ? nextLevel.minXP - currentLevel.minXP : 0;
   const progressToNext = nextLevel ? xpInCurrentLevel / xpToNextLevel : 1;
 
-  return {
-    ...currentLevel,
-    nextLevel,
-    xpInCurrentLevel,
-    xpToNextLevel,
-    progressToNext,
-    totalXP: xp,
-  };
-};
-
-/**
- * Get list of months for dropdown (last 12 months)
- */
-const getMonthsList = () => {
-  const months = [];
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-
-  // Show last 12 months
-  for (let i = 0; i < 12; i++) {
-    let month = currentMonth - i;
-    let year = currentYear;
-
-    if (month <= 0) {
-      month += 12;
-      year -= 1;
-    }
-
-    const date = new Date(year, month - 1, 1);
-    const label = date.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
-
-    months.push({
-      value: `${year}-${String(month).padStart(2, '0')}`,
-      label,
-      month,
-      year,
-      isCurrent: i === 0,
-    });
-  }
-
-  return months;
+  return { ...currentLevel, nextLevel, xpInCurrentLevel, xpToNextLevel, progressToNext, totalXP: xp };
 };
 
 // ============================================
 // COMPONENTS
 // ============================================
 
-/**
- * Month Selector Dropdown
- */
 const MonthSelector = ({ selectedMonth, onMonthChange }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const months = useMemo(() => getMonthsList(), []);
+  
+  // Generate last 12 months
+  const months = useMemo(() => {
+    const m = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      m.push({
+        value,
+        label: d.toLocaleString('en-IN', { month: 'long', year: 'numeric' }),
+        isCurrent: i === 0
+      });
+    }
+    return m;
+  }, []);
 
-  const selectedMonthData = months.find((m) => m.value === selectedMonth) || months[0];
+  const currentLabel = months.find(m => m.value === selectedMonth)?.label || months[0].label;
 
   return (
     <div className="relative">
-      <button
+      <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between bg-white border-2 border-orange-200 rounded-xl px-4 py-3 font-bold text-gray-800 shadow-sm active:scale-[0.98] transition-transform"
+        className="w-full flex items-center justify-between bg-white border-2 border-orange-200 rounded-xl px-4 py-3 font-bold text-gray-800 shadow-sm"
       >
         <div className="flex items-center gap-2">
           <Calendar className="w-5 h-5 text-orange-500" />
-          <span>{selectedMonthData.label}</span>
-          {selectedMonthData.isCurrent && (
-            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
-              Current
-            </span>
-          )}
+          <span>{currentLabel}</span>
         </div>
-        <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
           <div className="absolute top-full left-0 right-0 mt-2 bg-white border-2 border-orange-200 rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto">
-            {months.map((month) => (
+            {months.map(m => (
               <button
-                key={month.value}
-                onClick={() => {
-                  onMonthChange(month.value);
-                  setIsOpen(false);
-                }}
-                className={`w-full flex items-center justify-between px-4 py-3 text-left hover:bg-orange-50 transition-colors ${
-                  month.value === selectedMonth ? 'bg-orange-100' : ''
-                }`}
+                key={m.value}
+                onClick={() => { onMonthChange(m.value); setIsOpen(false); }}
+                className={`w-full flex items-center justify-between px-4 py-3 text-left hover:bg-orange-50 ${m.value === selectedMonth ? 'bg-orange-100' : ''}`}
               >
-                <span className="font-medium text-gray-800">{month.label}</span>
-                <div className="flex items-center gap-2">
-                  {month.isCurrent && (
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                      Current
-                    </span>
-                  )}
-                  {month.value === selectedMonth && (
-                    <Check className="w-5 h-5 text-orange-500" />
-                  )}
-                </div>
+                <span className="font-medium text-gray-800">{m.label}</span>
+                {m.value === selectedMonth && <Check className="w-5 h-5 text-orange-500" />}
               </button>
             ))}
           </div>
@@ -440,9 +327,6 @@ const MonthSelector = ({ selectedMonth, onMonthChange }) => {
   );
 };
 
-/**
- * XP Breakdown Card - Shows level and how XP is earned
- */
 const XPBreakdownCard = ({ xpBreakdown, level }) => {
   return (
     <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-4 text-white shadow-lg">
@@ -501,9 +385,6 @@ const XPBreakdownCard = ({ xpBreakdown, level }) => {
   );
 };
 
-/**
- * How to Earn XP - Expandable Help Section
- */
 const HowToEarnXP = () => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -573,14 +454,11 @@ const HowToEarnXP = () => {
   );
 };
 
-/**
- * Monthly Stats Summary - Shows current progress
- */
 const MonthlyStatsSummary = ({ stats, workingDays }) => {
   const {
     monthlyAttendance = 0,
     monthlyNewGathas = 0,
-    currentStreak = 0,
+    maxStreak = 0,
   } = stats;
 
   return (
@@ -599,17 +477,14 @@ const MonthlyStatsSummary = ({ stats, workingDays }) => {
       </div>
       <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-3 text-center">
         <Flame className="w-6 h-6 text-orange-500 mx-auto mb-1" />
-        <p className="text-2xl font-bold text-orange-700">{currentStreak}</p>
-        <p className="text-xs text-gray-500">days in row</p>
-        <p className="text-xs text-orange-600 font-medium">Streak</p>
+        <p className="text-2xl font-bold text-orange-700">{maxStreak}</p>
+        <p className="text-xs text-gray-500">days streak</p>
+        <p className="text-xs text-orange-600 font-medium">Best Streak</p>
       </div>
     </div>
   );
 };
 
-/**
- * Single Achievement Card
- */
 const AchievementCard = ({ achievement, stats, onClick }) => {
   const { unlocked, progress, current, target } = calculateAchievementProgress(achievement, stats);
   const Icon = achievement.icon;
@@ -618,67 +493,33 @@ const AchievementCard = ({ achievement, stats, onClick }) => {
   return (
     <button
       onClick={() => onClick?.(achievement)}
-      className={`
-        relative rounded-xl border-2 transition-all active:scale-[0.97] w-full p-3
-        ${unlocked
-          ? `${colors.border} bg-gradient-to-br from-white to-gray-50 shadow-md`
-          : 'border-gray-200 bg-gray-50'
-        }
-      `}
+      className={`relative rounded-xl border-2 transition-all active:scale-[0.97] w-full p-3 ${
+        unlocked ? `${colors.border} bg-gradient-to-br from-white to-gray-50 shadow-md` : 'border-gray-200 bg-gray-50'
+      }`}
     >
-      {/* Badge Icon (Bronze/Silver/Gold/Diamond) */}
-      <div className="absolute -top-2 -left-2 text-lg">
-        {colors.icon}
-      </div>
-
-      {/* Main Icon */}
-      <div
-        className={`
-          w-12 h-12 rounded-full mx-auto mb-2 flex items-center justify-center
-          ${unlocked ? `bg-gradient-to-br ${colors.bg}` : 'bg-gray-200'}
-        `}
-      >
+      <div className="absolute -top-2 -left-2 text-lg">{colors.icon}</div>
+      <div className={`w-12 h-12 rounded-full mx-auto mb-2 flex items-center justify-center ${
+        unlocked ? `bg-gradient-to-br ${colors.bg}` : 'bg-gray-200'
+      }`}>
         <Icon className={`w-6 h-6 ${unlocked ? 'text-white' : 'text-gray-400'}`} />
       </div>
-
-      {/* Title */}
-      <p className={`text-xs font-bold text-center ${unlocked ? 'text-gray-800' : 'text-gray-500'}`}>
-        {achievement.title}
-      </p>
-      
-      {/* Subtitle - Clear meaning */}
-      <p className={`text-xs text-center mt-0.5 ${unlocked ? 'text-gray-600' : 'text-gray-400'}`}>
-        ({achievement.subtitle})
-      </p>
-
-      {/* XP Badge */}
+      <p className={`text-xs font-bold text-center ${unlocked ? 'text-gray-800' : 'text-gray-500'}`}>{achievement.title}</p>
       <div className="mt-2 text-center">
         <span className={`text-xs px-2 py-0.5 rounded-full ${unlocked ? colors.badge : 'bg-gray-100 text-gray-500'}`}>
           +{achievement.xp} XP
         </span>
       </div>
-
-      {/* Progress Bar (when not unlocked but has some progress) */}
       {!unlocked && progress > 0 && (
         <div className="mt-2">
           <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-            <div
-              className={`h-full bg-gradient-to-r ${colors.bg} rounded-full transition-all duration-500`}
-              style={{ width: `${progress * 100}%` }}
-            />
+            <div className={`h-full bg-gradient-to-r ${colors.bg}`} style={{ width: `${progress * 100}%` }} />
           </div>
           <p className="text-xs text-gray-400 text-center mt-1">{current}/{target}</p>
         </div>
       )}
-
-      {/* Locked Icon (when no progress) */}
       {!unlocked && progress === 0 && (
-        <div className="absolute top-1 right-1">
-          <Lock className="w-4 h-4 text-gray-400" />
-        </div>
+        <div className="absolute top-1 right-1"><Lock className="w-4 h-4 text-gray-400" /></div>
       )}
-
-      {/* Unlocked Checkmark */}
       {unlocked && (
         <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-md">
           <Check className="w-4 h-4 text-white" />
@@ -688,9 +529,6 @@ const AchievementCard = ({ achievement, stats, onClick }) => {
   );
 };
 
-/**
- * Achievement Section with Header
- */
 const AchievementSection = ({ title, icon: Icon, color, achievements, stats, onAchievementClick }) => {
   const unlockedCount = useMemo(() => {
     return achievements.filter((a) => calculateAchievementProgress(a, stats).unlocked).length;
@@ -698,7 +536,6 @@ const AchievementSection = ({ title, icon: Icon, color, achievements, stats, onA
 
   return (
     <div className={`bg-white rounded-2xl border-2 ${color} shadow-sm overflow-hidden`}>
-      {/* Header */}
       <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon className="w-5 h-5" />
@@ -708,8 +545,6 @@ const AchievementSection = ({ title, icon: Icon, color, achievements, stats, onA
           {unlockedCount}/{achievements.length} unlocked
         </span>
       </div>
-
-      {/* Achievements Grid */}
       <div className="p-4 pt-2">
         <div className="grid grid-cols-3 gap-3">
           {achievements.map((achievement) => (
@@ -726,194 +561,101 @@ const AchievementSection = ({ title, icon: Icon, color, achievements, stats, onA
   );
 };
 
-/**
- * Achievement Detail Modal - Shows when you tap on a badge
- */
 export const AchievementDetailModal = ({ achievement, stats, onClose }) => {
   if (!achievement) return null;
-
   const { unlocked, progress, current, target } = calculateAchievementProgress(achievement, stats);
-  const Icon = achievement.icon;
   const colors = ACHIEVEMENT_COLORS[achievement.color] || ACHIEVEMENT_COLORS.bronze;
+  const Icon = achievement.icon;
 
   return (
-    <div
-      className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-2xl p-6 w-full max-w-sm text-center shadow-2xl animate-in zoom-in duration-200"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Badge Type */}
-        <div className="text-4xl mb-2">{colors.icon}</div>
-
-        {/* Icon */}
-        <div
-          className={`
-            w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center
-            ${unlocked ? `bg-gradient-to-br ${colors.bg}` : 'bg-gray-200'}
-            ${unlocked ? 'animate-pulse' : ''}
-          `}
-        >
+    <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center shadow-2xl animate-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+        <div className={`w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center ${
+          unlocked ? `bg-gradient-to-br ${colors.bg}` : 'bg-gray-200'
+        }`}>
           <Icon className={`w-10 h-10 ${unlocked ? 'text-white' : 'text-gray-400'}`} />
         </div>
-
-        {/* Title & Description */}
         <h3 className="text-xl font-bold text-gray-800 mb-1">{achievement.title}</h3>
-        <p className="text-lg text-gray-600 mb-2">({achievement.subtitle})</p>
         <p className="text-gray-500 mb-4 text-sm">{achievement.description}</p>
-
-        {/* XP Reward */}
-        <div className="mb-4">
-          <span className={`text-lg font-bold px-4 py-2 rounded-full ${colors.badge}`}>
-            +{achievement.xp} XP
-          </span>
-        </div>
-
-        {/* Status */}
         {unlocked ? (
-          <div className="bg-green-100 text-green-700 px-4 py-3 rounded-xl font-bold flex items-center justify-center gap-2 mb-4">
-            <CheckCircle className="w-5 h-5" />
-            Badge Unlocked! 🎉
-          </div>
+          <div className="bg-green-100 text-green-700 px-4 py-3 rounded-xl font-bold mb-4">Badge Unlocked! 🎉</div>
         ) : (
-          <div className="mb-4">
-            {/* Progress Bar */}
-            <div className="bg-gray-100 rounded-full h-4 mb-2 overflow-hidden">
-              <div
-                className={`h-full bg-gradient-to-r ${colors.bg} rounded-full transition-all duration-500`}
-                style={{ width: `${progress * 100}%` }}
-              />
+          <div className="mb-4 bg-gray-50 p-3 rounded-xl">
+            <p className="text-sm font-bold text-gray-600 mb-1">Progress: {current} / {target}</p>
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className={`h-full bg-gradient-to-r ${colors.bg}`} style={{ width: `${progress * 100}%` }} />
             </div>
-            <p className="text-sm text-gray-600">
-              <span className="font-bold">{current}</span> / {target}
-              <span className="text-gray-400 ml-2">({Math.round(progress * 100)}% done)</span>
-            </p>
           </div>
         )}
-
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className={`
-            w-full py-3 font-bold rounded-xl text-white
-            ${unlocked ? `bg-gradient-to-r ${colors.bg}` : 'bg-gray-400'}
-          `}
-        >
-          {unlocked ? 'Great Job! 👏' : 'Keep Going! 💪'}
-        </button>
+        <button onClick={onClose} className="w-full py-3 bg-gray-900 text-white font-bold rounded-xl">Close</button>
       </div>
     </div>
   );
 };
 
 // ============================================
-// MAIN COMPONENT - StudentAchievementPage
+// MAIN PAGE COMPONENT
 // ============================================
 
-export default function StudentAchievementPage({ 
-  stats = {}, 
-  onMonthChange,
-  workingDays = DEFAULT_WORKING_DAYS 
-}) {
+export default function StudentAchievementPage({ stats = {}, onMonthChange, workingDays = DEFAULT_WORKING_DAYS }) {
   const [selectedAchievement, setSelectedAchievement] = useState(null);
-  
-  // Get current month as default
   const now = new Date();
-  const currentMonthValue = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const [selectedMonth, setSelectedMonth] = useState(currentMonthValue);
+  const [selectedMonth, setSelectedMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
 
-  // Handle month change
-  const handleMonthChange = (monthValue) => {
-    setSelectedMonth(monthValue);
-    if (onMonthChange) {
-      const [year, month] = monthValue.split('-');
-      onMonthChange(parseInt(year), parseInt(month));
-    }
+  const handleMonthChange = (val) => {
+    setSelectedMonth(val);
+    const [y, m] = val.split('-');
+    onMonthChange?.(parseInt(y), parseInt(m));
   };
 
-  // Stats with working days
-  const statsWithWorkingDays = useMemo(() => ({
-    ...stats,
-    workingDays,
-  }), [stats, workingDays]);
-
-  // Calculate XP breakdown
-  const xpBreakdown = useMemo(
-    () => calculateTotalXP(statsWithWorkingDays, MONTHLY_ACHIEVEMENTS),
-    [statsWithWorkingDays]
-  );
-
-  // Get user level
+  const statsWithWorkingDays = useMemo(() => ({ ...stats, workingDays }), [stats, workingDays]);
+  
+  const xpBreakdown = useMemo(() => calculateTotalXP(statsWithWorkingDays), [statsWithWorkingDays]);
   const level = useMemo(() => getUserLevel(xpBreakdown.total), [xpBreakdown.total]);
+  const totalUnlocked = useMemo(() => MONTHLY_ACHIEVEMENTS.filter(a => calculateAchievementProgress(a, statsWithWorkingDays).unlocked).length, [statsWithWorkingDays]);
 
-  // Categorize achievements by type
-  const attendanceAchievements = MONTHLY_ACHIEVEMENTS.filter(
-    (a) => a.requirement.type === 'monthly_attendance'
-  );
-  const gathaAchievements = MONTHLY_ACHIEVEMENTS.filter(
-    (a) => a.requirement.type === 'monthly_gatha'
-  );
-  const streakAchievements = MONTHLY_ACHIEVEMENTS.filter(
-    (a) => a.requirement.type === 'streak'
-  );
-
-  // Count total unlocked
-  const totalUnlocked = useMemo(() => {
-    return MONTHLY_ACHIEVEMENTS.filter(
-      (a) => calculateAchievementProgress(a, statsWithWorkingDays).unlocked
-    ).length;
-  }, [statsWithWorkingDays]);
+  // Categorize achievements
+  const attendanceAchievements = MONTHLY_ACHIEVEMENTS.filter(a => a.requirement.type === 'monthly_attendance');
+  const gathaAchievements = MONTHLY_ACHIEVEMENTS.filter(a => a.requirement.type === 'monthly_gatha');
+  const streakAchievements = MONTHLY_ACHIEVEMENTS.filter(a => a.requirement.type === 'streak');
 
   return (
     <div className="space-y-4 pb-6">
-      {/* Month Selector Dropdown */}
-      <MonthSelector
-        selectedMonth={selectedMonth}
-        onMonthChange={handleMonthChange}
-      />
+      <MonthSelector selectedMonth={selectedMonth} onMonthChange={handleMonthChange} />
+      
+      <MonthlyStatsSummary stats={statsWithWorkingDays} workingDays={workingDays} />
 
-      {/* Monthly Stats Summary */}
-      <MonthlyStatsSummary stats={stats} workingDays={workingDays} />
-
-      {/* XP & Level Display */}
       <XPBreakdownCard xpBreakdown={xpBreakdown} level={level} />
 
-      {/* How to Earn XP - Expandable Help */}
       <HowToEarnXP />
 
-      {/* Attendance Badges */}
-      <AchievementSection
-        title="📅 Attendance Badges"
-        icon={Calendar}
-        color="border-green-200"
-        achievements={attendanceAchievements}
-        stats={statsWithWorkingDays}
-        onAchievementClick={setSelectedAchievement}
+      <AchievementSection 
+        title="📅 Attendance Badges" 
+        icon={Calendar} 
+        color="border-green-200" 
+        achievements={attendanceAchievements} 
+        stats={statsWithWorkingDays} 
+        onAchievementClick={setSelectedAchievement} 
       />
 
-      {/* Gatha Badges */}
-      <AchievementSection
-        title="📚 Gatha Badges (New Only)"
-        icon={BookOpen}
-        color="border-purple-200"
-        achievements={gathaAchievements}
-        stats={statsWithWorkingDays}
-        onAchievementClick={setSelectedAchievement}
+      <AchievementSection 
+        title="📚 Gatha Badges" 
+        icon={BookOpen} 
+        color="border-purple-200" 
+        achievements={gathaAchievements} 
+        stats={statsWithWorkingDays} 
+        onAchievementClick={setSelectedAchievement} 
       />
 
-      {/* Streak Badges */}
-      <AchievementSection
-        title="🔥 Streak Badges"
-        icon={Flame}
-        color="border-orange-200"
-        achievements={streakAchievements}
-        stats={statsWithWorkingDays}
-        onAchievementClick={setSelectedAchievement}
+      <AchievementSection 
+        title="🔥 Streak Badges" 
+        icon={Flame} 
+        color="border-orange-200" 
+        achievements={streakAchievements} 
+        stats={statsWithWorkingDays} 
+        onAchievementClick={setSelectedAchievement} 
       />
 
-      {/* Overall Progress Bar */}
       <div className="bg-gradient-to-r from-amber-100 to-orange-100 rounded-2xl p-4 border-2 border-orange-200">
         <div className="flex items-center justify-between mb-2">
           <h4 className="font-bold text-orange-800 flex items-center gap-2">
@@ -935,28 +677,11 @@ export default function StudentAchievementPage({
         </p>
       </div>
 
-      {/* Info Banner */}
-      <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-        <div className="flex items-start gap-3">
-          <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-bold text-blue-800">📅 Monthly Badges</p>
-            <p className="text-xs text-blue-600 mt-1">
-              These badges reset every month. Try to unlock all {MONTHLY_ACHIEVEMENTS.length} badges before the month ends!
-            </p>
-            <p className="text-xs text-blue-500 mt-1">
-              You can view previous months using the dropdown above.
-            </p>
-          </div>
-        </div>
+      <div className="bg-blue-50 rounded-xl p-4 border border-blue-200 text-sm text-blue-800">
+        <p>📅 <strong>Monthly Reset:</strong> These badges reset every month. Try to unlock them all!</p>
       </div>
 
-      {/* Achievement Detail Modal */}
-      <AchievementDetailModal
-        achievement={selectedAchievement}
-        stats={statsWithWorkingDays}
-        onClose={() => setSelectedAchievement(null)}
-      />
+      <AchievementDetailModal achievement={selectedAchievement} stats={statsWithWorkingDays} onClose={() => setSelectedAchievement(null)} />
     </div>
   );
 }
