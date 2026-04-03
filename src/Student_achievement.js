@@ -4,9 +4,7 @@ import {
   BookOpen,
   Calendar,
   Check,
-  CheckCircle,
   ChevronDown,
-  Clock,
   Crown,
   Flame,
   Lock,
@@ -16,11 +14,7 @@ import {
   Trophy,
   Zap,
   HelpCircle,
-  Info,
-  BookMarked,
-  X as CloseIcon,
-  ChevronLeft,
-  ChevronRight
+  BookMarked
 } from 'lucide-react';
 
 // ============================================

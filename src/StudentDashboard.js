@@ -17,14 +17,12 @@ import {
   Edit2,
   Flame,
   HelpCircle,
-  Home,
   Info,
   Loader,
   LogOut,
   Medal,
   Plus,
   RefreshCw,
-  Star,
   Target,
   Trash2,
   Trophy,
@@ -1460,7 +1458,7 @@ const HistoryPage = ({ activeUserId }) => {
     setSelectedMonth(newMonth);
   };
 
-  const activityData = historyData?.dailyActivity ?? {};
+  const activityData = useMemo(() => historyData?.dailyActivity ?? {}, [historyData?.dailyActivity]);
   const todayIso = formatLocalDateString(today);
 
   const monthlySummary = useMemo(() => {
@@ -2046,10 +2044,9 @@ export default function StudentDashboard({ user, onLogout }) {
   // Stats
   const [monthlyAttendance, setMonthlyAttendance] = useState(0);
   const [monthlyNewGathas, setMonthlyNewGathas] = useState(0);
-  const [monthlyRevisionGathas, setMonthlyRevisionGathas] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0); // Global
   const [maxStreak, setMaxStreak] = useState(0); // Global
-  const [workingDays, setWorkingDays] = useState(DEFAULT_WORKING_DAYS);
+  const [workingDays] = useState(DEFAULT_WORKING_DAYS);
 
   // Selected period for stats
   const [statsMonth, setStatsMonth] = useState(() => {
@@ -2325,9 +2322,9 @@ export default function StudentDashboard({ user, onLogout }) {
     }
   }, []);
 
-  const fetchMonthlyStats = useCallback(async (year, month) => {
-    // We rely on local calculation now for accuracy on switch
-  }, []);
+  // const fetchMonthlyStats = useCallback(async (year, month) => {
+  //   // We rely on local calculation now for accuracy on switch
+  // }, []);
 
   const loadUserData = useCallback(async (username) => {
     setIsLoadingSwitch(true);
@@ -2381,7 +2378,6 @@ export default function StudentDashboard({ user, onLogout }) {
     if (newUsername === loggedInUsername) {
       setIsLoadingSwitch(true);
       try {
-        const now = new Date();
         await Promise.all([
           fetchAttendance(),
           fetchGathas(),
@@ -2421,7 +2417,6 @@ export default function StudentDashboard({ user, onLogout }) {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      const now = new Date();
       await Promise.all([
         fetchGroupMembers(),
         fetchAttendance(),
