@@ -195,8 +195,6 @@ export default function AdminDashboard({ user, onLogout }) {
   const [familyGroups, setFamilyGroups] = useState([]);
   const [familyGroupsLoading, setFamilyGroupsLoading] = useState(false);
   const [showAddGroupModal, setShowAddGroupModal] = useState(false);
-  const [showEditGroupModal, setShowEditGroupModal] = useState(false);
-  const [editingGroup, setEditingGroup] = useState(null);
   const [newGroup, setNewGroup] = useState({ groupName: '', members: [] });
   const [selectedMembers, setSelectedMembers] = useState([]);
   
@@ -220,7 +218,6 @@ export default function AdminDashboard({ user, onLogout }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [expandedStudent, setExpandedStudent] = useState(null);
-  const [expandedDay, setExpandedDay] = useState(null);
   const [studentFilter, setStudentFilter] = useState('all');
   const [approvalFilter, setApprovalFilter] = useState('all');
   const [detailLoading, setDetailLoading] = useState(false);
@@ -1128,7 +1125,7 @@ const toggleMemberSelection = (username) => {
     setIsExporting(true);
     
     try {
-      const { students: reportStudents, summary, topPerformers } = exportData;
+      const { students: reportStudents, summary } = exportData;
       
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -2884,11 +2881,9 @@ const toggleMemberSelection = (username) => {
                   if (expandedStudent === student.id) {
                     setExpandedStudent(null);
                     setSelectedStudent(null);
-                    setExpandedDay(null);
                   } else {
                     setExpandedStudent(student.id);
                     setSelectedStudent(student.username);
-                    setExpandedDay(null);
                   }
                 }}
                 className="w-full p-3 text-left active:bg-gray-50"

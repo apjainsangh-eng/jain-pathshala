@@ -16,7 +16,6 @@ import {
   Edit2,
   Flame,
   HelpCircle,
-  Home,
   Info,
   Loader,
   LogOut,
@@ -995,7 +994,7 @@ const HistoryPage = () => {
     setSelectedMonth(newMonth);
   };
 
-  const activityData = historyData?.dailyActivity ?? {};
+  const activityData = useMemo(() => historyData?.dailyActivity ?? {}, [historyData?.dailyActivity]);
   const todayIso = formatLocalDateString(today);
 
   const monthlySummary = useMemo(() => {
