@@ -669,7 +669,6 @@ const LastVisitCard = ({ attendanceHistory, gathaEntries, currentStreak, statsFo
     const totalGathasOnDay = dayGathas.reduce((sum, g) => sum + (g.total_gatha || 0), 0);
     return { date: lastDate, gathaCount: totalGathasOnDay, gathaDetails: dayGathas };
   }, [attendanceHistory, gathaEntries]);
-  if (!lastVisitInfo) return null;
   const nextMilestone = useMemo(() => {
     const monthlyAtt = statsForCurrentMonth?.monthlyAttendance || 0;
     const milestones = [4, 10, 20, 25];
@@ -678,6 +677,8 @@ const LastVisitCard = ({ attendanceHistory, gathaEntries, currentStreak, statsFo
     }
     return null;
   }, [statsForCurrentMonth]);
+
+  if (!lastVisitInfo) return null;
 
   return (
     <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-indigo-200 shadow-sm">
