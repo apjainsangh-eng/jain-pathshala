@@ -17,6 +17,7 @@ import {
   Edit2,
   Flame,
   HelpCircle,
+  Home,
   Info,
   Loader,
   LogOut,
