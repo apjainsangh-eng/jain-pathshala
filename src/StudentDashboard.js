@@ -35,6 +35,11 @@ import {
   Sparkles,
   UserCircle,
   ChevronUp,
+  TrendingDown,
+  BarChart3,
+  ArrowRight,
+  XCircle,
+  Eye,
 } from 'lucide-react';
 
 // Import Achievement Components
@@ -96,6 +101,50 @@ const HELPFUL_TIPS = [
 // ============================================
 // HELPER UTILITIES
 // ============================================
+
+/** Count non-Sunday weekdays between two dates (inclusive) */
+const countWeekdaysExcludingSundays = (startDate, endDate) => {
+  let count = 0;
+  const d = new Date(startDate);
+  d.setHours(0, 0, 0, 0);
+  const end = new Date(endDate);
+  end.setHours(0, 0, 0, 0);
+  while (d <= end) {
+    if (d.getDay() !== 0) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+};
+
+/** Calculate days since last visit, excluding Sundays */
+const daysSinceLastVisit = (attendanceHistory) => {
+  if (!attendanceHistory || attendanceHistory.length === 0) return null;
+  const sortedDates = attendanceHistory
+    .map(r => r.date)
+    .sort((a, b) => new Date(b) - new Date(a));
+  const lastDate = new Date(sortedDates[0]);
+  lastDate.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (lastDate.getTime() === today.getTime()) return 0;
+  let count = 0;
+  const d = new Date(lastDate);
+  d.setDate(d.getDate() + 1);
+  while (d <= today) {
+    if (d.getDay() !== 0) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+};
+
+/** Get absence message based on count */
+const getAbsenceMessage = (absentDays) => {
+  if (absentDays === 0) return { text: 'Perfect attendance this month! 🌟', tone: 'positive' };
+  if (absentDays <= 2) return { text: 'Great job! Just a few days missed. Keep it up! 💪', tone: 'good' };
+  if (absentDays <= 5) return { text: `You missed ${absentDays} days. Let's get back on track! 🎯`, tone: 'warning' };
+  if (absentDays <= 10) return { text: `${absentDays} days absent! Your classmates are ahead. Come back! 🚀`, tone: 'urgent' };
+  return { text: `${absentDays} days missed! Don't fall behind — every day matters! 🙏`, tone: 'critical' };
+};
 
 const coerceToDate = (input) => {
   if (input instanceof Date) return new Date(input.getTime());
@@ -429,6 +478,277 @@ const HelpTooltip = ({ text }) => {
           </div>
         </>
       )}
+    </div>
+  );
+};
+
+// ============================================
+// ABSENCE AWARENESS CARD
+// ============================================
+
+const AbsenceAwarenessCard = ({ attendanceHistory, todayMarked }) => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const monthStart = new Date(currentYear, currentMonth, 1);
+  const todayDate = new Date(currentYear, currentMonth, now.getDate());
+  const totalWeekdays = countWeekdaysExcludingSundays(monthStart, todayDate);
+  const presentDates = new Set(
+    attendanceHistory
+      .filter(r => {
+        const d = new Date(r.date);
+        return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+      })
+      .map(r => r.date)
+  );
+  let presentCount = presentDates.size;
+  const adjustedWeekdays = todayMarked ? totalWeekdays : Math.max(totalWeekdays - (now.getDay() !== 0 ? 1 : 0), 0);
+  const absentDays = Math.max(adjustedWeekdays - presentCount, 0);
+  const absenceInfo = getAbsenceMessage(absentDays);
+  const attendancePercentage = adjustedWeekdays > 0 ? Math.round((presentCount / adjustedWeekdays) * 100) : 100;
+  const getBgGradient = () => {
+    if (absentDays === 0) return 'from-green-400 to-emerald-500';
+    if (absentDays <= 2) return 'from-blue-400 to-cyan-500';
+    if (absentDays <= 5) return 'from-amber-400 to-orange-500';
+    return 'from-red-400 to-rose-500';
+  };
+
+  return (
+    <div className={`bg-gradient-to-r ${getBgGradient()} rounded-2xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden card-animate card-animate-3 ${absentDays > 5 ? 'btn-glow-urgent' : ''}`}>
+      <div className="absolute top-0 right-0 w-28 h-28 bg-white/10 rounded-full -mr-14 -mt-14" />
+      <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/10 rounded-full -ml-10 -mb-10" />
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            {absentDays === 0 ? (
+              <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+            ) : (
+              <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6" />
+            )}
+            <span className="font-bold text-sm sm:text-base">Attendance Tracker</span>
+          </div>
+          <span className="text-2xl sm:text-3xl">{absentDays === 0 ? '🌟' : absentDays <= 2 ? '👍' : absentDays <= 5 ? '⚠️' : '🚨'}</span>
+        </div>
+        <div className="flex items-end gap-4 mb-3">
+          <div>
+            <p className="text-4xl sm:text-5xl font-bold number-pop">{absentDays}</p>
+            <p className="text-xs sm:text-sm opacity-90">days absent</p>
+          </div>
+          <div className="flex-1">
+            <div className="bg-white/20 rounded-full p-1 mb-1">
+              <div className="flex items-center justify-between text-xs px-1">
+                <span>{presentCount} present</span>
+                <span>{adjustedWeekdays} working days</span>
+              </div>
+            </div>
+            <div className="h-3 bg-white/20 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-white rounded-full progress-animate"
+                style={{ width: `${attendancePercentage}%` }}
+              />
+            </div>
+            <p className="text-xs opacity-80 mt-1 text-right">{attendancePercentage}% attendance</p>
+          </div>
+        </div>
+        <div className="bg-white/15 backdrop-blur rounded-xl p-2 sm:p-3">
+          <p className="text-xs sm:text-sm font-medium">{absenceInfo.text}</p>
+          <p className="text-xs opacity-70 mt-1">* Sundays excluded from count</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// MONTHLY WEEK STRIP
+// ============================================
+
+const MonthlyWeekStrip = ({ attendanceHistory, todayIso }) => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const stripRef = useRef(null);
+  const presentDates = useMemo(() => {
+    const set = new Set();
+    attendanceHistory.forEach(r => {
+      const d = new Date(r.date);
+      if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
+        set.add(r.date);
+      }
+    });
+    return set;
+  }, [attendanceHistory, currentYear, currentMonth]);
+  useEffect(() => {
+    if (stripRef.current) {
+      const todayEl = stripRef.current.querySelector('[data-today="true"]');
+      if (todayEl) {
+        todayEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
+    }
+  }, []);
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const days = [];
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(currentYear, currentMonth, day);
+    const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const isSunday = date.getDay() === 0;
+    const isToday = dateStr === todayIso;
+    const isFuture = date > now;
+    const isPresent = presentDates.has(dateStr);
+    const isAbsent = !isSunday && !isFuture && !isPresent && day <= now.getDate();
+    days.push({ day, dateStr, isSunday, isToday, isFuture, isPresent, isAbsent, dayName: dayNames[date.getDay()] });
+  }
+
+  return (
+    <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-orange-200 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
+          <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
+          This Month at a Glance
+        </h3>
+        <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-bold">
+          {new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' })}
+        </span>
+      </div>
+      <div ref={stripRef} className="flex gap-1.5 overflow-x-auto pb-2 week-strip-scroll">
+        {days.map(d => (
+          <div
+            key={d.day}
+            data-today={d.isToday ? "true" : "false"}
+            className={`day-cell flex-shrink-0 w-9 sm:w-10 flex flex-col items-center rounded-lg p-1 sm:p-1.5 text-center cursor-default
+              ${d.isToday ? 'ring-2 ring-orange-400 ring-offset-1' : ''}
+              ${d.isPresent ? 'bg-gradient-to-b from-green-400 to-green-500 text-white shadow-md' : ''}
+              ${d.isAbsent ? 'bg-gradient-to-b from-red-100 to-red-200 text-red-600' : ''}
+              ${d.isSunday ? 'bg-gray-100 text-gray-400' : ''}
+              ${d.isFuture && !d.isSunday ? 'bg-gray-50 text-gray-300' : ''}
+              ${!d.isPresent && !d.isAbsent && !d.isSunday && !d.isFuture ? 'bg-gray-50 text-gray-400' : ''}
+            `}
+          >
+            <span className="text-[9px] sm:text-[10px] font-medium leading-tight">{d.dayName}</span>
+            <span className="text-xs sm:text-sm font-bold leading-tight">{d.day}</span>
+            <span className="text-[10px] leading-tight">
+              {d.isPresent ? '✓' : d.isAbsent ? '✗' : d.isSunday ? '—' : ''}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-center gap-3 sm:gap-4 mt-2 text-xs flex-wrap">
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded bg-gradient-to-b from-green-400 to-green-500" />
+          <span className="text-gray-500">Present</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded bg-gradient-to-b from-red-100 to-red-200" />
+          <span className="text-gray-500">Absent</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded bg-gray-100" />
+          <span className="text-gray-500">Sunday</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// LAST VISIT / ACTIVITY SUMMARY CARD
+// ============================================
+
+const LastVisitCard = ({ attendanceHistory, gathaEntries, currentStreak, statsForCurrentMonth, onGoToStats }) => {
+  const daysSince = daysSinceLastVisit(attendanceHistory);
+  const lastVisitInfo = useMemo(() => {
+    if (!attendanceHistory || attendanceHistory.length === 0) return null;
+    const sorted = [...attendanceHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const lastDate = sorted[0]?.date;
+    if (!lastDate) return null;
+    const dayGathas = gathaEntries.filter(g => {
+      const gDate = g.created_at ? new Date(g.created_at).toISOString().split('T')[0] : null;
+      return gDate === lastDate;
+    });
+    const totalGathasOnDay = dayGathas.reduce((sum, g) => sum + (g.total_gatha || 0), 0);
+    return { date: lastDate, gathaCount: totalGathasOnDay, gathaDetails: dayGathas };
+  }, [attendanceHistory, gathaEntries]);
+  if (!lastVisitInfo) return null;
+  const nextMilestone = useMemo(() => {
+    const monthlyAtt = statsForCurrentMonth?.monthlyAttendance || 0;
+    const milestones = [4, 10, 20, 25];
+    for (const m of milestones) {
+      if (monthlyAtt < m) return { target: m, remaining: m - monthlyAtt, label: m === 4 ? 'Week Regular' : m === 10 ? 'Dedicated Student' : m === 20 ? 'Star Student' : 'Perfect Month' };
+    }
+    return null;
+  }, [statsForCurrentMonth]);
+
+  return (
+    <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-indigo-200 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
+          <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500" />
+          Your Activity
+        </h3>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center gap-3 bg-indigo-50 rounded-xl p-3 border border-indigo-200">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-indigo-200 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-700" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-gray-800 text-sm">Last visited</p>
+            <p className="text-xs text-gray-500">
+              {new Date(lastVisitInfo.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+              {daysSince !== null && daysSince > 0 && (
+                <span className={`ml-2 font-bold ${daysSince > 3 ? 'text-red-500' : 'text-orange-500'}`}>
+                  ({daysSince} {daysSince === 1 ? 'day' : 'days'} ago)
+                </span>
+              )}
+              {daysSince === 0 && <span className="ml-2 font-bold text-green-500">(Today! ✓)</span>}
+            </p>
+          </div>
+          {lastVisitInfo.gathaCount > 0 && (
+            <div className="text-right flex-shrink-0">
+              <p className="text-lg font-bold text-purple-600">{lastVisitInfo.gathaCount}</p>
+              <p className="text-xs text-gray-400">gathas</p>
+            </div>
+          )}
+        </div>
+        {nextMilestone && (
+          <button
+            onClick={onGoToStats}
+            className="w-full flex items-center gap-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 border border-green-200 active:scale-[0.98] transition-transform"
+          >
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-200 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-green-700" />
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="font-bold text-gray-800 text-sm">Next badge: {nextMilestone.label}</p>
+              <p className="text-xs text-green-600">
+                Just <span className="font-bold">{nextMilestone.remaining} more {nextMilestone.remaining === 1 ? 'day' : 'days'}</span> to unlock!
+              </p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-green-500 flex-shrink-0" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// PAGE TRANSITION WRAPPER
+// ============================================
+
+const PageTransitionWrapper = ({ pageKey, children }) => {
+  const [animClass, setAnimClass] = useState('page-enter');
+  const prevKeyRef = useRef(pageKey);
+  useEffect(() => {
+    if (prevKeyRef.current !== pageKey) {
+      setAnimClass('page-enter');
+      prevKeyRef.current = pageKey;
+    }
+  }, [pageKey]);
+  return (
+    <div key={pageKey} className={animClass}>
+      {children}
     </div>
   );
 };
@@ -1159,6 +1479,21 @@ const HistoryPage = ({ activeUserId }) => {
   const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
   const firstDayOfMonth = new Date(selectedYear, selectedMonth - 1, 1).getDay();
 
+  // Count absent weekdays
+  const absentWeekdays = useMemo(() => {
+    const todayNow = new Date();
+    let count = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(selectedYear, selectedMonth - 1, day);
+      const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      if (date <= todayNow && date.getDay() !== 0) {
+        const activity = activityData[dateStr];
+        if (!activity?.present) count++;
+      }
+    }
+    return count;
+  }, [activityData, daysInMonth, selectedYear, selectedMonth]);
+
   const renderCalendar = () => {
     const days = [];
 
@@ -1174,6 +1509,8 @@ const HistoryPage = ({ activeUserId }) => {
       const hasGathas = (activity?.gathas?.new || 0) + (activity?.gathas?.revision || 0) > 0;
       const isFuture = new Date(dateStr) > today;
       const isSunday = new Date(dateStr).getDay() === 0;
+      const isPastWeekday = !isFuture && !isSunday && new Date(dateStr) <= today;
+      const isAbsentWeekday = isPastWeekday && !isPresent;
 
       days.push(
         <button
@@ -1183,17 +1520,19 @@ const HistoryPage = ({ activeUserId }) => {
           className={`h-9 w-9 sm:h-11 sm:w-11 rounded-lg sm:rounded-xl flex items-center justify-center text-xs sm:text-sm font-bold transition-all ${
             isPresent
               ? 'bg-gradient-to-br from-green-400 to-green-600 text-white shadow-md active:scale-95'
-              : isToday
+              : isToday && !isPresent
               ? 'bg-orange-100 text-orange-600 border-2 border-orange-400 ring-2 ring-orange-200'
               : isSunday
               ? 'bg-red-50 text-red-300'
+              : isAbsentWeekday
+              ? 'bg-red-100 text-red-500 border border-red-300'
               : isFuture
               ? 'text-gray-200'
               : 'text-gray-400 hover:bg-gray-100'
           }`}
         >
           <div className="relative">
-            {day}
+            {isAbsentWeekday ? <span className="text-red-400">✗</span> : day}
             {hasGathas && isPresent && (
               <span className="absolute -top-1 -right-2 w-2 h-2 bg-purple-500 rounded-full" />
             )}
@@ -1274,16 +1613,25 @@ const HistoryPage = ({ activeUserId }) => {
                 <span className="text-gray-600">Present ({monthlySummary.presentDays})</span>
               </div>
               <div className="flex items-center gap-1.5">
+                <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-md bg-red-100 border border-red-300" />
+                <span className="text-gray-600">Absent ({absentWeekdays})</span>
+              </div>
+              <div className="flex items-center gap-1.5">
                 <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-md bg-red-50 border border-red-200" />
                 <span className="text-gray-600">Sunday</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
               <div className="bg-green-50 border-2 border-green-200 rounded-xl p-2 sm:p-3 text-center">
                 <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 mx-auto mb-1" />
                 <p className="text-xl sm:text-2xl font-bold text-green-600">{monthlySummary.presentDays}</p>
-                <p className="text-xs text-gray-500">Days Present</p>
+                <p className="text-xs text-gray-500">Present</p>
+              </div>
+              <div className="bg-red-50 border-2 border-red-200 rounded-xl p-2 sm:p-3 text-center">
+                <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-500 mx-auto mb-1" />
+                <p className="text-xl sm:text-2xl font-bold text-red-500">{absentWeekdays}</p>
+                <p className="text-xs text-gray-500">Absent</p>
               </div>
               <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-2 sm:p-3 text-center">
                 <Plus className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500 mx-auto mb-1" />
@@ -2422,11 +2770,27 @@ export default function StudentDashboard({ user, onLogout }) {
         </div>
       )}
 
+      {/* Absence Awareness Card */}
+      <AbsenceAwarenessCard
+        attendanceHistory={attendanceHistory}
+        todayMarked={todayAttendanceMarked}
+      />
+
+      {/* Monthly Week Strip */}
+      <div className="card-animate card-animate-4">
+        <MonthlyWeekStrip
+          attendanceHistory={attendanceHistory}
+          todayIso={todayIso}
+        />
+      </div>
+
       {/* Global Streak Display */}
-      <StreakDisplay streak={currentStreak} maxStreak={maxStreak} />
+      <div className="card-animate card-animate-5">
+        <StreakDisplay streak={currentStreak} maxStreak={maxStreak} />
+      </div>
 
       {/* Today's Quick Actions */}
-      <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-orange-200 shadow-sm">
+      <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-orange-200 shadow-sm card-animate card-animate-6">
         <div className="flex items-center justify-between mb-3 sm:mb-4">
           <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
             <Target className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
@@ -2451,7 +2815,7 @@ export default function StudentDashboard({ user, onLogout }) {
                 ? 'bg-green-100 border-2 border-green-300'
                 : todayAttendanceStatus === 'pending'
                 ? 'bg-yellow-100 border-2 border-yellow-300'
-                : 'bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-lg'
+                : 'bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-lg btn-glow-blue'
             }`}
           >
             {todayAttendanceStatus === 'approved' ? (
@@ -2480,7 +2844,7 @@ export default function StudentDashboard({ user, onLogout }) {
               setEditingGatha(null);
               setShowGathaModal(true);
             }}
-            className="relative p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-purple-400 to-purple-600 text-white shadow-lg active:scale-[0.97] transition-transform"
+            className="relative p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-purple-400 to-purple-600 text-white shadow-lg active:scale-[0.97] transition-transform btn-glow-purple"
           >
             <BookOpen className="w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-1 sm:mb-2" />
             <p className="font-bold text-sm">Add Gatha</p>
@@ -2546,12 +2910,23 @@ export default function StudentDashboard({ user, onLogout }) {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 card-animate card-animate-7">
         <QuickStatCard icon={CalendarDays} value={monthlyAttendance} label="Days Present" color="green" sublabel="This Month" />
         <QuickStatCard icon={BookMarked} value={monthlyNewGathas} label="New Gathas" color="purple" sublabel="This Month" />
       </div>
 
-      <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-yellow-200 shadow-sm">
+      {/* Last Visit Card */}
+      <div className="card-animate card-animate-8">
+        <LastVisitCard
+          attendanceHistory={attendanceHistory}
+          gathaEntries={gathaEntries}
+          currentStreak={currentStreak}
+          statsForCurrentMonth={statsForCurrentMonth}
+          onGoToStats={() => setCurrentPage(PAGES.STATS)}
+        />
+      </div>
+
+      <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-yellow-200 shadow-sm card-animate card-animate-9">
         <div className="flex items-center justify-between mb-2 sm:mb-3">
           <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
             <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
@@ -2632,15 +3007,19 @@ export default function StudentDashboard({ user, onLogout }) {
       );
     }
 
+    let pageContent;
     switch (currentPage) {
       case PAGES.HOME:
-        return renderHome();
+        pageContent = renderHome();
+        break;
       case PAGES.STATS:
-        return renderStats();
+        pageContent = renderStats();
+        break;
       case PAGES.HISTORY:
-        return <HistoryPage activeUserId={isViewingOther ? activeUsername : null} />;
+        pageContent = <HistoryPage activeUserId={isViewingOther ? activeUsername : null} />;
+        break;
       case PAGES.PENDING:
-        return (
+        pageContent = (
           <PendingPage
             pendingStatus={pendingStatus}
             onRefresh={fetchPendingStatus}
@@ -2649,9 +3028,16 @@ export default function StudentDashboard({ user, onLogout }) {
             isSubmitting={isSubmitting}
           />
         );
+        break;
       default:
-        return renderHome();
+        pageContent = renderHome();
     }
+    
+    return (
+      <PageTransitionWrapper pageKey={currentPage}>
+        {pageContent}
+      </PageTransitionWrapper>
+    );
   };
 
   // ==================== MAIN RETURN ====================
