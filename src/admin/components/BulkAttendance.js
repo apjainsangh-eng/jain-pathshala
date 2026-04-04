@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
-  Calendar, Check, CheckCircle, Search, Users, RefreshCw,
-  AlertTriangle, ChevronDown, X as CloseIcon
+  Calendar, Check, CheckCircle, Search, RefreshCw,
+  AlertTriangle, X as CloseIcon
 } from 'lucide-react';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.vercel.app/api';

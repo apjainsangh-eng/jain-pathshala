@@ -221,12 +221,10 @@ export default function AdminDashboard({ user, onLogout }) {
   
   // Students & Analytics state
   const [students, setStudents] = useState([]);
-  const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentDetail, setStudentDetail] = useState(null);
   const [topStudents, setTopStudents] = useState({ topAttendance: [], topGatha: [] });
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name');
-  const [expandedStudent, setExpandedStudent] = useState(null);
   const [studentFilter, setStudentFilter] = useState('all');
   const [approvalFilter, setApprovalFilter] = useState('all');
   const [detailLoading, setDetailLoading] = useState(false);
@@ -576,14 +574,6 @@ export default function AdminDashboard({ user, onLogout }) {
     fetchStudents();
     fetchTopStudents();
   }, [fetchStudents, fetchTopStudents]);
-
-  useEffect(() => {
-    if (selectedStudent) {
-      fetchStudentDetail(selectedStudent);
-    } else {
-      setStudentDetail(null);
-    }
-  }, [selectedStudent, fetchStudentDetail]);
 
   useEffect(() => {
     if (showExportModal) {
@@ -2918,68 +2908,10 @@ const toggleMemberSelection = (username) => {
                       <p className="text-base font-bold text-purple-600">{newGathas}</p>
                       <p className="text-xs text-gray-400">New</p>
                     </div>
-                    {expandedStudent === student.id ? (
-                      <ChevronUp className="w-4 h-4 text-gray-400" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-gray-400" />
-                    )}
                   </div>
                 </div>
               </button>
 
-              {expandedStudent === student.id && (
-                <div className="border-t-2 border-indigo-100 p-3 bg-gradient-to-br from-indigo-50 to-purple-50">
-                  {detailLoading ? (
-                    <div className="text-center py-4">
-                      <RefreshCw className="w-6 h-6 animate-spin text-indigo-500 mx-auto" />
-                    </div>
-                  ) : studentDetail ? (
-                    <>
-                      <div className="grid grid-cols-3 gap-2 mb-3">
-                        <div className="bg-white rounded-lg p-2 border border-green-200 text-center">
-                          <p className="text-lg font-bold text-green-600">
-                            {studentDetail.summary?.totalAttendance || 0}
-                          </p>
-                          <p className="text-xs text-gray-500">Days</p>
-                        </div>
-                        <div className="bg-white rounded-lg p-2 border border-purple-200 text-center">
-                          <p className="text-lg font-bold text-purple-600">
-                            {studentDetail.gathaStats?.new || 0}
-                          </p>
-                          <p className="text-xs text-gray-500">New</p>
-                        </div>
-                        <div className="bg-white rounded-lg p-2 border border-blue-200 text-center">
-                          <p className="text-lg font-bold text-blue-600">
-                            {studentDetail.gathaStats?.revision || 0}
-                          </p>
-                          <p className="text-xs text-gray-500">Revision</p>
-                        </div>
-                      </div>
-
-                      {studentDetail.recentActivity && studentDetail.recentActivity.length > 0 && (
-                        <div className="space-y-2 max-h-60 overflow-y-auto">
-                          <p className="text-xs font-bold text-gray-600 mb-2">Recent Activity</p>
-                          {groupActivitiesByDate(studentDetail.recentActivity).slice(0, 10).map((dayGroup, idx) => (
-                            <div key={idx} className="bg-white rounded-lg p-2 border border-gray-200">
-                              <p className="text-xs font-bold text-gray-700">{formatDate(dayGroup.date)}</p>
-                              {dayGroup.attendance && (
-                                <span className="text-xs bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full mr-1">Present</span>
-                              )}
-                              {dayGroup.gathas.length > 0 && (
-                                <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">
-                                  {dayGroup.gathas.length} gatha(s)
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-center text-gray-500 py-4 text-sm">No data available</p>
-                  )}
-                </div>
-              )}
             </div>
           );
         })}

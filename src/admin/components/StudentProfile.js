@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  ArrowLeft, Calendar, BookOpen, CheckCircle, XCircle, Clock,
-  TrendingUp, Award, Target, Zap, Plus, FileText, RefreshCw,
-  ChevronDown, ChevronUp, AlertTriangle, User, Users, Star, Activity
+  ArrowLeft, Calendar, BookOpen, CheckCircle,
+  TrendingUp, Plus, FileText, RefreshCw,
+  AlertTriangle, Users, Activity
 } from 'lucide-react';
 import CalendarHeatmap from './shared/CalendarHeatmap';
 
@@ -85,7 +85,7 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
     );
   }
 
-  const { student, stats, monthlyStats, recentActivity, attendanceHistory, pendingAttendanceHistory, gathaHistory, pendingGathaHistory, notes } = profile;
+  const { student, stats, monthlyStats, recentActivity, attendanceHistory, pendingAttendanceHistory, gathaHistory, notes } = profile;
 
   // Build calendar data for current month
   const now = new Date();
