@@ -1,0 +1,294 @@
+import React, { useState } from 'react';
+import {
+  BookOpen, Check, CheckCircle, Search, RefreshCw,
+  AlertTriangle, X as CloseIcon, Plus, Trash2
+} from 'lucide-react';
+
+const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.vercel.app/api';
+
+const formatLocalDate = (d = new Date()) => {
+  const dt = d instanceof Date ? d : new Date(d);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+};
+
+export default function BulkGatha({ students, familyGroups, onSuccess }) {
+  const [date, setDate] = useState(formatLocalDate());
+  const [search, setSearch] = useState('');
+  const [groupFilter, setGroupFilter] = useState('all');
+  const [mode, setMode] = useState('same'); // 'same' or 'individual'
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  // Same gatha mode
+  const [selectedStudents, setSelectedStudents] = useState({});
+  const [sameGatha, setSameGatha] = useState({ sutraName: '', whichGatha: '', totalGatha: 1, type: 'new', remark: '' });
+
+  // Individual mode
+  const [rows, setRows] = useState([]);
+
+  const groupLookup = {};
+  (familyGroups || []).forEach(g => { (g.members || []).forEach(m => { groupLookup[m] = g.groupName; }); });
+  const uniqueGroups = [...new Set(Object.values(groupLookup))];
+
+  const filtered = (students || []).filter(s => {
+    const matchSearch = s.name?.toLowerCase().includes(search.toLowerCase()) || s.username?.toLowerCase().includes(search.toLowerCase());
+    const matchGroup = groupFilter === 'all' || groupLookup[s.username] === groupFilter;
+    return matchSearch && matchGroup;
+  });
+
+  const toggleStudent = (username) => {
+    setSelectedStudents(prev => ({ ...prev, [username]: !prev[username] }));
+  };
+
+  const selectAll = () => {
+    const upd = {};
+    filtered.forEach(s => { upd[s.username] = true; });
+    setSelectedStudents(upd);
+  };
+
+  const deselectAll = () => setSelectedStudents({});
+
+  const addRow = (username) => {
+    if (rows.find(r => r.username === username)) return;
+    const student = students.find(s => s.username === username);
+    setRows(prev => [...prev, { username, name: student?.name || username, sutraName: '', whichGatha: '', totalGatha: 1, type: 'new', remark: '' }]);
+  };
+
+  const updateRow = (idx, field, value) => {
+    setRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+  };
+
+  const removeRow = (idx) => {
+    setRows(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const selectedCount = mode === 'same'
+    ? Object.values(selectedStudents).filter(Boolean).length
+    : rows.length;
+
+  const handleSave = async () => {
+    let entries = [];
+
+    if (mode === 'same') {
+      if (!sameGatha.sutraName || !sameGatha.totalGatha) {
+        setError('Please fill sutra name and gatha count');
+        return;
+      }
+      const selected = Object.entries(selectedStudents).filter(([_, v]) => v).map(([u]) => u);
+      if (selected.length === 0) { setError('Select at least one student'); return; }
+
+      entries = selected.map(username => ({
+        username,
+        sutraName: sameGatha.sutraName,
+        whichGatha: sameGatha.whichGatha,
+        totalGatha: parseInt(sameGatha.totalGatha),
+        type: sameGatha.type,
+        remark: sameGatha.remark
+      }));
+    } else {
+      if (rows.length === 0) { setError('Add at least one student row'); return; }
+      const invalid = rows.find(r => !r.sutraName || !r.totalGatha);
+      if (invalid) { setError('Fill sutra name and gatha count for all rows'); return; }
+
+      entries = rows.map(r => ({
+        username: r.username,
+        sutraName: r.sutraName,
+        whichGatha: r.whichGatha,
+        totalGatha: parseInt(r.totalGatha),
+        type: r.type,
+        remark: r.remark
+      }));
+    }
+
+    const token = localStorage.getItem('jainPathshalaToken');
+    setSaving(true);
+    setError('');
+
+    try {
+      const res = await fetch(`${API_BASE}/admin/bulk/gatha`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, entries })
+      });
+
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed'); }
+      const data = await res.json();
+      setSuccess(`Saved! ${data.added} gatha entries added.`);
+      setTimeout(() => setSuccess(''), 4000);
+      setSelectedStudents({});
+      setRows([]);
+      if (onSuccess) onSuccess();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-4 text-white">
+        <h3 className="font-bold text-lg flex items-center gap-2"><BookOpen className="w-5 h-5" /> Bulk Gatha Entry</h3>
+        <p className="text-purple-100 text-xs mt-1">Add gatha for multiple students at once</p>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-2.5 rounded-xl flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-red-500" />
+          <p className="text-xs text-red-700">{error}</p>
+          <button onClick={() => setError('')}><CloseIcon className="w-4 h-4 text-red-500" /></button>
+        </div>
+      )}
+      {success && (
+        <div className="bg-green-50 border-l-4 border-green-500 p-2.5 rounded-xl flex items-center gap-2">
+          <CheckCircle className="w-4 h-4 text-green-500" />
+          <p className="text-xs text-green-700 font-semibold">{success}</p>
+        </div>
+      )}
+
+      {/* Date */}
+      <div className="bg-white rounded-xl border-2 border-purple-200 p-3">
+        <label className="block text-xs font-bold text-gray-600 mb-1">Date</label>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)}
+          className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl text-sm font-bold focus:outline-none focus:border-purple-400 bg-white" />
+      </div>
+
+      {/* Mode toggle */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+        <button onClick={() => setMode('same')}
+          className={`flex-1 py-2 rounded-lg text-xs font-bold ${mode === 'same' ? 'bg-white text-purple-700 shadow' : 'text-gray-500'}`}>
+          Same Gatha for All
+        </button>
+        <button onClick={() => setMode('individual')}
+          className={`flex-1 py-2 rounded-lg text-xs font-bold ${mode === 'individual' ? 'bg-white text-purple-700 shadow' : 'text-gray-500'}`}>
+          Individual Rows
+        </button>
+      </div>
+
+      {mode === 'same' ? (
+        <>
+          {/* Gatha form */}
+          <div className="bg-white rounded-xl border-2 border-purple-200 p-3 space-y-3">
+            <p className="text-xs font-bold text-gray-600">Gatha Details (applies to all selected)</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">Sutra Name *</label>
+                <input type="text" value={sameGatha.sutraName} onChange={e => setSameGatha({...sameGatha, sutraName: e.target.value})}
+                  placeholder="e.g. Navkar" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">Which Gatha</label>
+                <input type="text" value={sameGatha.whichGatha} onChange={e => setSameGatha({...sameGatha, whichGatha: e.target.value})}
+                  placeholder="e.g. 1-5" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">Count *</label>
+                <input type="number" min="1" value={sameGatha.totalGatha} onChange={e => setSameGatha({...sameGatha, totalGatha: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">Type</label>
+                <select value={sameGatha.type} onChange={e => setSameGatha({...sameGatha, type: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400 bg-white">
+                  <option value="new">New</option>
+                  <option value="revision">Revision</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Student selection */}
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..."
+                className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-purple-400" />
+            </div>
+            <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
+              className="px-3 py-2.5 border-2 border-gray-200 rounded-xl text-xs font-bold bg-white">
+              <option value="all">All</option>
+              {uniqueGroups.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+          </div>
+
+          <div className="flex gap-2">
+            <button onClick={selectAll} className="flex-1 py-2 bg-purple-100 text-purple-700 rounded-xl text-xs font-bold active:scale-95">Select All</button>
+            <button onClick={deselectAll} className="flex-1 py-2 bg-gray-100 text-gray-600 rounded-xl text-xs font-bold active:scale-95">Deselect All</button>
+          </div>
+
+          <div className="bg-white rounded-xl border-2 border-gray-200 max-h-64 overflow-y-auto divide-y divide-gray-100">
+            {filtered.map(s => (
+              <button key={s.username} onClick={() => toggleStudent(s.username)}
+                className={`w-full flex items-center gap-2 p-2.5 text-left transition-colors ${selectedStudents[s.username] ? 'bg-purple-50' : ''}`}>
+                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${selectedStudents[s.username] ? 'bg-purple-500 border-purple-500' : 'border-gray-300'}`}>
+                  {selectedStudents[s.username] && <Check className="w-4 h-4 text-white" />}
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs font-bold text-gray-700">{s.name}</p>
+                  {groupLookup[s.username] && <p className="text-[10px] text-gray-400">{groupLookup[s.username]}</p>}
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        /* Individual mode */
+        <>
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search to add..."
+                className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-purple-400" />
+            </div>
+          </div>
+
+          {search && (
+            <div className="bg-white rounded-xl border border-gray-200 max-h-32 overflow-y-auto">
+              {filtered.filter(s => !rows.find(r => r.username === s.username)).slice(0, 5).map(s => (
+                <button key={s.username} onClick={() => { addRow(s.username); setSearch(''); }}
+                  className="w-full flex items-center gap-2 p-2 text-left hover:bg-purple-50 border-b border-gray-50">
+                  <Plus className="w-4 h-4 text-purple-500" />
+                  <p className="text-xs font-bold text-gray-700">{s.name}</p>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {rows.map((row, idx) => (
+              <div key={row.username} className="bg-white rounded-xl border-2 border-purple-100 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-bold text-gray-700">{row.name}</p>
+                  <button onClick={() => removeRow(idx)} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="text" placeholder="Sutra *" value={row.sutraName} onChange={e => updateRow(idx, 'sutraName', e.target.value)}
+                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:border-purple-400" />
+                  <input type="text" placeholder="Which" value={row.whichGatha} onChange={e => updateRow(idx, 'whichGatha', e.target.value)}
+                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:border-purple-400" />
+                  <input type="number" min="1" placeholder="Count" value={row.totalGatha} onChange={e => updateRow(idx, 'totalGatha', e.target.value)}
+                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:border-purple-400" />
+                  <select value={row.type} onChange={e => updateRow(idx, 'type', e.target.value)}
+                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-white">
+                    <option value="new">New</option>
+                    <option value="revision">Revision</option>
+                  </select>
+                </div>
+              </div>
+            ))}
+            {rows.length === 0 && (
+              <p className="text-center text-gray-400 text-xs py-6">Search and add students above</p>
+            )}
+          </div>
+        </>
+      )}
+
+      <button onClick={handleSave} disabled={saving || selectedCount === 0}
+        className="w-full py-3.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-bold text-sm active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg">
+        {saving ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+        Save Gatha ({selectedCount} students)
+      </button>
+    </div>
+  );
+}

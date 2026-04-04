@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import StudentProfile from './admin/components/StudentProfile';
+import BulkAttendance from './admin/components/BulkAttendance';
+import BulkGatha from './admin/components/BulkGatha';
+import AttendanceRegister from './admin/components/AttendanceRegister';
 import {
   BookOpen,
   Calendar,
@@ -43,6 +47,9 @@ import {
   Plus,
   Key,
   UserCog,
+  Menu,
+  LayoutGrid,
+  ClipboardList,
 } from 'lucide-react';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.vercel.app/api';
@@ -192,6 +199,8 @@ export default function AdminDashboard({ user, onLogout }) {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [viewingStudentProfile, setViewingStudentProfile] = useState(null);
   const [familyGroups, setFamilyGroups] = useState([]);
   const [familyGroupsLoading, setFamilyGroupsLoading] = useState(false);
   const [showAddGroupModal, setShowAddGroupModal] = useState(false);
@@ -2878,13 +2887,7 @@ const toggleMemberSelection = (username) => {
             <div key={student.id} className="bg-white rounded-xl border-2 border-indigo-200 overflow-hidden shadow-sm">
               <button
                 onClick={() => {
-                  if (expandedStudent === student.id) {
-                    setExpandedStudent(null);
-                    setSelectedStudent(null);
-                  } else {
-                    setExpandedStudent(student.id);
-                    setSelectedStudent(student.username);
-                  }
+                  setViewingStudentProfile(student.username);
                 }}
                 className="w-full p-3 text-left active:bg-gray-50"
               >
@@ -3114,34 +3117,100 @@ const toggleMemberSelection = (username) => {
           </div>
         )}
 
-        {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'approvals' && renderApprovals()}
-        {activeTab === 'students' && renderStudentsList()}
-        {activeTab === 'analytics' && renderAnalytics()}
-        {activeTab === 'users' && renderUserManagement()}
+        {activeTab === 'overview' && !viewingStudentProfile && renderOverview()}
+        {activeTab === 'approvals' && !viewingStudentProfile && renderApprovals()}
+        {activeTab === 'students' && !viewingStudentProfile && renderStudentsList()}
+        {activeTab === 'analytics' && !viewingStudentProfile && renderAnalytics()}
+        {activeTab === 'users' && !viewingStudentProfile && renderUserManagement()}
+
+        {activeTab === 'bulk-attendance' && !viewingStudentProfile && (
+          <BulkAttendance students={students} familyGroups={familyGroups}
+            onSuccess={() => { fetchStudents(); fetchPendingData(false); }} />
+        )}
+        {activeTab === 'bulk-gatha' && !viewingStudentProfile && (
+          <BulkGatha students={students} familyGroups={familyGroups}
+            onSuccess={() => { fetchStudents(); fetchPendingData(false); }} />
+        )}
+        {activeTab === 'register' && !viewingStudentProfile && (
+          <AttendanceRegister />
+        )}
+
+        {viewingStudentProfile && (
+          <StudentProfile
+            username={viewingStudentProfile}
+            onBack={() => setViewingStudentProfile(null)}
+            onAddAttendance={(u) => {
+              setAddEntryData({ ...addEntryData, studentUsername: u });
+              setAddEntryType('attendance');
+              setShowAddEntryModal(true);
+            }}
+            onAddGatha={(u) => {
+              setAddEntryData({ ...addEntryData, studentUsername: u });
+              setAddEntryType('gatha');
+              setShowAddEntryModal(true);
+            }}
+          />
+        )}
 
         {renderExportModal()}
         {renderAddUserModal()}
         {renderEditUserModal()}
         {renderAddEntryModal()}
 
+        {/* More Menu Overlay */}
+        {showMoreMenu && (
+          <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setShowMoreMenu(false)}>
+            <div className="absolute bottom-16 left-0 right-0 bg-white rounded-t-3xl p-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+              <p className="text-sm font-bold text-gray-700 mb-3">More Options</p>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { key: 'bulk-attendance', icon: ClipboardList, label: 'Bulk Attend.', color: 'bg-green-100 text-green-600' },
+                  { key: 'bulk-gatha', icon: BookOpen, label: 'Bulk Gatha', color: 'bg-purple-100 text-purple-600' },
+                  { key: 'register', icon: LayoutGrid, label: 'Register', color: 'bg-blue-100 text-blue-600' },
+                  { key: 'users', icon: UserCog, label: 'Users', color: 'bg-orange-100 text-orange-600' },
+                  { key: 'analytics', icon: TrendingUp, label: 'Analytics', color: 'bg-pink-100 text-pink-600' },
+                ].map(item => (
+                  <button key={item.key} onClick={() => { setActiveTab(item.key); setShowMoreMenu(false); setViewingStudentProfile(null); }}
+                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl active:scale-95 transition-all">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${item.color}`}>
+                      <item.icon className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-bold text-gray-600">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Bottom Navigation - 5 Tabs */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-indigo-200 p-2 shadow-2xl">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-indigo-200 p-2 shadow-2xl z-40">
           <div className="max-w-lg mx-auto grid grid-cols-5 gap-1">
             {[
               { key: 'overview', icon: BarChart3, label: 'Home' },
               { key: 'students', icon: Users, label: 'Students' },
-              { key: 'users', icon: UserCog, label: 'Users' },
-              { key: 'analytics', icon: TrendingUp, label: 'Stats' },
+              { key: 'bulk-attendance', icon: ClipboardList, label: 'Bulk' },
               { key: 'approvals', icon: Clock, label: 'Pending', badge: totalPending, alert: newPendingAlert },
+              { key: 'more', icon: Menu, label: 'More' },
             ].map((tab) => (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => {
+                  if (tab.key === 'more') {
+                    setShowMoreMenu(!showMoreMenu);
+                  } else {
+                    setActiveTab(tab.key);
+                    setShowMoreMenu(false);
+                    setViewingStudentProfile(null);
+                  }
+                }}
                 className={`relative flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl text-xs font-bold transition-all ${
-                  activeTab === tab.key
-                    ? 'bg-indigo-500 text-white'
-                    : 'text-gray-500'
+                  tab.key === 'more'
+                    ? (showMoreMenu ? 'bg-indigo-500 text-white' : 'text-gray-500')
+                    : activeTab === tab.key
+                      ? 'bg-indigo-500 text-white'
+                      : 'text-gray-500'
                 } ${tab.alert ? 'animate-pulse' : ''}`}
               >
                 <tab.icon className="w-5 h-5" />
