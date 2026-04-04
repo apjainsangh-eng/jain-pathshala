@@ -22,7 +22,6 @@ import {
   Award,
   BarChart3,
   ChevronDown,
-  ChevronUp,
   Search,
   Star,
   Activity,
@@ -159,33 +158,6 @@ const getPerformanceBadge = (attendance, gatha) => {
   return { label: 'New', color: 'from-gray-400 to-gray-500', icon: '🌱' };
 };
 
-const groupActivitiesByDate = (activities) => {
-  if (!activities || activities.length === 0) return [];
-  
-  const grouped = {};
-  
-  activities.forEach(activity => {
-    const dateKey = activity.date?.split('T')[0] || activity.date;
-    if (!grouped[dateKey]) {
-      grouped[dateKey] = {
-        date: dateKey,
-        attendance: null,
-        gathas: []
-      };
-    }
-    
-    if (activity.type === 'attendance') {
-      grouped[dateKey].attendance = activity;
-    } else if (activity.type === 'gatha') {
-      grouped[dateKey].gathas.push(activity);
-    }
-  });
-  
-  return Object.values(grouped).sort((a, b) => 
-    new Date(b.date) - new Date(a.date)
-  );
-};
-
 // ============================================
 // MAIN COMPONENT
 // ============================================
@@ -221,13 +193,11 @@ export default function AdminDashboard({ user, onLogout }) {
   
   // Students & Analytics state
   const [students, setStudents] = useState([]);
-  const [studentDetail, setStudentDetail] = useState(null);
   const [topStudents, setTopStudents] = useState({ topAttendance: [], topGatha: [] });
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [studentFilter, setStudentFilter] = useState('all');
   const [approvalFilter, setApprovalFilter] = useState('all');
-  const [detailLoading, setDetailLoading] = useState(false);
 
   // Date picker state
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -455,25 +425,6 @@ export default function AdminDashboard({ user, onLogout }) {
       }
     } catch (err) {
       console.error('Error fetching top students:', err);
-    }
-  }, [dateRange]);
-
-  const fetchStudentDetail = useCallback(async (studentId) => {
-    const token = localStorage.getItem('jainPathshalaToken');
-    setDetailLoading(true);
-    try {
-      const res = await fetch(
-        API_BASE + '/admin/student/' + studentId + '/activity?startDate=' + dateRange.start + '&endDate=' + dateRange.end + '&limit=500',
-        { headers: { Authorization: 'Bearer ' + token } }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setStudentDetail(data);
-      }
-    } catch (err) {
-      console.error('Error fetching student detail:', err);
-    } finally {
-      setDetailLoading(false);
     }
   }, [dateRange]);
 
