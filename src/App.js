@@ -12,7 +12,6 @@ export default function App() {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isAdminLogin, setIsAdminLogin] = useState(false);
 
   // Check for existing session
   useEffect(() => {
@@ -45,32 +44,44 @@ export default function App() {
     setLoginError('');
 
     try {
-      const endpoint = isAdminLogin ? '/admin/login' : '/login';
-      
-      const response = await fetch(`${API_BASE}${endpoint}`, {
+      // Try student login first, then admin
+      const studentResponse = await fetch(`${API_BASE}/login`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setLoginError(data.error || 'Login failed');
-        return;
+      if (studentResponse.ok) {
+        const data = await studentResponse.json();
+        if (data.user && data.token) {
+          localStorage.setItem('jainPathshalaUser', JSON.stringify(data.user));
+          localStorage.setItem('jainPathshalaToken', data.token);
+          setCurrentUser(data.user);
+          setIsLoggedIn(true);
+          setLoginForm({ username: '', password: '' });
+          setLoginError('');
+          return;
+        }
       }
 
-      if (data.user && data.token) {
-        localStorage.setItem('jainPathshalaUser', JSON.stringify(data.user));
-        localStorage.setItem('jainPathshalaToken', data.token);
-        setCurrentUser(data.user);
+      // Student login failed — try admin login
+      const adminResponse = await fetch(`${API_BASE}/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+
+      const adminData = await adminResponse.json();
+
+      if (adminResponse.ok && adminData.user && adminData.token) {
+        localStorage.setItem('jainPathshalaUser', JSON.stringify(adminData.user));
+        localStorage.setItem('jainPathshalaToken', adminData.token);
+        setCurrentUser(adminData.user);
         setIsLoggedIn(true);
         setLoginForm({ username: '', password: '' });
         setLoginError('');
       } else {
-        setLoginError('Invalid response from server');
+        setLoginError('Invalid username or password');
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -118,40 +129,6 @@ export default function App() {
             <p className="text-orange-100 text-sm">શ્રી સોમચીન્તામણી વાસુપૂજ્યસ્વામી જૈન પાઠશાળા</p>
           </div>
 
-          {/* Toggle Buttons */}
-          <div className="flex border-b-2 border-orange-100">
-            <button
-              type="button"
-              onClick={() => { 
-                setIsAdminLogin(false); 
-                setLoginError(''); 
-                setLoginForm({ username: '', password: '' });
-              }}
-              className={`flex-1 py-3 text-sm font-bold transition-colors ${
-                !isAdminLogin
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              Student Login
-            </button>
-            <button
-              type="button"
-              onClick={() => { 
-                setIsAdminLogin(true); 
-                setLoginError(''); 
-                setLoginForm({ username: '', password: '' });
-              }}
-              className={`flex-1 py-3 text-sm font-bold transition-colors ${
-                isAdminLogin
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              Admin Login
-            </button>
-          </div>
-
           {/* Login Form */}
           <div className="p-5">
             {loginError && (
@@ -163,14 +140,14 @@ export default function App() {
             <form onSubmit={handleLogin}>
               <div className="mb-4">
                 <label className="block text-gray-700 font-semibold mb-2 text-sm">
-                  {isAdminLogin ? 'Admin Username' : 'Username'}
+                  Username
                 </label>
                 <input
                   type="text"
                   value={loginForm.username}
                   onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
                   className="w-full px-4 py-3 border-2 border-orange-200 rounded-xl focus:outline-none focus:border-orange-400 text-sm"
-                  placeholder={isAdminLogin ? 'Enter admin username' : 'Enter your name'}
+                  placeholder="Enter your name"
                   disabled={isLoading}
                   autoComplete="username"
                 />
