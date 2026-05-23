@@ -1,4 +1,4 @@
-onst T = {
+const T = {
   en: {
     // Login
     username_label: 'Username',
