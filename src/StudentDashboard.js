@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useLanguage } from './LanguageContext';
 import {
   AlertCircle,
   AlertTriangle,
@@ -89,12 +90,12 @@ const TIP_ICON_COLORS = {
   orange: 'text-orange-500',
 };
 
-// Tips for new users
-const HELPFUL_TIPS = [
-  { icon: Calendar, tipText: "Tap the blue button to mark your attendance daily", color: "blue" },
-  { icon: BookOpen, tipText: "Record your gatha learning with the purple button", color: "purple" },
-  { icon: Trophy, tipText: "Check Stats to see your achievements and progress", color: "yellow" },
-  { icon: Clock, tipText: "Pending tab shows items waiting for teacher approval", color: "orange" },
+// Tips for new users — populated dynamically using t()
+const HELPFUL_TIPS_KEYS = [
+  { icon: Calendar, tipKey: "tip1", color: "blue" },
+  { icon: BookOpen, tipKey: "tip2", color: "purple" },
+  { icon: Trophy, tipKey: "tip3", color: "yellow" },
+  { icon: Clock, tipKey: "tip4", color: "orange" },
 ];
 
 // ============================================
@@ -137,12 +138,12 @@ const daysSinceLastVisit = (attendanceHistory) => {
 };
 
 /** Get absence message based on count */
-const getAbsenceMessage = (absentDays) => {
-  if (absentDays === 0) return { text: 'Perfect attendance this month! 🌟', tone: 'positive' };
-  if (absentDays <= 2) return { text: 'Great job! Just a few days missed. Keep it up! 💪', tone: 'good' };
-  if (absentDays <= 5) return { text: `You missed ${absentDays} days. Let's get back on track! 🎯`, tone: 'warning' };
-  if (absentDays <= 10) return { text: `${absentDays} days absent! Your classmates are ahead. Come back! 🚀`, tone: 'urgent' };
-  return { text: `${absentDays} days missed! Don't fall behind — every day matters! 🙏`, tone: 'critical' };
+const getAbsenceMessage = (absentDays, t) => {
+  if (absentDays === 0) return { text: t('abs_perfect'), tone: 'positive' };
+  if (absentDays <= 2) return { text: t('abs_great'), tone: 'good' };
+  if (absentDays <= 5) return { text: t('abs_warn').replace('{n}', absentDays), tone: 'warning' };
+  if (absentDays <= 10) return { text: t('abs_urgent').replace('{n}', absentDays), tone: 'urgent' };
+  return { text: t('abs_critical').replace('{n}', absentDays), tone: 'critical' };
 };
 
 const coerceToDate = (input) => {
@@ -173,22 +174,22 @@ export const formatDateIn = (input, options = DEFAULT_DATE_OPTIONS) => {
   return parsed.toLocaleDateString('en-IN', { ...DEFAULT_DATE_OPTIONS, ...options });
 };
 
-const getGreeting = () => {
+const getGreeting = (t) => {
   const hour = new Date().getHours();
-  if (hour < 5) return { text: 'Good Night', emoji: '🌙', period: 'night' };
-  if (hour < 12) return { text: 'Good Morning', emoji: '🌅', period: 'morning' };
-  if (hour < 17) return { text: 'Good Afternoon', emoji: '☀️', period: 'afternoon' };
-  if (hour < 21) return { text: 'Good Evening', emoji: '🌆', period: 'evening' };
-  return { text: 'Good Night', emoji: '🌙', period: 'night' };
+  if (hour < 5) return { text: t('good_night'), emoji: '🌙', period: 'night' };
+  if (hour < 12) return { text: t('good_morning'), emoji: '🌅', period: 'morning' };
+  if (hour < 17) return { text: t('good_afternoon'), emoji: '☀️', period: 'afternoon' };
+  if (hour < 21) return { text: t('good_evening'), emoji: '🌆', period: 'evening' };
+  return { text: t('good_night'), emoji: '🌙', period: 'night' };
 };
 
-const getMotivationalMessage = (streak, attendance, gathas) => {
-  if (streak >= 7) return { text: "You're on fire! Keep the streak going! 🔥", type: "streak" };
-  if (attendance >= 50) return { text: "Amazing dedication! You're a star! ⭐", type: "attendance" };
-  if (gathas >= 25) return { text: "Great gatha progress! Keep learning! 📚", type: "gatha" };
-  if (streak >= 3) return { text: "Nice streak! Don't break the chain! 💪", type: "streak" };
-  if (attendance >= 10) return { text: "You're doing great! Stay consistent! 🎯", type: "attendance" };
-  return { text: "Every journey begins with a single step! 🚀", type: "motivation" };
+const getMotivationalMessage = (streak, attendance, gathas, t) => {
+  if (streak >= 7) return { text: t('mot_streak_fire'), type: "streak" };
+  if (attendance >= 50) return { text: t('mot_high_att'), type: "attendance" };
+  if (gathas >= 25) return { text: t('mot_high_gatha'), type: "gatha" };
+  if (streak >= 3) return { text: t('mot_streak_ok'), type: "streak" };
+  if (attendance >= 10) return { text: t('mot_att_ok'), type: "attendance" };
+  return { text: t('mot_start'), type: "motivation" };
 };
 
 // ============================================
@@ -197,6 +198,7 @@ const getMotivationalMessage = (streak, attendance, gathas) => {
 
 const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoading }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const { t } = useLanguage();
 
   if (!groupMembers || groupMembers.length <= 1) {
     return null;
@@ -231,12 +233,12 @@ const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoad
               </p>
               {isViewingOther && (
                 <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full animate-pulse flex-shrink-0">
-                  Viewing
+                  {t('viewing')}
                 </span>
               )}
             </div>
             <p className="text-xs text-gray-500">
-              {groupMembers.length} members in group • Tap to switch
+              {groupMembers.length} {t('members_tap')}
             </p>
           </div>
         </div>
@@ -259,7 +261,7 @@ const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoad
             <div className="p-2 bg-orange-50 border-b border-orange-200">
               <p className="text-xs font-bold text-orange-800 flex items-center gap-2">
                 <Users className="w-3 h-3" />
-                Switch Account
+                {t('switch_account')}
               </p>
             </div>
             <div className="max-h-60 overflow-y-auto">
@@ -297,7 +299,7 @@ const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoad
                       </p>
                       <p className="text-xs text-gray-500">
                         {member.username}
-                        {isLoggedIn && ' • (You)'}
+                        {isLoggedIn && ` • ${t('you_suffix')}`}
                       </p>
                     </div>
                     {isActive && (
@@ -309,7 +311,7 @@ const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoad
             </div>
             <div className="p-2 bg-gray-50 border-t border-gray-200">
               <p className="text-xs text-gray-500 text-center">
-                💡 You can add gathas and mark attendance for any member
+                💡 {t('member_tip')}
               </p>
             </div>
           </div>
@@ -323,7 +325,8 @@ const UserSwitcher = ({ groupMembers, activeUser, loggedInUser, onSwitch, isLoad
 // REUSABLE COMPONENTS
 // ============================================
 
-const ConfirmationModal = ({ title, message, onConfirm, onCancel, confirmText = "Delete", confirmColor = "red" }) => {
+const ConfirmationModal = ({ title, message, onConfirm, onCancel, confirmText, confirmColor = "red" }) => {
+  const { t } = useLanguage();
   if (!title) return null;
 
   return (
@@ -335,7 +338,7 @@ const ConfirmationModal = ({ title, message, onConfirm, onCancel, confirmText = 
           </div>
           <div className="min-w-0">
             <h4 className="text-base sm:text-lg font-bold text-gray-800 truncate">{title}</h4>
-            <p className="text-xs sm:text-sm text-gray-500">This action cannot be undone</p>
+            <p className="text-xs sm:text-sm text-gray-500">{t('cannot_undo')}</p>
           </div>
         </div>
         <p className="text-gray-600 mb-4 sm:mb-6 text-sm bg-gray-50 p-3 rounded-xl">{message}</p>
@@ -344,17 +347,29 @@ const ConfirmationModal = ({ title, message, onConfirm, onCancel, confirmText = 
             onClick={onCancel}
             className="flex-1 px-3 sm:px-4 py-3 bg-gray-100 text-gray-700 font-bold rounded-2xl active:scale-[0.98] transition-transform text-sm sm:text-base"
           >
-            Cancel
+            {t('cancel')}
           </button>
           <button
             onClick={onConfirm}
             className={`flex-1 px-3 sm:px-4 py-3 ${confirmColor === 'red' ? 'bg-red-500' : 'bg-orange-500'} text-white font-bold rounded-2xl active:scale-[0.98] transition-transform shadow-lg text-sm sm:text-base`}
           >
-            {confirmText}
+            {confirmText || t('delete_btn')}
           </button>
         </div>
       </div>
     </div>
+  );
+};
+
+const LangToggleButton = () => {
+  const { t, toggleLang } = useLanguage();
+  return (
+    <button
+      onClick={toggleLang}
+      className="bg-orange-50 text-orange-600 border border-orange-200 px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm active:scale-[0.98] transition-transform"
+    >
+      {t('lang_toggle')}
+    </button>
   );
 };
 
@@ -391,13 +406,14 @@ const ErrorBanner = ({ message, onClose }) => {
 };
 
 const StreakDisplay = ({ streak, maxStreak }) => {
+  const { t } = useLanguage();
   const getStreakInfo = (s) => {
-    if (s >= 30) return { label: 'Legendary!', color: 'from-yellow-400 to-orange-500', emoji: '🔥', tier: 'diamond' };
-    if (s >= 14) return { label: 'Amazing!', color: 'from-purple-400 to-pink-500', emoji: '⚡', tier: 'gold' };
-    if (s >= 7) return { label: 'Great!', color: 'from-blue-400 to-indigo-500', emoji: '✨', tier: 'silver' };
-    if (s >= 3) return { label: 'Good!', color: 'from-green-400 to-emerald-500', emoji: '🌟', tier: 'bronze' };
-    if (s >= 1) return { label: 'Started!', color: 'from-cyan-400 to-blue-500', emoji: '🚀', tier: 'starter' };
-    return { label: 'Start today!', color: 'from-gray-400 to-gray-500', emoji: '💪', tier: 'none' };
+    if (s >= 30) return { label: t('streak_legendary'), color: 'from-yellow-400 to-orange-500', emoji: '🔥', tier: 'diamond' };
+    if (s >= 14) return { label: t('streak_amazing'), color: 'from-purple-400 to-pink-500', emoji: '⚡', tier: 'gold' };
+    if (s >= 7) return { label: t('streak_great'), color: 'from-blue-400 to-indigo-500', emoji: '✨', tier: 'silver' };
+    if (s >= 3) return { label: t('streak_good'), color: 'from-green-400 to-emerald-500', emoji: '🌟', tier: 'bronze' };
+    if (s >= 1) return { label: t('streak_started'), color: 'from-cyan-400 to-blue-500', emoji: '🚀', tier: 'starter' };
+    return { label: t('streak_start_today'), color: 'from-gray-400 to-gray-500', emoji: '💪', tier: 'none' };
   };
 
   const info = getStreakInfo(streak);
@@ -411,19 +427,19 @@ const StreakDisplay = ({ streak, maxStreak }) => {
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Flame className="w-5 h-5 sm:w-6 sm:h-6" />
-            <span className="font-bold text-sm sm:text-base">Current Streak</span>
+            <span className="font-bold text-sm sm:text-base">{t('streak_current')}</span>
           </div>
           <span className="text-2xl sm:text-3xl">{info.emoji}</span>
         </div>
         <div className="flex items-end gap-3">
           <div>
             <p className="text-4xl sm:text-5xl font-bold">{streak}</p>
-            <p className="text-xs sm:text-sm opacity-80">{streak === 1 ? 'day' : 'days'}</p>
+            <p className="text-xs sm:text-sm opacity-80">{t('days')}</p>
           </div>
           <div className="flex-1 text-right">
             <p className="text-base sm:text-lg font-bold">{info.label}</p>
             <p className="text-xs opacity-80 flex items-center justify-end gap-1">
-              <Trophy className="w-3 h-3" /> Best: {maxStreak} days
+              <Trophy className="w-3 h-3" /> {t('streak_best')}: {maxStreak} {t('days')}
             </p>
           </div>
         </div>
@@ -486,6 +502,7 @@ const HelpTooltip = ({ text }) => {
 // ============================================
 
 const AbsenceAwarenessCard = ({ attendanceHistory, todayMarked }) => {
+  const { t } = useLanguage();
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
@@ -503,7 +520,7 @@ const AbsenceAwarenessCard = ({ attendanceHistory, todayMarked }) => {
   let presentCount = presentDates.size;
   const adjustedWeekdays = todayMarked ? totalWeekdays : Math.max(totalWeekdays - (now.getDay() !== 0 ? 1 : 0), 0);
   const absentDays = Math.max(adjustedWeekdays - presentCount, 0);
-  const absenceInfo = getAbsenceMessage(absentDays);
+  const absenceInfo = getAbsenceMessage(absentDays, t);
   const attendancePercentage = adjustedWeekdays > 0 ? Math.round((presentCount / adjustedWeekdays) * 100) : 100;
   const getBgGradient = () => {
     if (absentDays === 0) return 'from-green-400 to-emerald-500';
@@ -524,20 +541,20 @@ const AbsenceAwarenessCard = ({ attendanceHistory, todayMarked }) => {
             ) : (
               <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6" />
             )}
-            <span className="font-bold text-sm sm:text-base">Attendance Tracker</span>
+            <span className="font-bold text-sm sm:text-base">{t('att_tracker')}</span>
           </div>
           <span className="text-2xl sm:text-3xl">{absentDays === 0 ? '🌟' : absentDays <= 2 ? '👍' : absentDays <= 5 ? '⚠️' : '🚨'}</span>
         </div>
         <div className="flex items-end gap-4 mb-3">
           <div>
             <p className="text-4xl sm:text-5xl font-bold number-pop">{absentDays}</p>
-            <p className="text-xs sm:text-sm opacity-90">days absent</p>
+            <p className="text-xs sm:text-sm opacity-90">{t('att_days_absent')}</p>
           </div>
           <div className="flex-1">
             <div className="bg-white/20 rounded-full p-1 mb-1">
               <div className="flex items-center justify-between text-xs px-1">
-                <span>{presentCount} present</span>
-                <span>{adjustedWeekdays} working days</span>
+                <span>{presentCount} {t('att_present')}</span>
+                <span>{adjustedWeekdays} {t('att_working_days')}</span>
               </div>
             </div>
             <div className="h-3 bg-white/20 rounded-full overflow-hidden">
@@ -551,7 +568,7 @@ const AbsenceAwarenessCard = ({ attendanceHistory, todayMarked }) => {
         </div>
         <div className="bg-white/15 backdrop-blur rounded-xl p-2 sm:p-3">
           <p className="text-xs sm:text-sm font-medium">{absenceInfo.text}</p>
-          <p className="text-xs opacity-70 mt-1">* Sundays excluded from count</p>
+          <p className="text-xs opacity-70 mt-1">{t('att_sundays_note')}</p>
         </div>
       </div>
     </div>
@@ -563,6 +580,7 @@ const AbsenceAwarenessCard = ({ attendanceHistory, todayMarked }) => {
 // ============================================
 
 const MonthlyWeekStrip = ({ attendanceHistory, todayIso }) => {
+  const { t } = useLanguage();
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
@@ -604,7 +622,7 @@ const MonthlyWeekStrip = ({ attendanceHistory, todayIso }) => {
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
           <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
-          This Month at a Glance
+          {t('month_glance')}
         </h3>
         <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-bold">
           {new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' })}
@@ -635,15 +653,15 @@ const MonthlyWeekStrip = ({ attendanceHistory, todayIso }) => {
       <div className="flex items-center justify-center gap-3 sm:gap-4 mt-2 text-xs flex-wrap">
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded bg-gradient-to-b from-green-400 to-green-500" />
-          <span className="text-gray-500">Present</span>
+          <span className="text-gray-500">{t('present')}</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded bg-gradient-to-b from-red-100 to-red-200" />
-          <span className="text-gray-500">Absent</span>
+          <span className="text-gray-500">{t('absent')}</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded bg-gray-100" />
-          <span className="text-gray-500">Sunday</span>
+          <span className="text-gray-500">{t('sunday')}</span>
         </div>
       </div>
     </div>
@@ -655,6 +673,7 @@ const MonthlyWeekStrip = ({ attendanceHistory, todayIso }) => {
 // ============================================
 
 const LastVisitCard = ({ attendanceHistory, gathaEntries, currentStreak, statsForCurrentMonth, onGoToStats }) => {
+  const { t } = useLanguage();
   const daysSince = daysSinceLastVisit(attendanceHistory);
   const lastVisitInfo = useMemo(() => {
     if (!attendanceHistory || attendanceHistory.length === 0) return null;
@@ -684,7 +703,7 @@ const LastVisitCard = ({ attendanceHistory, gathaEntries, currentStreak, statsFo
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
           <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500" />
-          Your Activity
+          {t('your_activity')}
         </h3>
       </div>
       <div className="space-y-2">
@@ -693,15 +712,15 @@ const LastVisitCard = ({ attendanceHistory, gathaEntries, currentStreak, statsFo
             <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-700" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-gray-800 text-sm">Last visited</p>
+            <p className="font-bold text-gray-800 text-sm">{t('last_visited')}</p>
             <p className="text-xs text-gray-500">
               {new Date(lastVisitInfo.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
               {daysSince !== null && daysSince > 0 && (
                 <span className={`ml-2 font-bold ${daysSince > 3 ? 'text-red-500' : 'text-orange-500'}`}>
-                  ({daysSince} {daysSince === 1 ? 'day' : 'days'} ago)
+                  ({t('days_ago').replace('{n}', daysSince).replace('{day}', t('days'))})
                 </span>
               )}
-              {daysSince === 0 && <span className="ml-2 font-bold text-green-500">(Today! ✓)</span>}
+              {daysSince === 0 && <span className="ml-2 font-bold text-green-500">({t('today_mark')})</span>}
             </p>
           </div>
           {lastVisitInfo.gathaCount > 0 && (
@@ -720,9 +739,9 @@ const LastVisitCard = ({ attendanceHistory, gathaEntries, currentStreak, statsFo
               <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-green-700" />
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <p className="font-bold text-gray-800 text-sm">Next badge: {nextMilestone.label}</p>
+              <p className="font-bold text-gray-800 text-sm">{t('next_badge')}: {nextMilestone.label}</p>
               <p className="text-xs text-green-600">
-                Just <span className="font-bold">{nextMilestone.remaining} more {nextMilestone.remaining === 1 ? 'day' : 'days'}</span> to unlock!
+                {t('days_to_unlock').replace('{n}', nextMilestone.remaining).replace('{day}', t('days'))}
               </p>
             </div>
             <ArrowRight className="w-4 h-4 text-green-500 flex-shrink-0" />
@@ -758,6 +777,7 @@ const PageTransitionWrapper = ({ pageKey, children }) => {
 // ============================================
 
 const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel, stats }) => {
+  const { t } = useLanguage();
   if (!isOpen) return null;
 
   const allLevels = LEVELS || [
@@ -788,8 +808,8 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
                   {userLevel.icon}
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-lg sm:text-xl font-bold">Level Progress</h3>
-                  <p className="text-sm opacity-80">Your XP Journey</p>
+                  <h3 className="text-lg sm:text-xl font-bold">{t('level_progress')}</h3>
+                  <p className="text-sm opacity-80">{t('xp_journey')}</p>
                 </div>
               </div>
               <button
@@ -805,14 +825,14 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
             <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 border-b">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <p className="text-sm text-gray-600">Current Level</p>
+                  <p className="text-sm text-gray-600">{t('current_level')}</p>
                   <p className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center gap-2">
                     <span className="text-2xl sm:text-3xl">{userLevel.icon}</span>
                     {userLevel.name}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-600">Total XP</p>
+                  <p className="text-sm text-gray-600">{t('total_xp')}</p>
                   <p className="text-2xl sm:text-3xl font-bold text-indigo-600">{currentXP}</p>
                 </div>
               </div>
@@ -836,7 +856,7 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
             <div className="p-4 border-b">
               <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
                 <Zap className="w-5 h-5 text-yellow-500 flex-shrink-0" />
-                How You Earned XP This Month
+                {t('how_earned_xp')}
               </h4>
               <div className="space-y-2">
                 <div className="flex items-center justify-between p-3 bg-green-50 rounded-xl border border-green-200">
@@ -883,7 +903,7 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
             <div className="p-4">
               <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
                 <TrendingUp className="w-5 h-5 text-blue-500 flex-shrink-0" />
-                All Levels
+                {t('all_levels')}
               </h4>
               <div className="space-y-2">
                 {allLevels.map((level, index) => {
@@ -921,7 +941,7 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
                             )}
                           </div>
                           <p className="text-xs text-gray-500">
-                            {level.minXP === 0 ? 'Starting level' : `${level.minXP} XP required`}
+                            {level.minXP === 0 ? t('starting_level') : `${level.minXP} XP`}
                           </p>
                         </div>
                       </div>
@@ -946,7 +966,7 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
               onClick={onClose}
               className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold py-3 sm:py-3.5 rounded-xl active:scale-[0.98] transition-transform shadow-lg text-sm sm:text-base"
             >
-              Got it! 💪
+              {t('got_it')}
             </button>
           </div>
         </div>
@@ -960,6 +980,7 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
 // ============================================
 
 const LeaderboardSection = ({ currentUserId, currentUserName, year, month }) => {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('attendance');
   const [leaderboardData, setLeaderboardData] = useState({ attendanceLeaders: [], gathaLeaders: [] });
   const [isLoading, setIsLoading] = useState(true);
@@ -1068,7 +1089,7 @@ const LeaderboardSection = ({ currentUserId, currentUserName, year, month }) => 
             activeTab === 'attendance' ? 'bg-green-500 text-white shadow-lg' : 'text-gray-600 bg-white'
           }`}
         >
-          <Calendar className="w-3 h-3 sm:w-4 sm:h-4" /> Attendance
+          <Calendar className="w-3 h-3 sm:w-4 sm:h-4" /> {t('attendance_label')}
         </button>
         <button
           onClick={() => setActiveTab('gatha')}
@@ -1076,7 +1097,7 @@ const LeaderboardSection = ({ currentUserId, currentUserName, year, month }) => 
             activeTab === 'gatha' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-600 bg-white'
           }`}
         >
-          <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" /> New Gathas
+          <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" /> {t('new_gathas')}
         </button>
       </div>
 
@@ -1207,6 +1228,7 @@ const LeaderboardSection = ({ currentUserId, currentUserName, year, month }) => 
 // ============================================
 
 const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, activeUserName }) => {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState(editData?.type || 'new');
   const [form, setForm] = useState({
     sutraName: editData?.sutra_name || '',
@@ -1258,9 +1280,9 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
                   <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-lg sm:text-xl font-bold">{editData ? 'Edit Entry' : 'Add Gatha'}</h3>
+                  <h3 className="text-lg sm:text-xl font-bold">{editData ? t('edit_entry') : t('add_gatha_title')}</h3>
                   <p className="text-xs sm:text-sm opacity-80">
-                    {activeUserName ? `For: ${activeUserName}` : 'Record your learning progress'}
+                    {activeUserName ? `${t('for_user')}: ${activeUserName}` : t('record_progress')}
                   </p>
                 </div>
               </div>
@@ -1281,7 +1303,7 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
                   activeTab === 'new' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-600 bg-white'
                 }`}
               >
-                <Plus className="w-4 h-4 sm:w-5 sm:h-5" /> New Learning
+                <Plus className="w-4 h-4 sm:w-5 sm:h-5" /> {t('new_learning')}
               </button>
               <button
                 onClick={() => setActiveTab('revision')}
@@ -1289,7 +1311,7 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
                   activeTab === 'revision' ? 'bg-blue-500 text-white shadow-lg' : 'text-gray-600 bg-white'
                 }`}
               >
-                <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" /> Revision
+                <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" /> {t('revision')}
               </button>
             </div>
           )}
@@ -1297,8 +1319,8 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
           <div className="max-h-[50vh] overflow-y-auto p-4 sm:p-5 space-y-4">
             <div>
               <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
-                📖 Sutra Name
-                <HelpTooltip text="Enter the name of the sutra you learned or revised" />
+                {t('sutra_name')}
+                <HelpTooltip text={t('sutra_help')} />
               </label>
               <div className="flex flex-wrap gap-2 mb-2">
                 {commonSutras.map((sutra) => (
@@ -1321,28 +1343,28 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
                 value={form.sutraName}
                 onChange={(e) => setForm({ ...form, sutraName: e.target.value })}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
-                placeholder="Enter sutra name or select above"
+                placeholder={t('sutra_placeholder')}
               />
             </div>
 
             <div>
               <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
-                📝 Which Gatha
-                <HelpTooltip text="Enter the gatha numbers you completed (e.g., 1-5 or 3,4,5)" />
+                {t('which_gatha')}
+                <HelpTooltip text={t('gatha_help')} />
               </label>
               <input
                 type="text"
                 value={form.whichGatha}
                 onChange={(e) => setForm({ ...form, whichGatha: e.target.value })}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
-                placeholder="e.g., Gatha 1-5 or 3,4,5"
+                placeholder={t('which_gatha_placeholder')}
               />
             </div>
 
             <div>
               <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
-                #️⃣ Total Count
-                <HelpTooltip text="How many gathas did you complete in total?" />
+                {t('total_count')}
+                <HelpTooltip text={t('total_help')} />
               </label>
               <div className="flex gap-2">
                 {[1, 3, 5, 10].map((num) => (
@@ -1365,7 +1387,7 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
                 value={form.totalGatha}
                 onChange={(e) => setForm({ ...form, totalGatha: e.target.value })}
                 className="w-full mt-2 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium"
-                placeholder="Or enter custom count"
+                placeholder={t('total_placeholder')}
                 min="1"
               />
             </div>
@@ -1377,7 +1399,7 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
                 onClick={onClose}
                 className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl active:scale-[0.98] transition-transform text-sm"
               >
-                Cancel
+                {t('cancel')}
               </button>
               <button
                 onClick={handleSubmit}
@@ -1393,7 +1415,7 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
                 ) : (
                   <Check className="w-4 h-4 sm:w-5 sm:h-5" />
                 )}
-                {editData ? 'Save' : 'Submit'}
+                {editData ? t('save') : t('submit')}
               </button>
             </div>
           </div>
@@ -1408,6 +1430,7 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
 // ============================================
 
 const HistoryPage = ({ activeUserId }) => {
+  const { t } = useLanguage();
   const today = new Date();
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
@@ -1416,7 +1439,11 @@ const HistoryPage = ({ activeUserId }) => {
   const [error, setError] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null);
 
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const monthNames = [
+    t('month_jan'), t('month_feb'), t('month_mar'), t('month_apr'),
+    t('month_may'), t('month_jun'), t('month_jul'), t('month_aug'),
+    t('month_sep'), t('month_oct'), t('month_nov'), t('month_dec'),
+  ];
 
   const fetchHistory = useCallback(async (year, month) => {
     setIsLoading(true);
@@ -1550,10 +1577,10 @@ const HistoryPage = ({ activeUserId }) => {
         <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
         <div>
           <p className="text-sm font-bold text-blue-800">
-            {activeUserId ? `Viewing ${activeUserId}'s History` : "My Personal History"}
+            {activeUserId ? t('viewing_history').replace('{name}', activeUserId) : t('my_history')}
           </p>
           <p className="text-xs text-blue-600 mt-1">
-            Green = Present • Red tint = Sunday (Holiday) • Tap green days for details
+            {t('history_hint')}
           </p>
         </div>
       </div>
@@ -1581,7 +1608,7 @@ const HistoryPage = ({ activeUserId }) => {
         {isLoading ? (
           <div className="text-center py-12">
             <RefreshCw className="w-10 h-10 sm:w-12 sm:h-12 animate-spin text-orange-500 mx-auto" />
-            <p className="mt-4 text-gray-600 font-medium text-sm sm:text-base">Loading history...</p>
+            <p className="mt-4 text-gray-600 font-medium text-sm sm:text-base">{t('loading_history')}</p>
           </div>
         ) : error ? (
           <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 sm:p-6 text-center">
@@ -1591,7 +1618,7 @@ const HistoryPage = ({ activeUserId }) => {
               onClick={() => fetchHistory(selectedYear, selectedMonth)}
               className="mt-3 px-4 py-2 bg-red-100 text-red-700 rounded-xl font-medium text-sm"
             >
-              Try Again
+              {t('try_again')}
             </button>
           </div>
         ) : (
@@ -1610,15 +1637,15 @@ const HistoryPage = ({ activeUserId }) => {
             <div className="flex items-center justify-center gap-3 sm:gap-4 text-xs mb-4 flex-wrap">
               <div className="flex items-center gap-1.5">
                 <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-md bg-gradient-to-br from-green-400 to-green-600" />
-                <span className="text-gray-600">Present ({monthlySummary.presentDays})</span>
+                <span className="text-gray-600">{t('present')} ({monthlySummary.presentDays})</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-md bg-red-100 border border-red-300" />
-                <span className="text-gray-600">Absent ({absentWeekdays})</span>
+                <span className="text-gray-600">{t('absent')} ({absentWeekdays})</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-md bg-red-50 border border-red-200" />
-                <span className="text-gray-600">Sunday</span>
+                <span className="text-gray-600">{t('sunday')}</span>
               </div>
             </div>
 
@@ -1626,22 +1653,22 @@ const HistoryPage = ({ activeUserId }) => {
               <div className="bg-green-50 border-2 border-green-200 rounded-xl p-2 sm:p-3 text-center">
                 <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 mx-auto mb-1" />
                 <p className="text-xl sm:text-2xl font-bold text-green-600">{monthlySummary.presentDays}</p>
-                <p className="text-xs text-gray-500">Present</p>
+                <p className="text-xs text-gray-500">{t('present')}</p>
               </div>
               <div className="bg-red-50 border-2 border-red-200 rounded-xl p-2 sm:p-3 text-center">
                 <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-500 mx-auto mb-1" />
                 <p className="text-xl sm:text-2xl font-bold text-red-500">{absentWeekdays}</p>
-                <p className="text-xs text-gray-500">Absent</p>
+                <p className="text-xs text-gray-500">{t('absent')}</p>
               </div>
               <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-2 sm:p-3 text-center">
                 <Plus className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500 mx-auto mb-1" />
                 <p className="text-xl sm:text-2xl font-bold text-purple-600">{monthlySummary.newGathas}</p>
-                <p className="text-xs text-gray-500">New Gathas</p>
+                <p className="text-xs text-gray-500">{t('new_gathas_hist')}</p>
               </div>
               <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-2 sm:p-3 text-center">
                 <RefreshCw className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 mx-auto mb-1" />
                 <p className="text-xl sm:text-2xl font-bold text-blue-600">{monthlySummary.revisionGathas}</p>
-                <p className="text-xs text-gray-500">Revisions</p>
+                <p className="text-xs text-gray-500">{t('revisions')}</p>
               </div>
             </div>
           </>
@@ -1668,7 +1695,7 @@ const HistoryPage = ({ activeUserId }) => {
                     <h3 className="font-bold text-gray-800 text-base sm:text-lg">
                       {formatDateIn(selectedDay.dateStr, { weekday: 'short', day: 'numeric', month: 'short' })}
                     </h3>
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Present ✓</span>
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">{t('present_badge')}</span>
                   </div>
                 </div>
                 <button onClick={() => setSelectedDay(null)} className="p-2 bg-gray-100 rounded-xl flex-shrink-0">
@@ -1680,17 +1707,17 @@ const HistoryPage = ({ activeUserId }) => {
                 <div className="bg-purple-50 rounded-xl p-3 sm:p-4 border-2 border-purple-200">
                   <h4 className="font-bold text-purple-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
                     <Plus size={18} className="text-purple-600 flex-shrink-0" />
-                    New Gathas: {selectedDay.activity.gathas?.new || 0}
+                    {t('new_gathas_hist')}: {selectedDay.activity.gathas?.new || 0}
                   </h4>
                   {(selectedDay.activity.details || []).filter((d) => d.type === 'new').length === 0 ? (
-                    <p className="text-sm text-purple-600 bg-white/50 px-3 py-2 rounded-lg">No new gathas recorded</p>
+                    <p className="text-sm text-purple-600 bg-white/50 px-3 py-2 rounded-lg">{t('no_new_gathas')}</p>
                   ) : (
                     <div className="space-y-2">
                       {(selectedDay.activity.details || []).filter((d) => d.type === 'new').map((entry, idx) => (
                         <div key={idx} className="bg-white rounded-lg p-3 border border-purple-200">
-                          <p className="text-sm"><strong>Sutra:</strong> {entry.sutra_name}</p>
-                          <p className="text-sm"><strong>Gatha:</strong> {entry.which_gatha}</p>
-                          <p className="text-sm font-bold text-purple-700">Count: {entry.total_gatha}</p>
+                          <p className="text-sm"><strong>{t('sutra_label')}:</strong> {entry.sutra_name}</p>
+                          <p className="text-sm"><strong>{t('gatha_label')}:</strong> {entry.which_gatha}</p>
+                          <p className="text-sm font-bold text-purple-700">{t('count_label')}: {entry.total_gatha}</p>
                         </div>
                       ))}
                     </div>
@@ -1700,17 +1727,17 @@ const HistoryPage = ({ activeUserId }) => {
                 <div className="bg-blue-50 rounded-xl p-3 sm:p-4 border-2 border-blue-200">
                   <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
                     <RefreshCw size={18} className="text-blue-600 flex-shrink-0" />
-                    Revisions: {selectedDay.activity.gathas?.revision || 0}
+                    {t('revisions')}: {selectedDay.activity.gathas?.revision || 0}
                   </h4>
                   {(selectedDay.activity.details || []).filter((d) => d.type === 'revision').length === 0 ? (
-                    <p className="text-sm text-blue-600 bg-white/50 px-3 py-2 rounded-lg">No revisions recorded</p>
+                    <p className="text-sm text-blue-600 bg-white/50 px-3 py-2 rounded-lg">{t('no_revisions')}</p>
                   ) : (
                     <div className="space-y-2">
                       {(selectedDay.activity.details || []).filter((d) => d.type === 'revision').map((entry, idx) => (
                         <div key={idx} className="bg-white rounded-lg p-3 border border-blue-200">
-                          <p className="text-sm"><strong>Sutra:</strong> {entry.sutra_name}</p>
-                          <p className="text-sm"><strong>Gatha:</strong> {entry.which_gatha}</p>
-                          <p className="text-sm font-bold text-blue-700">Count: {entry.total_gatha}</p>
+                          <p className="text-sm"><strong>{t('sutra_label')}:</strong> {entry.sutra_name}</p>
+                          <p className="text-sm"><strong>{t('gatha_label')}:</strong> {entry.which_gatha}</p>
+                          <p className="text-sm font-bold text-blue-700">{t('count_label')}: {entry.total_gatha}</p>
                         </div>
                       ))}
                     </div>
@@ -1722,7 +1749,7 @@ const HistoryPage = ({ activeUserId }) => {
                 onClick={() => setSelectedDay(null)}
                 className="w-full mt-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold py-3 rounded-xl active:scale-[0.98] transition-transform text-sm sm:text-base"
               >
-                Close
+                {t('close')}
               </button>
             </div>
           </div>
@@ -1737,11 +1764,12 @@ const HistoryPage = ({ activeUserId }) => {
 // ============================================
 
 const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting }) => {
+  const { t } = useLanguage();
   const PendingBadge = ({ status }) => {
     const badges = {
-      pending: { className: 'text-yellow-700 bg-yellow-100 border-yellow-200', icon: Clock, label: 'Pending' },
-      approved: { className: 'text-green-700 bg-green-100 border-green-200', icon: Check, label: 'Approved' },
-      rejected: { className: 'text-red-700 bg-red-100 border-red-200', icon: CloseIcon, label: 'Rejected' },
+      pending: { className: 'text-yellow-700 bg-yellow-100 border-yellow-200', icon: Clock, label: t('pending_badge') },
+      approved: { className: 'text-green-700 bg-green-100 border-green-200', icon: Check, label: t('approved_badge') },
+      rejected: { className: 'text-red-700 bg-red-100 border-red-200', icon: CloseIcon, label: t('rejected_badge') },
     };
     const badge = badges[status];
     if (!badge) return null;
@@ -1771,9 +1799,9 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
       <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
         <Clock className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-bold text-yellow-800">What is Pending?</p>
+          <p className="text-sm font-bold text-yellow-800">{t('pending_info_title')}</p>
           <p className="text-xs text-yellow-700 mt-1">
-            After you mark attendance or add gathas, your teacher needs to approve them.
+            {t('pending_info_desc')}
           </p>
         </div>
       </div>
@@ -1784,7 +1812,7 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
-              <span className="font-bold text-base sm:text-lg">Pending Approvals</span>
+              <span className="font-bold text-base sm:text-lg">{t('pending_approvals')}</span>
             </div>
             <button
               onClick={onRefresh}
@@ -1796,7 +1824,7 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
           </div>
           <p className="text-4xl sm:text-5xl font-bold">{totalPendingCount}</p>
           <p className="text-xs sm:text-sm opacity-80 mt-1">
-            {totalPendingCount === 0 ? 'All caught up!' : 'items awaiting approval'}
+            {totalPendingCount === 0 ? t('all_caught_up_big') : t('items_waiting')}
           </p>
         </div>
       </div>
@@ -1806,14 +1834,14 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
           <div className="w-16 h-16 sm:w-20 sm:h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-8 h-8 sm:w-10 sm:h-10 text-green-500" />
           </div>
-          <p className="text-lg sm:text-xl font-bold text-gray-800">All Caught Up! 🎉</p>
-          <p className="text-sm text-gray-500 mt-2">No pending approvals</p>
+          <p className="text-lg sm:text-xl font-bold text-gray-800">{t('all_caught_up_big')}</p>
+          <p className="text-sm text-gray-500 mt-2">{t('no_pending_approvals')}</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-yellow-200 shadow-sm">
           <h3 className="font-bold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
             <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
-            Awaiting Approval
+            {t('awaiting_approval')}
           </h3>
           <div className="space-y-2 sm:space-y-3">
             {allPending.map((item, index) => (
@@ -1836,7 +1864,7 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
                     </div>
                     <div className="min-w-0">
                       <p className="font-bold text-gray-800 text-sm">
-                        {item.itemType === 'attendance' ? 'Attendance' : `Gatha - ${item.type === 'new' ? 'New' : 'Revision'}`}
+                        {item.itemType === 'attendance' ? t('attendance_label') : `${item.type === 'new' ? t('gatha_type_new') : t('gatha_type_revision')}`}
                       </p>
                       <p className="text-xs sm:text-sm text-gray-600">{formatDateIn(item.date)}</p>
                       {item.itemType === 'gatha' && (
@@ -1876,7 +1904,7 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
         <div className="bg-white rounded-2xl p-3 sm:p-4 border-2 border-red-200 shadow-sm">
           <h3 className="font-bold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
             <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
-            Rejected ({allRejected.length})
+            {t('rejected_section')} ({allRejected.length})
           </h3>
           <div className="space-y-2 sm:space-y-3">
             {allRejected.map((item, index) => (
@@ -1891,18 +1919,18 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-gray-800 text-sm">
-                      {item.itemType === 'attendance' ? 'Attendance' : `Gatha - ${item.type}`}
+                      {item.itemType === 'attendance' ? t('attendance_label') : `${item.type === 'new' ? t('gatha_type_new') : t('gatha_type_revision')}`}
                     </p>
                     <p className="text-xs sm:text-sm text-gray-600">{formatDateIn(item.date)}</p>
                     {item.rejection_reason && (
                       <p className="text-xs text-red-600 mt-1 bg-red-100 px-2 py-1 rounded truncate">
-                        Reason: {item.rejection_reason}
+                        {t('reason_label')}: {item.rejection_reason}
                       </p>
                     )}
                   </div>
                   <span className="inline-flex items-center gap-1 font-bold rounded-full border text-xs px-2 py-0.5 text-red-700 bg-red-100 border-red-200">
                     <CloseIcon className="w-3 h-3" />
-                    Rejected
+                    {t('rejected_badge')}
                   </span>
                 </div>
               </div>
@@ -1919,6 +1947,7 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
 // ============================================
 
 const RecentBadges = ({ stats, onBadgeClick }) => {
+  const { t } = useLanguage();
   const recentlyUnlocked = useMemo(() => {
     return MONTHLY_ACHIEVEMENTS
       .filter((a) => calculateAchievementProgress(a, stats).unlocked)
@@ -1929,8 +1958,8 @@ const RecentBadges = ({ stats, onBadgeClick }) => {
     return (
       <div className="bg-gray-50 rounded-xl p-4 sm:p-6 text-center border-2 border-gray-200">
         <Award className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-2" />
-        <p className="text-gray-500 text-sm">No badges yet this month</p>
-        <p className="text-gray-400 text-xs mt-1">Keep learning to unlock!</p>
+        <p className="text-gray-500 text-sm">{t('no_badges_yet')}</p>
+        <p className="text-gray-400 text-xs mt-1">{t('keep_learning')}</p>
       </div>
     );
   }
@@ -1964,6 +1993,7 @@ const RecentBadges = ({ stats, onBadgeClick }) => {
 // ============================================
 
 const NextBadges = ({ stats, onBadgeClick }) => {
+  const { t } = useLanguage();
   const nextAchievements = useMemo(() => {
     return MONTHLY_ACHIEVEMENTS
       .map((a) => ({ ...a, ...calculateAchievementProgress(a, stats) }))
@@ -1980,7 +2010,7 @@ const NextBadges = ({ stats, onBadgeClick }) => {
     <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 sm:p-4 border-2 border-green-200">
       <h4 className="font-bold text-green-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
         <Target className="w-4 h-4 sm:w-5 sm:h-5" />
-        Almost There! Keep Going!
+        {t('almost_there')}
       </h4>
       <div className="space-y-2 sm:space-y-3">
         {nextAchievements.map((achievement) => {
@@ -2024,6 +2054,7 @@ const NextBadges = ({ stats, onBadgeClick }) => {
 // ============================================
 
 export default function StudentDashboard({ user, onLogout }) {
+  const { t } = useLanguage();
   const [currentPage, setCurrentPage] = useState(PAGES.HOME);
 
   // Group/Account Switching States
@@ -2068,7 +2099,7 @@ export default function StudentDashboard({ user, onLogout }) {
   const [showLevelModal, setShowLevelModal] = useState(false);
 
   const todayIso = formatLocalDateString(new Date());
-  const greeting = getGreeting();
+  const greeting = getGreeting(t);
   const [dailyQuote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)]);
 
   const activeUsername = activeUser?.username || activeUser?.name;
@@ -2524,8 +2555,8 @@ export default function StudentDashboard({ user, onLogout }) {
   );
 
   const motivationalMessage = useMemo(
-    () => getMotivationalMessage(currentStreak, statsForCurrentMonth.monthlyAttendance, statsForCurrentMonth.monthlyNewGathas),
-    [currentStreak, statsForCurrentMonth]
+    () => getMotivationalMessage(currentStreak, statsForCurrentMonth.monthlyAttendance, statsForCurrentMonth.monthlyNewGathas, t),
+    [currentStreak, statsForCurrentMonth, t]
   );
 
   // ============================================
@@ -2644,7 +2675,7 @@ export default function StudentDashboard({ user, onLogout }) {
     <div className="space-y-4">
       {!isOnline && (
         <div className="bg-red-100 border border-red-300 rounded-xl p-3 text-center">
-          <p className="text-red-700 text-sm font-medium">📵 You are offline. Some features may not work.</p>
+          <p className="text-red-700 text-sm font-medium">{t('offline_msg')}</p>
         </div>
       )}
 
@@ -2666,10 +2697,10 @@ export default function StudentDashboard({ user, onLogout }) {
             </div>
             <div>
                             <p className="font-bold text-blue-800 text-sm">
-                Viewing: {activeUser?.name || activeUsername}
+                {t('viewing')}: {activeUser?.name || activeUsername}
               </p>
               <p className="text-xs text-blue-600">
-                Actions will be performed for this user
+                {t('actions_for_user')}
               </p>
             </div>
           </div>
@@ -2677,7 +2708,7 @@ export default function StudentDashboard({ user, onLogout }) {
             onClick={() => handleUserSwitch(user)}
             className="px-3 py-2 bg-blue-500 text-white text-xs font-bold rounded-xl"
           >
-            Back to Me
+            {t('back_to_me')}
           </button>
         </div>
       )}
@@ -2685,7 +2716,7 @@ export default function StudentDashboard({ user, onLogout }) {
       {isLoadingSwitch && (
         <div className="bg-white rounded-2xl p-6 border-2 border-orange-200 text-center">
           <RefreshCw className="w-8 h-8 animate-spin text-orange-500 mx-auto mb-2" />
-          <p className="text-gray-600 text-sm">Loading {activeUser?.name || activeUsername}'s data...</p>
+          <p className="text-gray-600 text-sm">{t('loading_dashboard')} ({activeUser?.name || activeUsername})</p>
         </div>
       )}
 
@@ -2706,7 +2737,7 @@ export default function StudentDashboard({ user, onLogout }) {
               </div>
               <h1 className="text-xl sm:text-2xl font-bold truncate">
                 {activeUser?.name || activeUsername}
-                {isViewingOther && <span className="text-sm opacity-80 ml-2">(Viewing)</span>}
+                {isViewingOther && <span className="text-sm opacity-80 ml-2">({t('viewing')})</span>}
               </h1>
               <p className="text-orange-100 text-xs sm:text-sm mt-1">{motivationalMessage.text}</p>
             </div>
@@ -2736,7 +2767,7 @@ export default function StudentDashboard({ user, onLogout }) {
                 />
               </div>
             )}
-            <p className="text-xs text-orange-100 mt-1 text-center">Tap to see level details & XP breakdown</p>
+            <p className="text-xs text-orange-100 mt-1 text-center">{t('tap_level')}</p>
           </div>
         </div>
       </button>
@@ -2746,20 +2777,20 @@ export default function StudentDashboard({ user, onLogout }) {
           <div className="flex items-center justify-between mb-2 sm:mb-3">
             <div className="flex items-center gap-2">
               <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
-              <span className="font-bold text-blue-800 text-sm sm:text-base">Quick Tips</span>
+              <span className="font-bold text-blue-800 text-sm sm:text-base">{t('quick_tips')}</span>
             </div>
             <button onClick={() => setShowTips(false)} className="text-blue-400 p-1">
               <CloseIcon size={16} />
             </button>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            {HELPFUL_TIPS.map((tip, i) => {
+            {HELPFUL_TIPS_KEYS.map((tip, i) => {
               const TipIcon = tip.icon;
               const iconColorClass = TIP_ICON_COLORS[tip.color] || 'text-gray-500';
               return (
                 <div key={i} className="flex items-start gap-2 bg-white p-2 rounded-lg">
                   <TipIcon className={`w-3 h-3 sm:w-4 sm:h-4 ${iconColorClass} flex-shrink-0 mt-0.5`} />
-                  <span className="text-xs text-gray-600">{tip.tipText}</span>
+                  <span className="text-xs text-gray-600">{t(tip.tipKey)}</span>
                 </div>
               );
             })}
@@ -2791,10 +2822,10 @@ export default function StudentDashboard({ user, onLogout }) {
         <div className="flex items-center justify-between mb-3 sm:mb-4">
           <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
             <Target className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
-            Today's Goals
+            {t('today_goals')}
             {isViewingOther && (
               <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                For {(activeUser?.name || activeUsername)?.split(' ')[0]}
+                {t('for_user')} {(activeUser?.name || activeUsername)?.split(' ')[0]}
               </span>
             )}
           </h3>
@@ -2818,19 +2849,19 @@ export default function StudentDashboard({ user, onLogout }) {
             {todayAttendanceStatus === 'approved' ? (
               <>
                 <CheckCircle className="w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-1 sm:mb-2 text-green-600" />
-                <p className="font-bold text-green-700 text-sm">Present ✓</p>
-                <p className="text-xs text-green-600">+{XP_VALUES.attendance} XP earned!</p>
+                <p className="font-bold text-green-700 text-sm">{t('present_check')}</p>
+                <p className="text-xs text-green-600">+{XP_VALUES.attendance} {t('xp_earned')}</p>
               </>
             ) : todayAttendanceStatus === 'pending' ? (
               <>
                 <Clock className="w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-1 sm:mb-2 text-yellow-600 animate-pulse" />
-                <p className="font-bold text-yellow-700 text-sm">Pending...</p>
-                <p className="text-xs text-yellow-600">Waiting for approval</p>
+                <p className="font-bold text-yellow-700 text-sm">{t('pending_dots')}</p>
+                <p className="text-xs text-yellow-600">{t('waiting_approval')}</p>
               </>
             ) : (
               <>
                 <Calendar className="w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-1 sm:mb-2" />
-                <p className="font-bold text-sm">Mark Present</p>
+                <p className="font-bold text-sm">{t('mark_present')}</p>
                 <p className="text-xs opacity-80">+{XP_VALUES.attendance} XP</p>
               </>
             )}
@@ -2844,8 +2875,8 @@ export default function StudentDashboard({ user, onLogout }) {
             className="relative p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-purple-400 to-purple-600 text-white shadow-lg active:scale-[0.97] transition-transform btn-glow-purple"
           >
             <BookOpen className="w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-1 sm:mb-2" />
-            <p className="font-bold text-sm">Add Gatha</p>
-            <p className="text-xs opacity-80">Record learning</p>
+            <p className="font-bold text-sm">{t('add_gatha')}</p>
+            <p className="text-xs opacity-80">{t('record_learning')}</p>
             {todaysApprovedGathas.length + todaysPendingGathas.length > 0 && (
               <span className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-5 h-5 sm:w-7 sm:h-7 bg-green-500 rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
                 {todaysApprovedGathas.length + todaysPendingGathas.length}
@@ -2858,7 +2889,7 @@ export default function StudentDashboard({ user, onLogout }) {
           <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t-2 border-gray-100">
             <p className="text-xs sm:text-sm font-bold text-gray-700 mb-2 sm:mb-3 flex items-center gap-2">
               <BookMarked className="w-3 h-3 sm:w-4 sm:h-4" />
-              Today's Gathas ({todaysApprovedGathas.length + todaysPendingGathas.length})
+              {t('today_gathas')} ({todaysApprovedGathas.length + todaysPendingGathas.length})
             </p>
             <div className="space-y-2 max-h-40 sm:max-h-48 overflow-y-auto">
               {[
@@ -2887,7 +2918,7 @@ export default function StudentDashboard({ user, onLogout }) {
                         : 'text-yellow-700 bg-yellow-100 border-yellow-200'
                     }`}>
                       {entry.status === 'approved' ? <Check className="w-3 h-3" /> : <Clock className="w-3 h-3 animate-pulse" />}
-                      {entry.status === 'approved' ? 'Approved' : 'Pending'}
+                      {entry.status === 'approved' ? t('approved_badge') : t('pending_badge')}
                     </span>
                     {entry.status === 'pending' && !isViewingOther && (
                       <div className="flex gap-1">
@@ -2908,8 +2939,8 @@ export default function StudentDashboard({ user, onLogout }) {
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:gap-3 card-animate card-animate-7">
-        <QuickStatCard icon={CalendarDays} value={monthlyAttendance} label="Days Present" color="green" sublabel="This Month" />
-        <QuickStatCard icon={BookMarked} value={monthlyNewGathas} label="New Gathas" color="purple" sublabel="This Month" />
+        <QuickStatCard icon={CalendarDays} value={monthlyAttendance} label={t('days_present')} color="green" sublabel={t('this_month')} />
+        <QuickStatCard icon={BookMarked} value={monthlyNewGathas} label={t('new_gathas')} color="purple" sublabel={t('this_month')} />
       </div>
 
       {/* Last Visit Card */}
@@ -2927,10 +2958,10 @@ export default function StudentDashboard({ user, onLogout }) {
         <div className="flex items-center justify-between mb-2 sm:mb-3">
           <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
             <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
-            {isViewingOther ? `${(activeUser?.name || activeUsername)?.split(' ')[0]}'s Badges` : 'Your Badges'}
+            {isViewingOther ? `${(activeUser?.name || activeUsername)?.split(' ')[0]}'s Badges` : t('your_badges')}
           </h3>
           <button onClick={() => setCurrentPage(PAGES.STATS)} className="text-xs bg-yellow-100 text-yellow-700 px-2 sm:px-3 py-1 rounded-full font-bold flex items-center gap-1">
-            View All <ChevronRight className="w-3 h-3" />
+            {t('view_all')} <ChevronRight className="w-3 h-3" />
           </button>
         </div>
         <RecentBadges stats={statsForCurrentMonth} onBadgeClick={setSelectedAchievement} />
@@ -2945,7 +2976,7 @@ export default function StudentDashboard({ user, onLogout }) {
           <div className="min-w-0">
             <p className="text-base sm:text-lg font-bold">{dailyQuote.text}</p>
             <p className="text-xs sm:text-sm text-indigo-100 mt-1">{dailyQuote.meaning}</p>
-            <p className="text-xs text-indigo-200 mt-2">— {dailyQuote.lang} Proverb</p>
+            <p className="text-xs text-indigo-200 mt-2">— {dailyQuote.lang} {t('proverb_suffix')}</p>
           </div>
         </div>
       </div>
@@ -2957,7 +2988,7 @@ export default function StudentDashboard({ user, onLogout }) {
     <div className="space-y-4">
       {!isOnline && (
         <div className="bg-red-100 border border-red-300 rounded-xl p-3 text-center">
-          <p className="text-red-700 text-sm font-medium">📵 You are offline.</p>
+          <p className="text-red-700 text-sm font-medium">{t('offline_short')}</p>
         </div>
       )}
 
@@ -2966,10 +2997,10 @@ export default function StudentDashboard({ user, onLogout }) {
           <UserCircle className="w-8 h-8 text-blue-600" />
           <div className="flex-1">
             <p className="font-bold text-blue-800 text-sm">
-              Viewing stats for: {activeUser?.name || activeUsername}
+              {t('viewing')}: {activeUser?.name || activeUsername}
             </p>
             <p className="text-xs text-blue-600">
-              Change month to see different periods
+              {t('leaderboard_tip')}
             </p>
           </div>
         </div>
@@ -2999,7 +3030,7 @@ export default function StudentDashboard({ user, onLogout }) {
           <div className="w-16 h-16 sm:w-20 sm:h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <RefreshCw className="w-8 h-8 sm:w-10 sm:h-10 animate-spin text-orange-500" />
           </div>
-          <p className="text-gray-600 font-medium text-base sm:text-lg">Loading your dashboard...</p>
+          <p className="text-gray-600 font-medium text-base sm:text-lg">{t('loading_dashboard')}</p>
         </div>
       );
     }
@@ -3053,18 +3084,21 @@ export default function StudentDashboard({ user, onLogout }) {
               {isViewingOther && (
                 <p className="text-xs text-blue-600 flex items-center gap-1">
                   <UserCircle className="w-3 h-3" />
-                  Viewing: {(activeUser?.name || activeUsername)?.split(' ')[0]}
+                  {t('viewing')}: {(activeUser?.name || activeUsername)?.split(' ')[0]}
                 </p>
               )}
             </div>
           </div>
-          <button
-            onClick={onLogout}
-            className="flex items-center gap-1 sm:gap-2 bg-red-50 text-red-600 px-2 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm active:scale-[0.98] transition-transform border border-red-200 flex-shrink-0"
-          >
-            <LogOut className="w-3 h-3 sm:w-4 sm:h-4" />
-            <span className="hidden sm:inline">Logout</span>
-          </button>
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+            <LangToggleButton />
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-1 sm:gap-2 bg-red-50 text-red-600 px-2 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm active:scale-[0.98] transition-transform border border-red-200"
+            >
+              <LogOut className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">{t('logout')}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -3073,10 +3107,10 @@ export default function StudentDashboard({ user, onLogout }) {
 
         <div className="grid grid-cols-4 gap-1 sm:gap-2 mb-3 sm:mb-4">
           {[
-            { key: PAGES.HOME, icon: Home, label: 'Home' },
-            { key: PAGES.STATS, icon: Award, label: 'Stats', badge: unlockedBadgesCount },
-            { key: PAGES.HISTORY, icon: Calendar, label: 'History' },
-            { key: PAGES.PENDING, icon: Clock, label: 'Pending', badge: totalPendingCount, badgeColor: 'red' },
+            { key: PAGES.HOME, icon: Home, label: t('nav_home') },
+            { key: PAGES.STATS, icon: Award, label: t('nav_stats'), badge: unlockedBadgesCount },
+            { key: PAGES.HISTORY, icon: Calendar, label: t('nav_history') },
+            { key: PAGES.PENDING, icon: Clock, label: t('nav_pending'), badge: totalPendingCount, badgeColor: 'red' },
           ].map((tab) => (
             <button
               key={tab.key}
