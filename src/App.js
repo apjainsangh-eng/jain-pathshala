@@ -7,7 +7,7 @@ import { BookOpen } from 'lucide-react';
 const API_BASE = 'https://pathshala-backend.vercel.app/api';
 
 function LoginScreen({ onLogin }) {
-  const { t, lang, toggleLang } = useLanguage();
+  const { t, toggleLang } = useLanguage();
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [isLoading, setIsLoading] = useState(false);

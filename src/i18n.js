@@ -1,4 +1,4 @@
-﻿const T = {
+onst T = {
   en: {
     // Login
     username_label: 'Username',
