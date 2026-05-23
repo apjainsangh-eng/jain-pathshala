@@ -17,7 +17,17 @@ html, body, #root { height: 100%; }
 }
 .card-animate {
   opacity: 0;
-  animation: cardSlideUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: cardSlideUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-animate {
+    opacity: 1;
+    animation: none;
+  }
+  .page-enter {
+    animation: none;
+  }
 }
 .card-animate-1 { animation-delay: 0.03s; }
 .card-animate-2 { animation-delay: 0.08s; }
