@@ -397,7 +397,7 @@ export default function AdminDashboard({ user, onLogout }) {
     } finally {
       setIsLoading(false);
     }
-  }, [refreshInterval, playNotificationSound, showBrowserNotification]);
+  }, [refreshInterval, playNotificationSound, showBrowserNotification, t]);
 
   const fetchStudents = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
@@ -488,7 +488,7 @@ export default function AdminDashboard({ user, onLogout }) {
     } finally {
       setUsersLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // ============ AUTO-REFRESH EFFECT ============
 

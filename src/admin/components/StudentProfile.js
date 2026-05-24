@@ -42,7 +42,7 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
     } finally {
       setLoading(false);
     }
-  }, [username]);
+  }, [username, t]);
 
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
 
