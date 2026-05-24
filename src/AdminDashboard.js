@@ -1128,14 +1128,14 @@ const toggleMemberSelection = (username) => {
       doc.setTextColor(...colors.white);
       doc.setFontSize(22);
       doc.setFont('helvetica', 'bold');
-      doc.text('JAIN PATHSHALA', pageWidth / 2, 18, { align: 'center' });
+      doc.text('Shree Somchintamani Vasupujyaswami Jain Pathshala', pageWidth / 2, 18, { align: 'center' });
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.text('Student Progress Report', pageWidth / 2, 29, { align: 'center' });
 
       // Date badge
       doc.setFillColor(...colors.gold);
-      const dateText = formatDate(dateRange.start) + '  →  ' + formatDate(dateRange.end);
+      const dateText = formatDate(dateRange.start) + '  to  ' + formatDate(dateRange.end);
       const dateTextWidth = doc.getTextWidth(dateText) + 18;
       doc.roundedRect((pageWidth - dateTextWidth) / 2, 47, dateTextWidth, 11, 3, 3, 'F');
       doc.setTextColor(...colors.dark);
