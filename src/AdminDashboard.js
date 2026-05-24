@@ -78,6 +78,18 @@ const formatDateShort = (dateStr) => {
   });
 };
 
+const countWorkingDays = (startStr, endStr) => {
+  const start = new Date(startStr);
+  const end = new Date(endStr);
+  let count = 0;
+  const cur = new Date(start);
+  while (cur <= end) {
+    if (cur.getDay() !== 0) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+};
+
 const getYearOptions = () => {
   const currentYear = new Date().getFullYear();
   const years = [];
@@ -1079,129 +1091,144 @@ const toggleMemberSelection = (username) => {
     
     try {
       const { students: reportStudents, summary } = exportData;
-      
+      const pdfWorkingDays = countWorkingDays(dateRange.start, dateRange.end);
+
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      
+
       const colors = {
         primary: [99, 102, 241],
         secondary: [168, 85, 247],
         accent: [236, 72, 153],
         success: [34, 197, 94],
         warning: [249, 115, 22],
+        danger: [239, 68, 68],
         gold: [234, 179, 8],
+        teal: [20, 184, 166],
         dark: [31, 41, 55],
         light: [248, 250, 252],
         white: [255, 255, 255],
       };
 
+      // ── Header gradient bands ──
       doc.setFillColor(...colors.primary);
-      doc.rect(0, 0, pageWidth, 40, 'F');
-      
+      doc.rect(0, 0, pageWidth, 36, 'F');
       doc.setFillColor(...colors.secondary);
-      doc.rect(0, 40, pageWidth, 4, 'F');
-      
+      doc.rect(0, 36, pageWidth, 5, 'F');
       doc.setFillColor(...colors.accent);
-      doc.rect(0, 44, pageWidth, 2, 'F');
-      
+      doc.rect(0, 41, pageWidth, 2, 'F');
+
+      // Decorative corner squares
+      doc.setFillColor(255, 255, 255, 0.15);
+      doc.setFillColor(129, 140, 248);
+      doc.roundedRect(pageWidth - 30, 2, 20, 20, 4, 4, 'F');
+      doc.roundedRect(10, 2, 14, 14, 3, 3, 'F');
+
       doc.setTextColor(...colors.white);
-      doc.setFontSize(24);
+      doc.setFontSize(22);
       doc.setFont('helvetica', 'bold');
-      doc.text('JAIN PATHSHALA', pageWidth / 2, 20, { align: 'center' });
-      
-      doc.setFontSize(12);
+      doc.text('JAIN PATHSHALA', pageWidth / 2, 18, { align: 'center' });
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      doc.text('Progress Report', pageWidth / 2, 32, { align: 'center' });
-      
+      doc.text('Student Progress Report', pageWidth / 2, 29, { align: 'center' });
+
+      // Date badge
       doc.setFillColor(...colors.gold);
-      const dateText = formatDate(dateRange.start) + ' - ' + formatDate(dateRange.end);
-      const dateTextWidth = doc.getTextWidth(dateText) + 16;
-      doc.roundedRect((pageWidth - dateTextWidth) / 2, 50, dateTextWidth, 10, 3, 3, 'F');
+      const dateText = formatDate(dateRange.start) + '  →  ' + formatDate(dateRange.end);
+      const dateTextWidth = doc.getTextWidth(dateText) + 18;
+      doc.roundedRect((pageWidth - dateTextWidth) / 2, 47, dateTextWidth, 11, 3, 3, 'F');
       doc.setTextColor(...colors.dark);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
-      doc.text(dateText, pageWidth / 2, 56.5, { align: 'center' });
+      doc.text(dateText, pageWidth / 2, 54, { align: 'center' });
 
-      let yPos = 70;
+      let yPos = 68;
 
+      // ── Summary section header ──
+      doc.setFillColor(239, 246, 255);
+      doc.roundedRect(12, yPos - 5, pageWidth - 24, 7, 2, 2, 'F');
       doc.setTextColor(...colors.primary);
-      doc.setFontSize(14);
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.text('SUMMARY OVERVIEW', 14, yPos);
-      
-      doc.setDrawColor(...colors.primary);
-      doc.setLineWidth(1);
-      doc.line(14, yPos + 2, 70, yPos + 2);
-      
-      yPos += 12;
+      yPos += 8;
 
       const cardWidth = 43;
-      const cardHeight = 28;
+      const cardHeight = 32;
       const cardGap = 4;
       const cardStartX = 14;
 
       const summaryCards = [
-        { value: summary.totalStudents, label: 'Total Students', bgColor: [239, 246, 255], borderColor: colors.primary, textColor: colors.primary },
-        { value: summary.activeStudents, label: 'Active', bgColor: [240, 253, 244], borderColor: colors.success, textColor: colors.success },
-        { value: summary.totalAttendance, label: 'Attendance', bgColor: [254, 249, 195], borderColor: colors.warning, textColor: colors.warning },
-        { value: summary.totalNewGathas, label: 'New Gathas', bgColor: [243, 232, 255], borderColor: colors.secondary, textColor: colors.secondary },
+        { value: summary.totalStudents, label: 'Total Students', sub: 'Enrolled', bgColor: [239, 246, 255], borderColor: colors.primary, textColor: colors.primary },
+        { value: pdfWorkingDays, label: 'Working Days', sub: 'Excl. Sundays', bgColor: [255, 247, 237], borderColor: colors.warning, textColor: colors.warning },
+        { value: summary.totalAttendance, label: 'Attendance', sub: 'Total Records', bgColor: [240, 253, 244], borderColor: colors.success, textColor: colors.success },
+        { value: summary.totalNewGathas, label: 'New Gathas', sub: 'Learned', bgColor: [243, 232, 255], borderColor: colors.secondary, textColor: colors.secondary },
       ];
 
       summaryCards.forEach((card, index) => {
         const x = cardStartX + (cardWidth + cardGap) * index;
-        
+
         doc.setFillColor(...card.bgColor);
-        doc.roundedRect(x, yPos, cardWidth, cardHeight, 3, 3, 'F');
-        
+        doc.roundedRect(x, yPos, cardWidth, cardHeight, 4, 4, 'F');
+
+        // Top accent bar on each card
+        doc.setFillColor(...card.borderColor);
+        doc.roundedRect(x, yPos, cardWidth, 4, 2, 2, 'F');
+        doc.rect(x, yPos + 2, cardWidth, 2, 'F');
+
         doc.setDrawColor(...card.borderColor);
-        doc.setLineWidth(0.8);
-        doc.roundedRect(x, yPos, cardWidth, cardHeight, 3, 3, 'S');
-        
+        doc.setLineWidth(0.5);
+        doc.roundedRect(x, yPos, cardWidth, cardHeight, 4, 4, 'S');
+
         doc.setTextColor(...card.textColor);
-        doc.setFontSize(18);
+        doc.setFontSize(20);
         doc.setFont('helvetica', 'bold');
-        doc.text(String(card.value), x + cardWidth / 2, yPos + 14, { align: 'center' });
-        
-        doc.setTextColor(100, 100, 100);
-        doc.setFontSize(7);
+        doc.text(String(card.value), x + cardWidth / 2, yPos + 18, { align: 'center' });
+
+        doc.setTextColor(60, 60, 60);
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'bold');
+        doc.text(card.label, x + cardWidth / 2, yPos + 25, { align: 'center' });
+
+        doc.setTextColor(150, 150, 150);
+        doc.setFontSize(6);
         doc.setFont('helvetica', 'normal');
-        doc.text(card.label, x + cardWidth / 2, yPos + 22, { align: 'center' });
+        doc.text(card.sub, x + cardWidth / 2, yPos + 30, { align: 'center' });
       });
 
-      yPos += cardHeight + 15;
+      yPos += cardHeight + 14;
 
+      // ── Table section header ──
+      doc.setFillColor(239, 246, 255);
+      doc.roundedRect(12, yPos - 5, pageWidth - 24, 7, 2, 2, 'F');
       doc.setTextColor(...colors.dark);
-      doc.setFontSize(14);
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
-      doc.text('STUDENT-WISE REPORT (A-Z)', 14, yPos);
-      
-      doc.setDrawColor(...colors.primary);
-      doc.setLineWidth(1);
-      doc.line(14, yPos + 2, 82, yPos + 2);
-      
-      yPos += 8;
+      doc.text('STUDENT-WISE REPORT  (A – Z)', 14, yPos);
+      yPos += 6;
 
       const tableData = reportStudents.map((student, index) => [
         index + 1,
         student.name,
         student.attendanceCount,
+        Math.max(0, pdfWorkingDays - student.attendanceCount),
         student.newGathas,
         student.revisionGathas,
-        student.attendanceCount + student.newGathas
+        student.attendanceCount + student.newGathas,
       ]);
 
       doc.autoTable({
         startY: yPos,
-        head: [['#', 'Student Name', 'Attend.', 'New', 'Revision', 'Score']],
+        head: [['#', 'Student Name', 'Present', 'Absent', 'New\nGathas', 'Revision', 'Score']],
         body: tableData,
         theme: 'grid',
         styles: {
           font: 'helvetica',
           fontSize: 8,
           cellPadding: 3,
-          lineColor: [200, 200, 200],
-          lineWidth: 0.1,
+          lineColor: [220, 220, 230],
+          lineWidth: 0.15,
         },
         headStyles: {
           fillColor: colors.primary,
@@ -1209,47 +1236,76 @@ const toggleMemberSelection = (username) => {
           fontStyle: 'bold',
           fontSize: 8,
           halign: 'center',
+          cellPadding: 4,
         },
         bodyStyles: {
           halign: 'center',
           valign: 'middle',
         },
         columnStyles: {
-          0: { cellWidth: 12, halign: 'center', fontStyle: 'bold' },
-          1: { cellWidth: 55, halign: 'left' },
-          2: { cellWidth: 20, halign: 'center' },
-          3: { cellWidth: 20, halign: 'center' },
+          0: { cellWidth: 10, halign: 'center', fontStyle: 'bold' },
+          1: { cellWidth: 52, halign: 'left' },
+          2: { cellWidth: 18, halign: 'center' },
+          3: { cellWidth: 18, halign: 'center' },
           4: { cellWidth: 20, halign: 'center' },
           5: { cellWidth: 20, halign: 'center' },
+          6: { cellWidth: 17, halign: 'center' },
         },
         alternateRowStyles: {
-          fillColor: [248, 250, 252],
+          fillColor: [245, 247, 255],
         },
         margin: { left: 14, right: 14 },
+        didParseCell: function(data) {
+          if (data.section !== 'body') return;
+          // Absent column — red if > 50%, green if ≤ 10%
+          if (data.column.index === 3) {
+            const absent = Number(data.cell.raw);
+            const pct = pdfWorkingDays > 0 ? absent / pdfWorkingDays : 0;
+            if (pct >= 0.5) {
+              data.cell.styles.textColor = [220, 38, 38];
+              data.cell.styles.fontStyle = 'bold';
+            } else if (pct <= 0.1) {
+              data.cell.styles.textColor = [22, 163, 74];
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+          // Present column — bold green if attendance ≥ 80%
+          if (data.column.index === 2) {
+            const present = Number(data.cell.raw);
+            const pct = pdfWorkingDays > 0 ? present / pdfWorkingDays : 0;
+            if (pct >= 0.8) {
+              data.cell.styles.textColor = [22, 163, 74];
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+        },
         didDrawPage: function(data) {
           const pageCount = doc.internal.getNumberOfPages();
           const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
-          
+
+          // Footer band
           doc.setFillColor(...colors.primary);
-          doc.rect(0, pageHeight - 12, pageWidth, 12, 'F');
-          
+          doc.rect(0, pageHeight - 13, pageWidth, 13, 'F');
+          doc.setFillColor(...colors.secondary);
+          doc.rect(0, pageHeight - 14, pageWidth, 1, 'F');
+
           doc.setTextColor(...colors.white);
           doc.setFontSize(7);
           doc.setFont('helvetica', 'normal');
-          
-          const generatedDate = new Date().toLocaleString('en-IN', { 
+
+          const generatedDate = new Date().toLocaleString('en-IN', {
             timeZone: 'Asia/Kolkata',
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
           });
-          
-          doc.text('Generated: ' + generatedDate, 14, pageHeight - 4);
-          doc.text('Page ' + currentPage + ' of ' + pageCount, pageWidth / 2, pageHeight - 4, { align: 'center' });
+
+          doc.text('Generated: ' + generatedDate, 14, pageHeight - 5);
+          doc.text('Page ' + currentPage + ' of ' + pageCount, pageWidth / 2, pageHeight - 5, { align: 'center' });
           doc.setFont('helvetica', 'bold');
-          doc.text('Jai Jinendra!', pageWidth - 14, pageHeight - 4, { align: 'right' });
+          doc.text('|| Jai Jinendra ||', pageWidth - 14, pageHeight - 5, { align: 'right' });
         },
       });
 
@@ -1309,6 +1365,7 @@ const toggleMemberSelection = (username) => {
   
   const totalAttendanceCount = students.reduce((sum, s) => sum + (s.attendance_count || 0), 0);
   const totalNewGathaCount = students.reduce((sum, s) => sum + (s.new_gathas || 0), 0);
+  const workingDays = countWorkingDays(dateRange.start, dateRange.end);
 
   const attendanceRate = students.length > 0 
     ? Math.round((stats?.today_attendance || 0) / students.length * 100)
@@ -1670,8 +1727,8 @@ const toggleMemberSelection = (username) => {
                     <p className="text-xs text-gray-500">{t('adm_students')}</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-xl font-bold text-blue-600">{exportData.summary.activeStudents}</p>
-                    <p className="text-xs text-gray-500">{t('adm_active_students')}</p>
+                    <p className="text-xl font-bold text-orange-500">{workingDays}</p>
+                    <p className="text-xs text-gray-500">{t('adm_working_days')}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-xl font-bold text-green-600">{exportData.summary.totalAttendance}</p>
