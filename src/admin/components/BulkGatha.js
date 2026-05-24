@@ -3,6 +3,7 @@ import {
   BookOpen, Check, CheckCircle, Search, RefreshCw,
   AlertTriangle, X as CloseIcon, Plus, Trash2
 } from 'lucide-react';
+import { useLanguage } from '../../LanguageContext';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.vercel.app/api';
 
@@ -12,6 +13,7 @@ const formatLocalDate = (d = new Date()) => {
 };
 
 export default function BulkGatha({ students, familyGroups, onSuccess }) {
+  const { t } = useLanguage();
   const [date, setDate] = useState(formatLocalDate());
   const [search, setSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState('all');
@@ -72,11 +74,11 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
 
     if (mode === 'same') {
       if (!sameGatha.sutraName || !sameGatha.totalGatha) {
-        setError('Please fill sutra name and gatha count');
+        setError(t('bulk_fill_sutra_err'));
         return;
       }
       const selected = Object.entries(selectedStudents).filter(([_, v]) => v).map(([u]) => u);
-      if (selected.length === 0) { setError('Select at least one student'); return; }
+      if (selected.length === 0) { setError(t('bulk_select_one_err')); return; }
 
       entries = selected.map(username => ({
         username,
@@ -87,9 +89,9 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
         remark: sameGatha.remark
       }));
     } else {
-      if (rows.length === 0) { setError('Add at least one student row'); return; }
+      if (rows.length === 0) { setError(t('bulk_add_one_err')); return; }
       const invalid = rows.find(r => !r.sutraName || !r.totalGatha);
-      if (invalid) { setError('Fill sutra name and gatha count for all rows'); return; }
+      if (invalid) { setError(t('bulk_fill_all_err')); return; }
 
       entries = rows.map(r => ({
         username: r.username,
@@ -114,7 +116,7 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
 
       if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed'); }
       const data = await res.json();
-      setSuccess(`Saved! ${data.added} gatha entries added.`);
+      setSuccess(t('bulk_gatha_saved').replace('{added}', data.added));
       setTimeout(() => setSuccess(''), 4000);
       setSelectedStudents({});
       setRows([]);
@@ -129,8 +131,8 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
   return (
     <div className="space-y-3">
       <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-4 text-white">
-        <h3 className="font-bold text-lg flex items-center gap-2"><BookOpen className="w-5 h-5" /> Bulk Gatha Entry</h3>
-        <p className="text-purple-100 text-xs mt-1">Add gatha for multiple students at once</p>
+        <h3 className="font-bold text-lg flex items-center gap-2"><BookOpen className="w-5 h-5" /> {t('bulk_gatha_title')}</h3>
+        <p className="text-purple-100 text-xs mt-1">{t('bulk_gatha_subtitle')}</p>
       </div>
 
       {error && (
@@ -149,7 +151,7 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
 
       {/* Date */}
       <div className="bg-white rounded-xl border-2 border-purple-200 p-3">
-        <label className="block text-xs font-bold text-gray-600 mb-1">Date</label>
+        <label className="block text-xs font-bold text-gray-600 mb-1">{t('adm_date_field')}</label>
         <input type="date" value={date} onChange={e => setDate(e.target.value)}
           className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl text-sm font-bold focus:outline-none focus:border-purple-400 bg-white" />
       </div>
@@ -158,11 +160,11 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
         <button onClick={() => setMode('same')}
           className={`flex-1 py-2 rounded-lg text-xs font-bold ${mode === 'same' ? 'bg-white text-purple-700 shadow' : 'text-gray-500'}`}>
-          Same Gatha for All
+          {t('bulk_same_mode')}
         </button>
         <button onClick={() => setMode('individual')}
           className={`flex-1 py-2 rounded-lg text-xs font-bold ${mode === 'individual' ? 'bg-white text-purple-700 shadow' : 'text-gray-500'}`}>
-          Individual Rows
+          {t('bulk_individual_mode')}
         </button>
       </div>
 
@@ -170,29 +172,29 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
         <>
           {/* Gatha form */}
           <div className="bg-white rounded-xl border-2 border-purple-200 p-3 space-y-3">
-            <p className="text-xs font-bold text-gray-600">Gatha Details (applies to all selected)</p>
+            <p className="text-xs font-bold text-gray-600">{t('bulk_gatha_details')}</p>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">Sutra Name *</label>
+                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t('adm_sutra_name_field')}</label>
                 <input type="text" value={sameGatha.sutraName} onChange={e => setSameGatha({...sameGatha, sutraName: e.target.value})}
                   placeholder="e.g. Navkar" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400" />
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">Which Gatha</label>
+                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t('adm_which_gatha')}</label>
                 <input type="text" value={sameGatha.whichGatha} onChange={e => setSameGatha({...sameGatha, whichGatha: e.target.value})}
                   placeholder="e.g. 1-5" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400" />
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">Count *</label>
+                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t('bulk_count_star')}</label>
                 <input type="number" min="1" value={sameGatha.totalGatha} onChange={e => setSameGatha({...sameGatha, totalGatha: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400" />
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">Type</label>
+                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t('bulk_type_label')}</label>
                 <select value={sameGatha.type} onChange={e => setSameGatha({...sameGatha, type: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400 bg-white">
-                  <option value="new">New</option>
-                  <option value="revision">Revision</option>
+                  <option value="new">{t('new_learning')}</option>
+                  <option value="revision">{t('revision')}</option>
                 </select>
               </div>
             </div>
@@ -202,19 +204,19 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..."
+              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder={t('adm_search_students')}
                 className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-purple-400" />
             </div>
             <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
               className="px-3 py-2.5 border-2 border-gray-200 rounded-xl text-xs font-bold bg-white">
-              <option value="all">All</option>
+              <option value="all">{t('adm_all_filter')}</option>
               {uniqueGroups.map(g => <option key={g} value={g}>{g}</option>)}
             </select>
           </div>
 
           <div className="flex gap-2">
-            <button onClick={selectAll} className="flex-1 py-2 bg-purple-100 text-purple-700 rounded-xl text-xs font-bold active:scale-95">Select All</button>
-            <button onClick={deselectAll} className="flex-1 py-2 bg-gray-100 text-gray-600 rounded-xl text-xs font-bold active:scale-95">Deselect All</button>
+            <button onClick={selectAll} className="flex-1 py-2 bg-purple-100 text-purple-700 rounded-xl text-xs font-bold active:scale-95">{t('bulk_select_all')}</button>
+            <button onClick={deselectAll} className="flex-1 py-2 bg-gray-100 text-gray-600 rounded-xl text-xs font-bold active:scale-95">{t('bulk_deselect_all')}</button>
           </div>
 
           <div className="bg-white rounded-xl border-2 border-gray-200 max-h-64 overflow-y-auto divide-y divide-gray-100">
@@ -238,7 +240,7 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search to add..."
+              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder={t('bulk_search_to_add_ph')}
                 className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-purple-400" />
             </div>
           </div>
@@ -263,22 +265,22 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
                   <button onClick={() => removeRow(idx)} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <input type="text" placeholder="Sutra *" value={row.sutraName} onChange={e => updateRow(idx, 'sutraName', e.target.value)}
+                  <input type="text" placeholder={t('adm_sutra_name_field')} value={row.sutraName} onChange={e => updateRow(idx, 'sutraName', e.target.value)}
                     className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:border-purple-400" />
-                  <input type="text" placeholder="Which" value={row.whichGatha} onChange={e => updateRow(idx, 'whichGatha', e.target.value)}
+                  <input type="text" placeholder={t('adm_which_gatha')} value={row.whichGatha} onChange={e => updateRow(idx, 'whichGatha', e.target.value)}
                     className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:border-purple-400" />
-                  <input type="number" min="1" placeholder="Count" value={row.totalGatha} onChange={e => updateRow(idx, 'totalGatha', e.target.value)}
+                  <input type="number" min="1" placeholder={t('bulk_count_star')} value={row.totalGatha} onChange={e => updateRow(idx, 'totalGatha', e.target.value)}
                     className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:border-purple-400" />
                   <select value={row.type} onChange={e => updateRow(idx, 'type', e.target.value)}
                     className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-white">
-                    <option value="new">New</option>
-                    <option value="revision">Revision</option>
+                    <option value="new">{t('new_learning')}</option>
+                    <option value="revision">{t('revision')}</option>
                   </select>
                 </div>
               </div>
             ))}
             {rows.length === 0 && (
-              <p className="text-center text-gray-400 text-xs py-6">Search and add students above</p>
+              <p className="text-center text-gray-400 text-xs py-6">{t('bulk_empty_rows_msg')}</p>
             )}
           </div>
         </>
@@ -287,7 +289,7 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
       <button onClick={handleSave} disabled={saving || selectedCount === 0}
         className="w-full py-3.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-bold text-sm active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg">
         {saving ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
-        Save Gatha ({selectedCount} students)
+        {t('adm_gatha_added')} ({selectedCount} {t('reg_student_col')})
       </button>
     </div>
   );

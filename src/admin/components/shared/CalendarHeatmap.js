@@ -1,11 +1,10 @@
 import React from 'react';
+import { useLanguage } from '../../../LanguageContext';
 
 const MONTH_NAMES_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 export default function CalendarHeatmap({ year, month, attendanceMap, gathaMap, pendingMap }) {
-  // attendanceMap: { 'YYYY-MM-DD': true/false }
-  // gathaMap: { 'YYYY-MM-DD': number }
-  // pendingMap: { 'YYYY-MM-DD': true/false }
+  const { t } = useLanguage();
 
   const y = year || new Date().getFullYear();
   const m = (month || new Date().getMonth() + 1) - 1;
@@ -62,10 +61,10 @@ export default function CalendarHeatmap({ year, month, attendanceMap, gathaMap, 
           {MONTH_NAMES_SHORT[m]} {y}
         </p>
         <div className="flex gap-2 text-[10px]">
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-400" /> Present</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100" /> Absent</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-purple-400" /> Gatha</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-yellow-200" /> Pending</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-400" /> {t('sp_legend_attendance')}</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100" /> {t('sp_stat_absent')}</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-purple-400" /> {t('sp_legend_gatha')}</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-yellow-200" /> {t('sp_legend_pending')}</span>
         </div>
       </div>
       <div className="grid grid-cols-7 gap-1 mb-1">

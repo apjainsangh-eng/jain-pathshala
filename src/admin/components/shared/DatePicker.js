@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Calendar, Check, ChevronDown } from 'lucide-react';
+import { useLanguage } from '../../../LanguageContext';
 
 const MONTH_NAMES_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -27,6 +28,7 @@ const getDateRangePreset = (preset, month, year, cs, ce) => {
 };
 
 export default function DatePickerPanel({ dateRange, onDateRangeChange, showExport, onExport }) {
+  const { t } = useLanguage();
   const [datePreset, setDatePreset] = useState('month');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()+1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -43,20 +45,29 @@ export default function DatePickerPanel({ dateRange, onDateRangeChange, showExpo
 
   const formatDate = (s) => { if(!s) return ''; const d=new Date(s); return d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}); };
 
+  const presets = [
+    { key: 'today', label: t('adm_today') },
+    { key: 'week', label: t('adm_week') },
+    { key: 'month', label: t('adm_month') },
+    { key: 'year', label: t('adm_year') },
+    { key: 'all', label: t('adm_all_time') },
+    { key: 'custom', label: t('adm_custom') },
+  ];
+
   return (
     <div className="bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-bold text-gray-700 flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-indigo-500" /> Date Range
+          <Calendar className="w-5 h-5 text-indigo-500" /> {t('adm_date_range')}
         </p>
         {showExport && (
           <button onClick={onExport} className="flex items-center gap-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold active:scale-[0.98]">
-            Export
+            {t('adm_export_btn')}
           </button>
         )}
       </div>
       <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
-        {[{key:'today',label:'Today'},{key:'week',label:'Week'},{key:'month',label:'Month'},{key:'year',label:'Year'},{key:'all',label:'All'},{key:'custom',label:'Custom'}].map(p => (
+        {presets.map(p => (
           <button key={p.key} onClick={() => { setDatePreset(p.key); setShowCustom(p.key==='custom'); applyPreset(p.key); }}
             className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap flex-shrink-0 transition-all ${datePreset===p.key?'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg':'bg-gray-100 text-gray-600'}`}>
             {p.label}
@@ -68,19 +79,19 @@ export default function DatePickerPanel({ dateRange, onDateRangeChange, showExpo
         <div className="mt-3 p-3 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl border-2 border-orange-200">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">From</label>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">{t('adm_from_date')}</label>
               <input type="date" value={customStart} onChange={e => { setCustomStart(e.target.value); setDatePreset('custom'); }}
                 className="w-full px-3 py-2.5 border-2 border-orange-200 rounded-xl text-sm font-bold focus:outline-none focus:border-orange-400 bg-white" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">To</label>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">{t('adm_to_date')}</label>
               <input type="date" value={customEnd} onChange={e => { setCustomEnd(e.target.value); setDatePreset('custom'); }}
                 className="w-full px-3 py-2.5 border-2 border-orange-200 rounded-xl text-sm font-bold focus:outline-none focus:border-orange-400 bg-white" />
             </div>
           </div>
           <button onClick={() => { applyPreset('custom', null, null, customStart, customEnd); setShowCustom(false); }}
             className="w-full mt-3 py-2.5 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-xl font-bold text-sm active:scale-[0.98]">
-            Apply
+            {t('adm_apply_custom')}
           </button>
         </div>
       )}

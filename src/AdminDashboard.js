@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useLanguage } from './LanguageContext';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import StudentProfile from './admin/components/StudentProfile';
@@ -151,11 +152,11 @@ const getDateRangePreset = (preset, month, year, customStart, customEnd) => {
 
 const getPerformanceBadge = (attendance, gatha) => {
   const total = (attendance || 0) + (gatha || 0);
-  if (total >= 50) return { label: 'Champion', color: 'from-yellow-400 to-orange-500', icon: '🏆' };
-  if (total >= 30) return { label: 'Star', color: 'from-purple-400 to-pink-500', icon: '⭐' };
-  if (total >= 15) return { label: 'Rising', color: 'from-blue-400 to-indigo-500', icon: '🚀' };
-  if (total >= 5) return { label: 'Active', color: 'from-green-400 to-emerald-500', icon: '✨' };
-  return { label: 'New', color: 'from-gray-400 to-gray-500', icon: '🌱' };
+  if (total >= 50) return { labelKey: 'badge_champion', color: 'from-yellow-400 to-orange-500', icon: '🏆' };
+  if (total >= 30) return { labelKey: 'badge_star', color: 'from-purple-400 to-pink-500', icon: '⭐' };
+  if (total >= 15) return { labelKey: 'badge_rising', color: 'from-blue-400 to-indigo-500', icon: '🚀' };
+  if (total >= 5) return { labelKey: 'badge_active', color: 'from-green-400 to-emerald-500', icon: '✨' };
+  return { labelKey: 'badge_new', color: 'from-gray-400 to-gray-500', icon: '🌱' };
 };
 
 // ============================================
@@ -163,6 +164,8 @@ const getPerformanceBadge = (attendance, gatha) => {
 // ============================================
 
 export default function AdminDashboard({ user, onLogout }) {
+  const { t, lang, toggleLang } = useLanguage();
+
   // ============ STATE VARIABLES ============
   const [pendingData, setPendingData] = useState({ attendance: [], gatha: [] });
   const [stats, setStats] = useState(null);
@@ -389,7 +392,7 @@ export default function AdminDashboard({ user, onLogout }) {
     } catch (err) {
       console.error('Fetch error:', err);
       if (!isAutoRefresh) {
-        setError('Failed to load data. Please refresh.');
+        setError(t('adm_load_fail'));
       }
     } finally {
       setIsLoading(false);
@@ -481,7 +484,7 @@ export default function AdminDashboard({ user, onLogout }) {
       }
     } catch (err) {
       console.error('Error fetching users:', err);
-      setError('Failed to load users');
+      setError(t('adm_users_fail'));
     } finally {
       setUsersLoading(false);
     }
@@ -543,7 +546,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
   const handleCreateGroup = async () => {
   if (!newGroup.groupName || selectedMembers.length < 2) {
-    setError('Group name and at least 2 members required');
+    setError(t('adm_group_req_err'));
     return;
   }
 
@@ -568,7 +571,7 @@ export default function AdminDashboard({ user, onLogout }) {
       throw new Error(data.error || 'Failed to create group');
     }
 
-    setSuccessMessage('Family group created!');
+    setSuccessMessage(t('adm_group_created'));
     setTimeout(() => setSuccessMessage(''), 3000);
     setShowAddGroupModal(false);
     setNewGroup({ groupName: '', members: [] });
@@ -595,7 +598,7 @@ const handleDeleteGroup = async (groupId) => {
 
     if (!res.ok) throw new Error('Failed to delete group');
 
-    setSuccessMessage('Group deleted!');
+    setSuccessMessage(t('adm_group_deleted'));
     setTimeout(() => setSuccessMessage(''), 3000);
     fetchFamilyGroups();
   } catch (err) {
@@ -633,7 +636,7 @@ const toggleMemberSelection = (username) => {
         throw new Error(data.error || 'Approval failed');
       }
 
-      setSuccessMessage('Entry approved!');
+      setSuccessMessage(t('adm_entry_approved'));
       setTimeout(() => setSuccessMessage(''), 3000);
       fetchPendingData(false);
       fetchStudents();
@@ -668,7 +671,7 @@ const toggleMemberSelection = (username) => {
         throw new Error(data.error || 'Rejection failed');
       }
 
-      setSuccessMessage('Entry rejected!');
+      setSuccessMessage(t('adm_entry_rejected'));
       setTimeout(() => setSuccessMessage(''), 3000);
       fetchPendingData(false);
     } catch (err) {
@@ -694,7 +697,7 @@ const toggleMemberSelection = (username) => {
       if (!res.ok) throw new Error('Bulk approval failed');
 
       const data = await res.json();
-      setSuccessMessage('Approved ' + data.approved.attendance + ' attendance + ' + data.approved.gatha + ' gatha!');
+      setSuccessMessage('✓ ' + data.approved.attendance + ' ' + t('adm_attendance') + ' + ' + data.approved.gatha + ' ' + t('adm_gathas_suffix') + '!');
       setTimeout(() => setSuccessMessage(''), 5000);
       fetchPendingData(false);
       fetchStudents();
@@ -763,7 +766,7 @@ const toggleMemberSelection = (username) => {
         throw new Error(data.error || 'Failed to add user');
       }
 
-      setSuccessMessage('User added successfully!');
+      setSuccessMessage(t('adm_user_added'));
       setTimeout(() => setSuccessMessage(''), 3000);
       setShowAddUserModal(false);
       setNewUser({ username: '', password: '', name: '', role: 'student' });
@@ -809,7 +812,7 @@ const toggleMemberSelection = (username) => {
         throw new Error(data.error || 'Failed to update user');
       }
 
-      setSuccessMessage('User updated successfully!');
+      setSuccessMessage(t('adm_user_updated'));
       setTimeout(() => setSuccessMessage(''), 3000);
       setShowEditUserModal(false);
       setEditingUser(null);
@@ -841,7 +844,7 @@ const toggleMemberSelection = (username) => {
         throw new Error(data.error || 'Failed to delete user');
       }
 
-      setSuccessMessage('User deleted successfully!');
+      setSuccessMessage(t('adm_user_deleted'));
       setTimeout(() => setSuccessMessage(''), 3000);
       fetchAllUsers();
       fetchStudents();
@@ -863,7 +866,7 @@ const toggleMemberSelection = (username) => {
 
   const handleAddEntry = async () => {
     if (!addEntryData.studentUsername) {
-      setError('Please select a student');
+      setError(t('adm_select_err'));
       return;
     }
 
@@ -882,7 +885,7 @@ const toggleMemberSelection = (username) => {
         };
       } else {
         if (!addEntryData.sutraName || !addEntryData.totalGatha) {
-          setError('Please fill all required fields');
+          setError(t('adm_fields_err'));
           setAddEntryLoading(false);
           return;
         }
@@ -911,7 +914,7 @@ const toggleMemberSelection = (username) => {
         throw new Error(data.error || 'Failed to add entry');
       }
 
-      setSuccessMessage(addEntryType === 'attendance' ? 'Attendance added!' : 'Gatha added!');
+      setSuccessMessage(addEntryType === 'attendance' ? t('adm_att_added') : t('adm_gatha_added'));
       setTimeout(() => setSuccessMessage(''), 3000);
       setShowAddEntryModal(false);
       setAddEntryData({
@@ -1063,7 +1066,7 @@ const toggleMemberSelection = (username) => {
       URL.revokeObjectURL(url);
 
       setIsExporting(false);
-      setSuccessMessage('Report downloaded!');
+      setSuccessMessage(t('adm_report_dl'));
       setTimeout(() => setSuccessMessage(''), 3000);
     }, 500);
   };
@@ -1253,12 +1256,12 @@ const toggleMemberSelection = (username) => {
       const fileName = 'Jain-Pathshala-Report-' + dateRange.start + '-to-' + dateRange.end + '.pdf';
       doc.save(fileName);
       
-      setSuccessMessage('PDF Report downloaded successfully!');
+      setSuccessMessage(t('adm_pdf_dl'));
       setTimeout(() => setSuccessMessage(''), 3000);
       
     } catch (error) {
       console.error('PDF generation error:', error);
-      setError('Failed to generate PDF. Please try again.');
+      setError(t('adm_pdf_fail'));
     } finally {
       setIsExporting(false);
     }
@@ -1333,16 +1336,16 @@ const toggleMemberSelection = (username) => {
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <p className="text-xs font-bold text-gray-700">Auto-Refresh</p>
+              <p className="text-xs font-bold text-gray-700">{t('adm_auto_refresh')}</p>
               {!isOnline && (
                 <span className="flex items-center gap-0.5 bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">
                   <WifiOff className="w-3 h-3" />
-                  Offline
+                  {t('adm_offline')}
                 </span>
               )}
             </div>
             <p className="text-[10px] text-gray-500">
-              {!isOnline ? 'No connection' : autoRefresh ? 'Next in ' + countdown + 's' : 'Disabled'}
+              {!isOnline ? t('adm_no_conn') : autoRefresh ? t('adm_next_in') + ' ' + countdown + 's' : t('adm_refresh_disabled')}
             </p>
           </div>
         </div>
@@ -1406,7 +1409,7 @@ const toggleMemberSelection = (username) => {
             <WifiOff className="w-3 h-3 text-red-500" />
           )}
           <p className="text-[10px] text-gray-400">
-            Last updated: {lastRefreshed.toLocaleTimeString('en-IN', { 
+            {t('adm_last_updated')}: {lastRefreshed.toLocaleTimeString('en-IN', {
               hour: '2-digit', 
               minute: '2-digit',
               second: '2-digit'
@@ -1422,7 +1425,7 @@ const toggleMemberSelection = (username) => {
             className="flex items-center gap-1 bg-red-100 text-red-600 px-2 py-0.5 rounded-full animate-pulse"
           >
             <BellRing className="w-3 h-3" />
-            <span className="text-[10px] font-bold">New requests!</span>
+            <span className="text-[10px] font-bold">{t('adm_new_reqs')}</span>
           </button>
         )}
       </div>
@@ -1435,25 +1438,25 @@ const toggleMemberSelection = (username) => {
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-bold text-gray-700 flex items-center gap-2">
           <CalendarDays className="w-5 h-5 text-indigo-500" />
-          Date Range
+          {t('adm_date_range')}
         </p>
         <button
           onClick={() => setShowExportModal(true)}
           className="flex items-center gap-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold active:scale-[0.98]"
         >
           <Download className="w-3.5 h-3.5" />
-          Export
+          {t('adm_export_btn')}
         </button>
       </div>
       
       <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
         {[
-          { key: 'today', label: 'Today' },
-          { key: 'week', label: 'Week' },
-          { key: 'month', label: 'Month' },
-          { key: 'year', label: 'Year' },
-          { key: 'all', label: 'All' },
-          { key: 'custom', label: 'Custom' },
+          { key: 'today', labelKey: 'adm_today' },
+          { key: 'week', labelKey: 'adm_week' },
+          { key: 'month', labelKey: 'adm_month' },
+          { key: 'year', labelKey: 'adm_year' },
+          { key: 'all', labelKey: 'adm_all_time' },
+          { key: 'custom', labelKey: 'adm_custom' },
         ].map((preset) => (
           <button
             key={preset.key}
@@ -1473,7 +1476,7 @@ const toggleMemberSelection = (username) => {
                 : 'bg-gray-100 text-gray-600 active:scale-95'
             }`}
           >
-            {preset.label}
+            {t(preset.labelKey)}
           </button>
         ))}
       </div>
@@ -1482,12 +1485,12 @@ const toggleMemberSelection = (username) => {
         <div className="mt-3 p-3 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl border-2 border-orange-200">
           <p className="text-xs font-bold text-orange-700 mb-3 flex items-center gap-2">
             <Calendar className="w-4 h-4" />
-            Select Custom Range
+            {t('adm_custom_range_title')}
           </p>
-          
+
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">From Date</label>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">{t('adm_from_date')}</label>
               <input
                 type="date"
                 value={customStartDate}
@@ -1499,7 +1502,7 @@ const toggleMemberSelection = (username) => {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">To Date</label>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">{t('adm_to_date')}</label>
               <input
                 type="date"
                 value={customEndDate}
@@ -1519,7 +1522,7 @@ const toggleMemberSelection = (username) => {
             }}
             className="w-full mt-3 py-2.5 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-xl font-bold text-sm active:scale-[0.98]"
           >
-            Apply Custom Range
+            {t('adm_apply_custom')}
           </button>
         </div>
       )}
@@ -1638,7 +1641,7 @@ const toggleMemberSelection = (username) => {
               <div className="flex items-center gap-3">
                 <FileText className="w-6 h-6" />
                 <div>
-                  <h3 className="font-bold text-lg">Export Report</h3>
+                  <h3 className="font-bold text-lg">{t('adm_export_report')}</h3>
                   <p className="text-xs opacity-80">
                     {formatDateShort(dateRange.start)} - {formatDateShort(dateRange.end)}
                   </p>
@@ -1656,7 +1659,7 @@ const toggleMemberSelection = (username) => {
           {exportLoading ? (
             <div className="p-8 text-center">
               <RefreshCw className="w-10 h-10 animate-spin text-indigo-500 mx-auto" />
-              <p className="mt-4 text-gray-600">Loading report data...</p>
+              <p className="mt-4 text-gray-600">{t('adm_loading_report')}</p>
             </div>
           ) : exportData ? (
             <>
@@ -1664,19 +1667,19 @@ const toggleMemberSelection = (username) => {
                 <div className="grid grid-cols-4 gap-2">
                   <div className="text-center">
                     <p className="text-xl font-bold text-indigo-600">{exportData.summary.totalStudents}</p>
-                    <p className="text-xs text-gray-500">Students</p>
+                    <p className="text-xs text-gray-500">{t('adm_students')}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-xl font-bold text-blue-600">{exportData.summary.activeStudents}</p>
-                    <p className="text-xs text-gray-500">Active</p>
+                    <p className="text-xs text-gray-500">{t('adm_active_students')}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-xl font-bold text-green-600">{exportData.summary.totalAttendance}</p>
-                    <p className="text-xs text-gray-500">Days</p>
+                    <p className="text-xs text-gray-500">{t('adm_days_suffix')}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-xl font-bold text-purple-600">{exportData.summary.totalNewGathas}</p>
-                    <p className="text-xs text-gray-500">Gathas</p>
+                    <p className="text-xs text-gray-500">{t('adm_gathas_suffix')}</p>
                   </div>
                 </div>
               </div>
@@ -1692,7 +1695,7 @@ const toggleMemberSelection = (username) => {
                   ) : (
                     <FileText className="w-5 h-5" />
                   )}
-                  Download PDF Report
+                  {t('adm_download_pdf')}
                 </button>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -1702,7 +1705,7 @@ const toggleMemberSelection = (username) => {
                     className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-bold text-xs active:scale-[0.98] disabled:opacity-50"
                   >
                     <Download className="w-4 h-4" />
-                    Text File
+                    {t('adm_text_file')}
                   </button>
                   <button
                     onClick={() => downloadReport('csv')}
@@ -1721,12 +1724,12 @@ const toggleMemberSelection = (username) => {
                   {exportCopied ? (
                     <>
                       <CheckCheck className="w-4 h-4 text-green-500" />
-                      <span className="text-green-600">Copied!</span>
+                      <span className="text-green-600">{t('adm_copied')}</span>
                     </>
                   ) : (
                     <>
                       <Copy className="w-4 h-4" />
-                      Copy to Clipboard
+                      {t('adm_copy')}
                     </>
                   )}
                 </button>
@@ -1736,19 +1739,19 @@ const toggleMemberSelection = (username) => {
                   className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2.5 rounded-xl font-bold text-xs active:scale-[0.98]"
                 >
                   <Share2 className="w-4 h-4" />
-                  Share Report
+                  {t('adm_share')}
                 </button>
               </div>
             </>
           ) : (
             <div className="p-8 text-center text-gray-500">
               <AlertTriangle className="w-10 h-10 mx-auto text-yellow-500 mb-2" />
-              <p>Failed to load report data</p>
+              <p>{t('adm_failed_report')}</p>
               <button
                 onClick={fetchExportData}
                 className="mt-4 px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm"
               >
-                Retry
+                {t('adm_retry')}
               </button>
             </div>
           )}
@@ -1768,7 +1771,7 @@ const toggleMemberSelection = (username) => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <UserPlus className="w-6 h-6" />
-                <h3 className="font-bold text-lg">Add New User</h3>
+                <h3 className="font-bold text-lg">{t('adm_add_new_user')}</h3>
               </div>
               <button
                 onClick={() => {
@@ -1791,49 +1794,49 @@ const toggleMemberSelection = (username) => {
             )}
 
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Full Name *</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_full_name')}</label>
               <input
                 type="text"
                 value={newUser.name}
                 onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                placeholder="Enter full name"
+                placeholder={t('adm_enter_name')}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-400"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Username *</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_username_field')}</label>
               <input
                 type="text"
                 value={newUser.username}
                 onChange={(e) => setNewUser({ ...newUser, username: e.target.value.toLowerCase().replace(/\s/g, '') })}
-                placeholder="Enter username"
+                placeholder={t('adm_enter_username')}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-400"
               />
-              <p className="text-xs text-gray-500 mt-1">No spaces, lowercase only</p>
+              <p className="text-xs text-gray-500 mt-1">{t('adm_no_spaces')}</p>
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Password *</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_password_star')}</label>
               <input
                 type="text"
                 value={newUser.password}
                 onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                placeholder="Enter password"
+                placeholder={t('adm_enter_password')}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-400"
               />
-              <p className="text-xs text-gray-500 mt-1">Minimum 4 characters. Must be unique if username exists.</p>
+              <p className="text-xs text-gray-500 mt-1">{t('adm_pw_hint')}</p>
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Role</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_role_field')}</label>
               <select
                 value={newUser.role}
                 onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-400"
               >
-                <option value="student">Student</option>
-                <option value="admin">Admin</option>
+                <option value="student">{t('adm_student_opt')}</option>
+                <option value="admin">{t('adm_admin_opt')}</option>
               </select>
             </div>
 
@@ -1847,7 +1850,7 @@ const toggleMemberSelection = (username) => {
               ) : (
                 <UserPlus className="w-5 h-5" />
               )}
-              Add User
+              {t('adm_add_user')}
             </button>
           </div>
         </div>
@@ -1866,7 +1869,7 @@ const toggleMemberSelection = (username) => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Edit3 className="w-6 h-6" />
-                <h3 className="font-bold text-lg">Edit User</h3>
+                <h3 className="font-bold text-lg">{t('adm_edit_user')}</h3>
               </div>
               <button
                 onClick={() => {
@@ -1889,7 +1892,7 @@ const toggleMemberSelection = (username) => {
             )}
 
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Full Name *</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_full_name')}</label>
               <input
                 type="text"
                 value={editingUser.name}
@@ -1899,7 +1902,7 @@ const toggleMemberSelection = (username) => {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Username *</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_username_field')}</label>
               <input
                 type="text"
                 value={editingUser.username}
@@ -1909,26 +1912,26 @@ const toggleMemberSelection = (username) => {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Password</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_password_field')}</label>
               <input
                 type="text"
                 value={editingUser.password || ''}
                 onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })}
-                placeholder="Leave empty to keep current"
+                placeholder={t('adm_leave_empty_pw')}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-400"
               />
-              <p className="text-xs text-gray-500 mt-1">Leave empty to keep current password</p>
+              <p className="text-xs text-gray-500 mt-1">{t('adm_leave_pw_hint')}</p>
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Role</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_role_field')}</label>
               <select
                 value={editingUser.role}
                 onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-400"
               >
-                <option value="student">Student</option>
-                <option value="admin">Admin</option>
+                <option value="student">{t('adm_student_opt')}</option>
+                <option value="admin">{t('adm_admin_opt')}</option>
               </select>
             </div>
 
@@ -1942,7 +1945,7 @@ const toggleMemberSelection = (username) => {
               ) : (
                 <Save className="w-5 h-5" />
               )}
-              Save Changes
+              {t('adm_save_changes')}
             </button>
           </div>
         </div>
@@ -1961,7 +1964,7 @@ const toggleMemberSelection = (username) => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Plus className="w-6 h-6" />
-                <h3 className="font-bold text-lg">Add Entry for Student</h3>
+                <h3 className="font-bold text-lg">{t('adm_add_entry_title')}</h3>
               </div>
               <button
                 onClick={() => {
@@ -1992,7 +1995,7 @@ const toggleMemberSelection = (username) => {
                 }`}
               >
                 <Calendar className="w-4 h-4" />
-                Attendance
+                {t('adm_attendance')}
               </button>
               <button
                 onClick={() => setAddEntryType('gatha')}
@@ -2007,13 +2010,13 @@ const toggleMemberSelection = (username) => {
 
             {/* Select Student */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Select Student *</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_select_student')}</label>
               <select
                 value={addEntryData.studentUsername}
                 onChange={(e) => setAddEntryData({ ...addEntryData, studentUsername: e.target.value })}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
               >
-                <option value="">-- Select Student --</option>
+                <option value="">{t('adm_select_student_ph')}</option>
                 {students.map((s) => (
                   <option key={s.username} value={s.username}>
                     {s.name} (@{s.username})
@@ -2024,7 +2027,7 @@ const toggleMemberSelection = (username) => {
 
             {/* Date */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Date *</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_date_field')}</label>
               <input
                 type="date"
                 value={addEntryData.date}
@@ -2037,33 +2040,33 @@ const toggleMemberSelection = (username) => {
             {addEntryType === 'gatha' && (
               <>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Gatha Type</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_gatha_type')}</label>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setAddEntryData({ ...addEntryData, gathaType: 'new' })}
                       className={`flex-1 py-2.5 rounded-lg text-sm font-bold ${
-                        addEntryData.gathaType === 'new' 
-                          ? 'bg-purple-500 text-white' 
+                        addEntryData.gathaType === 'new'
+                          ? 'bg-purple-500 text-white'
                           : 'bg-gray-100 text-gray-600'
                       }`}
                     >
-                      New
+                      {t('adm_new_type')}
                     </button>
                     <button
                       onClick={() => setAddEntryData({ ...addEntryData, gathaType: 'revision' })}
                       className={`flex-1 py-2.5 rounded-lg text-sm font-bold ${
-                        addEntryData.gathaType === 'revision' 
-                          ? 'bg-blue-500 text-white' 
+                        addEntryData.gathaType === 'revision'
+                          ? 'bg-blue-500 text-white'
                           : 'bg-gray-100 text-gray-600'
                       }`}
                     >
-                      Revision
+                      {t('revision')}
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Sutra Name *</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_sutra_name_field')}</label>
                   <input
                     type="text"
                     value={addEntryData.sutraName}
@@ -2074,7 +2077,7 @@ const toggleMemberSelection = (username) => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Which Gatha (optional)</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_which_gatha')}</label>
                   <input
                     type="text"
                     value={addEntryData.whichGatha}
@@ -2085,7 +2088,7 @@ const toggleMemberSelection = (username) => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Total Gatha Count *</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_total_gatha')}</label>
                   <input
                     type="number"
                     min="1"
@@ -2107,7 +2110,7 @@ const toggleMemberSelection = (username) => {
               ) : (
                 <Plus className="w-5 h-5" />
               )}
-              {addEntryType === 'attendance' ? 'Add Attendance' : 'Add Gatha'}
+              {addEntryType === 'attendance' ? t('adm_add_attendance') : t('adm_add_gatha_btn')}
             </button>
           </div>
         </div>
@@ -2121,7 +2124,7 @@ const toggleMemberSelection = (username) => {
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
           <Users className="w-5 h-5 text-purple-500" />
-          Family Groups
+          {t('adm_family_groups')}
         </h3>
         <button
           onClick={() => {
@@ -2132,13 +2135,13 @@ const toggleMemberSelection = (username) => {
           className="flex items-center gap-1 bg-purple-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold active:scale-[0.98]"
         >
           <Plus className="w-4 h-4" />
-          Create Group
+          {t('adm_create_group')}
         </button>
       </div>
 
       <div className="bg-purple-50 rounded-xl p-3 border-2 border-purple-200">
         <p className="text-xs text-purple-700">
-          💡 Family groups allow members to mark attendance and add gatha for each other without logging out.
+          {t('adm_family_info')}
         </p>
       </div>
 
@@ -2149,7 +2152,7 @@ const toggleMemberSelection = (username) => {
       ) : familyGroups.length === 0 ? (
         <div className="bg-white rounded-xl p-6 border-2 border-gray-200 text-center">
           <Users className="w-10 h-10 mx-auto text-gray-300 mb-2" />
-          <p className="text-gray-500 text-sm">No family groups created yet</p>
+          <p className="text-gray-500 text-sm">{t('adm_no_groups')}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -2159,7 +2162,7 @@ const toggleMemberSelection = (username) => {
                 <div>
                   <p className="font-bold text-gray-800">{group.groupName}</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    {group.members.length} members
+                    {group.members.length} {t('adm_members')}
                   </p>
                 </div>
                 <button
@@ -2206,7 +2209,7 @@ const toggleMemberSelection = (username) => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Users className="w-6 h-6" />
-                <h3 className="font-bold text-lg">Create Family Group</h3>
+                <h3 className="font-bold text-lg">{t('adm_create_family_group')}</h3>
               </div>
               <button
                 onClick={() => {
@@ -2222,7 +2225,7 @@ const toggleMemberSelection = (username) => {
 
           <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Group Name *</label>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_group_name')}</label>
               <input
                 type="text"
                 value={newGroup.groupName}
@@ -2234,9 +2237,9 @@ const toggleMemberSelection = (username) => {
 
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">
-                Select Members * ({selectedMembers.length} selected)
+                {t('adm_select_members')} * ({selectedMembers.length} {t('adm_selected')})
               </label>
-              <p className="text-xs text-gray-500 mb-2">Select at least 2 members</p>
+              <p className="text-xs text-gray-500 mb-2">{t('adm_min_2_members')}</p>
 
               <div className="max-h-48 overflow-y-auto border-2 border-gray-200 rounded-xl p-2 space-y-1">
                 {availableStudents.map((student) => (
@@ -2289,7 +2292,7 @@ const toggleMemberSelection = (username) => {
               ) : (
                 <Users className="w-5 h-5" />
               )}
-              Create Group
+              {t('adm_create_group')}
             </button>
           </div>
         </div>
@@ -2303,7 +2306,7 @@ const toggleMemberSelection = (username) => {
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
           <UserCog className="w-5 h-5 text-indigo-500" />
-          User Management
+          {t('adm_user_mgmt')}
         </h3>
         <button
           onClick={fetchAllUsers}
@@ -2327,14 +2330,14 @@ const toggleMemberSelection = (username) => {
           className="flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-xl font-bold active:scale-[0.98] shadow-lg"
         >
           <UserPlus className="w-5 h-5" />
-          Add User
+          {t('adm_add_user')}
         </button>
         <button
           onClick={() => setShowAddEntryModal(true)}
           className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-bold active:scale-[0.98] shadow-lg"
         >
           <Plus className="w-5 h-5" />
-          Add Entry
+          {t('adm_add_entry')}
         </button>
       </div>
 
@@ -2346,7 +2349,7 @@ const toggleMemberSelection = (username) => {
             type="text"
             value={userSearchQuery}
             onChange={(e) => setUserSearchQuery(e.target.value)}
-            placeholder="Search users..."
+            placeholder={t('adm_search_users')}
             className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400 text-sm"
           />
         </div>
@@ -2356,15 +2359,15 @@ const toggleMemberSelection = (username) => {
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-white rounded-xl p-3 border-2 border-blue-200 text-center">
           <p className="text-xl font-bold text-blue-600">{allUsers.length}</p>
-          <p className="text-xs text-gray-500">Total Users</p>
+          <p className="text-xs text-gray-500">{t('adm_total_users')}</p>
         </div>
         <div className="bg-white rounded-xl p-3 border-2 border-green-200 text-center">
           <p className="text-xl font-bold text-green-600">{allUsers.filter(u => u.role === 'student').length}</p>
-          <p className="text-xs text-gray-500">Students</p>
+          <p className="text-xs text-gray-500">{t('adm_students')}</p>
         </div>
         <div className="bg-white rounded-xl p-3 border-2 border-purple-200 text-center">
           <p className="text-xl font-bold text-purple-600">{allUsers.filter(u => u.role === 'admin').length}</p>
-          <p className="text-xs text-gray-500">Admins</p>
+          <p className="text-xs text-gray-500">{t('adm_admins')}</p>
         </div>
       </div>
 
@@ -2372,7 +2375,7 @@ const toggleMemberSelection = (username) => {
       {usersLoading ? (
         <div className="bg-white rounded-xl p-8 border-2 border-indigo-200 text-center">
           <RefreshCw className="w-10 h-10 animate-spin text-indigo-500 mx-auto" />
-          <p className="mt-4 text-gray-600">Loading users...</p>
+          <p className="mt-4 text-gray-600">{t('adm_loading_users')}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -2443,7 +2446,7 @@ const toggleMemberSelection = (username) => {
           {filteredUsers.length === 0 && (
             <div className="bg-white rounded-xl p-8 border-2 border-gray-200 text-center">
               <Users className="w-12 h-12 mx-auto text-gray-300 mb-2" />
-              <p className="text-gray-500">No users found</p>
+              <p className="text-gray-500">{t('adm_no_users')}</p>
             </div>
           )}
         </div>
@@ -2466,10 +2469,10 @@ const toggleMemberSelection = (username) => {
         >
           <div className="flex items-center gap-2">
             <BellRing className="w-5 h-5" />
-            <span className="font-bold text-sm">New pending requests!</span>
+            <span className="font-bold text-sm">{t('adm_new_pending_alert')}</span>
           </div>
           <span className="bg-white text-red-500 px-2 py-1 rounded-lg text-xs font-bold">
-            View Now
+            {t('adm_view_now')}
           </span>
         </button>
       )}
@@ -2478,7 +2481,7 @@ const toggleMemberSelection = (username) => {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Activity className="w-5 h-5" />
-            <span className="font-bold">Today's Summary</span>
+            <span className="font-bold">{t('adm_todays_summary')}</span>
           </div>
           <span className="text-xs bg-white/20 px-2 py-1 rounded-full">
             {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
@@ -2489,17 +2492,17 @@ const toggleMemberSelection = (username) => {
           <div className="bg-white/20 backdrop-blur rounded-xl p-2.5 text-center">
             <UserCheck className="w-5 h-5 mx-auto mb-1" />
             <p className="text-xl font-bold">{stats?.today_attendance || 0}</p>
-            <p className="text-xs opacity-80">Present</p>
+            <p className="text-xs opacity-80">{t('present')}</p>
           </div>
           <div className="bg-white/20 backdrop-blur rounded-xl p-2.5 text-center">
             <Users className="w-5 h-5 mx-auto mb-1" />
             <p className="text-xl font-bold">{students.length}</p>
-            <p className="text-xs opacity-80">Students</p>
+            <p className="text-xs opacity-80">{t('adm_students')}</p>
           </div>
           <div className="bg-white/20 backdrop-blur rounded-xl p-2.5 text-center">
             <Clock className="w-5 h-5 mx-auto mb-1" />
             <p className="text-xl font-bold">{totalPending}</p>
-            <p className="text-xs opacity-80">Pending</p>
+            <p className="text-xs opacity-80">{t('adm_pending_tab')}</p>
           </div>
         </div>
       </div>
@@ -2511,11 +2514,11 @@ const toggleMemberSelection = (username) => {
           <div className="flex items-center justify-between mb-1">
             <Users className="w-6 h-6 text-blue-500" />
             <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold">
-              {activeStudentsCount} active
+              {activeStudentsCount} {t('adm_active_badge')}
             </span>
           </div>
           <p className="text-2xl font-bold text-gray-800">{students.length}</p>
-          <p className="text-xs text-gray-500">Total Students</p>
+          <p className="text-xs text-gray-500">{t('adm_total_students')}</p>
         </div>
 
         <div className="bg-white rounded-xl p-3 border-2 border-green-200 shadow-sm">
@@ -2530,7 +2533,7 @@ const toggleMemberSelection = (username) => {
             </span>
           </div>
           <p className="text-2xl font-bold text-gray-800">{stats?.today_attendance || 0}/{students.length}</p>
-          <p className="text-xs text-gray-500">Today's Attendance</p>
+          <p className="text-xs text-gray-500">{t('adm_todays_att')}</p>
         </div>
 
         <div className="bg-white rounded-xl p-3 border-2 border-purple-200 shadow-sm">
@@ -2541,7 +2544,7 @@ const toggleMemberSelection = (username) => {
             </span>
           </div>
           <p className="text-2xl font-bold text-gray-800">{totalNewGathaCount}</p>
-          <p className="text-xs text-gray-500">New Gathas (Range)</p>
+          <p className="text-xs text-gray-500">{t('adm_new_gathas_range')}</p>
         </div>
 
         <button
@@ -2558,7 +2561,7 @@ const toggleMemberSelection = (username) => {
             )}
           </div>
           <p className="text-2xl font-bold text-gray-800">{totalPending}</p>
-          <p className="text-xs text-gray-500">Pending</p>
+          <p className="text-xs text-gray-500">{t('adm_pending_tab')}</p>
         </button>
       </div>
 
@@ -2566,36 +2569,36 @@ const toggleMemberSelection = (username) => {
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
             <Award className="w-5 h-5 text-yellow-500" />
-            Top Performers
+            {t('adm_top_performers')}
           </h3>
           <button
             onClick={() => setActiveTab('analytics')}
             className="text-xs text-indigo-600 font-bold"
           >
-            View All
+            {t('adm_view_all')}
           </button>
         </div>
         
         <div className="grid grid-cols-2 gap-2">
           <div className="relative bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-xl p-3 overflow-hidden">
             <div className="absolute top-1 right-1 text-2xl">🏆</div>
-            <p className="text-xs font-bold text-yellow-800 mb-0.5">Attendance</p>
+            <p className="text-xs font-bold text-yellow-800 mb-0.5">{t('adm_attendance')}</p>
             <p className="text-sm font-bold text-gray-800 truncate pr-6">
               {topStudents.topAttendance?.[0]?.name || 'N/A'}
             </p>
             <p className="text-xs font-bold text-yellow-700 mt-1">
-              {topStudents.topAttendance?.[0]?.count || 0} days
+              {topStudents.topAttendance?.[0]?.count || 0} {t('adm_days_suffix')}
             </p>
           </div>
 
           <div className="relative bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-3 overflow-hidden">
             <div className="absolute top-1 right-1 text-2xl">📚</div>
-            <p className="text-xs font-bold text-purple-800 mb-0.5">New Gatha</p>
+            <p className="text-xs font-bold text-purple-800 mb-0.5">{t('adm_new_gatha')}</p>
             <p className="text-sm font-bold text-gray-800 truncate pr-6">
               {topStudents.topGatha?.[0]?.name || 'N/A'}
             </p>
             <p className="text-xs font-bold text-purple-700 mt-1">
-              {topStudents.topGatha?.[0]?.count || 0} new
+              {topStudents.topGatha?.[0]?.count || 0} {t('adm_new_type')}
             </p>
           </div>
         </div>
@@ -2610,8 +2613,8 @@ const toggleMemberSelection = (username) => {
             <Users className="w-5 h-5 text-blue-600" />
           </div>
           <div className="text-left">
-            <p className="font-bold text-gray-800 text-sm">Students</p>
-            <p className="text-xs text-gray-500">View all</p>
+            <p className="font-bold text-gray-800 text-sm">{t('adm_students')}</p>
+            <p className="text-xs text-gray-500">{t('adm_view_all_sub')}</p>
           </div>
         </button>
 
@@ -2623,8 +2626,8 @@ const toggleMemberSelection = (username) => {
             <UserCog className="w-5 h-5 text-purple-600" />
           </div>
           <div className="text-left">
-            <p className="font-bold text-gray-800 text-sm">Manage Users</p>
-            <p className="text-xs text-gray-500">Add/Edit</p>
+            <p className="font-bold text-gray-800 text-sm">{t('adm_manage_users')}</p>
+            <p className="text-xs text-gray-500">{t('adm_add_edit')}</p>
           </div>
         </button>
       </div>
@@ -2637,7 +2640,7 @@ const toggleMemberSelection = (username) => {
       {renderAutoRefreshControls()}
 
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold text-gray-800">Pending Approvals</h3>
+        <h3 className="text-lg font-bold text-gray-800">{t('adm_pending_section')}</h3>
       </div>
 
       {totalPending > 0 && (
@@ -2647,14 +2650,14 @@ const toggleMemberSelection = (username) => {
           className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-3 rounded-xl active:scale-[0.98] font-bold shadow-lg"
         >
           <Check className="w-5 h-5" />
-          {actionLoading === 'approve-all' ? 'Approving...' : 'Approve All (' + totalPending + ')'}
+          {actionLoading === 'approve-all' ? t('adm_approving') : t('adm_approve_all') + ' (' + totalPending + ')'}
         </button>
       )}
 
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
         {[
-          { key: 'all', label: 'All (' + totalPending + ')' },
-          { key: 'attendance', label: 'Attend (' + pendingData.attendance.length + ')' },
+          { key: 'all', label: t('adm_all_filter') + ' (' + totalPending + ')' },
+          { key: 'attendance', label: t('adm_attendance').slice(0, 5) + ' (' + pendingData.attendance.length + ')' },
           { key: 'gatha', label: 'Gatha (' + pendingData.gatha.length + ')' },
         ].map((filter) => (
           <button
@@ -2672,13 +2675,13 @@ const toggleMemberSelection = (username) => {
       {isLoading ? (
         <div className="bg-white rounded-xl p-8 border-2 border-indigo-200 text-center">
           <RefreshCw className="w-10 h-10 animate-spin text-indigo-500 mx-auto" />
-          <p className="mt-4 text-gray-600 text-sm">Loading...</p>
+          <p className="mt-4 text-gray-600 text-sm">{t('adm_loading_report')}</p>
         </div>
       ) : totalPending === 0 ? (
         <div className="bg-white rounded-xl p-8 border-2 border-green-200 text-center">
           <CheckCircle className="w-16 h-16 mx-auto text-green-400 mb-4" />
-          <p className="text-lg font-bold text-gray-800">All Caught Up!</p>
-          <p className="text-sm text-gray-500">No pending approvals</p>
+          <p className="text-lg font-bold text-gray-800">{t('adm_all_caught_up')}</p>
+          <p className="text-sm text-gray-500">{t('no_pending_approvals')}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -2727,7 +2730,7 @@ const toggleMemberSelection = (username) => {
                     <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${
                       item.type === 'new' ? 'bg-purple-500 text-white' : 'bg-blue-500 text-white'
                     }`}>
-                      {item.type === 'new' ? 'New' : 'Rev'}
+                      {item.type === 'new' ? t('adm_new_type') : t('adm_rev_type')}
                     </span>
                   </div>
                   <div className="ml-6 text-xs text-gray-600 space-y-0.5">
@@ -2770,7 +2773,7 @@ const toggleMemberSelection = (username) => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search students..."
+            placeholder={t('adm_search_students')}
             className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400 text-sm"
           />
         </div>
@@ -2791,7 +2794,7 @@ const toggleMemberSelection = (username) => {
           >
             {filter === 'all' ? 'All (' + students.length + ')' : 
              filter === 'active' ? 'Active (' + activeStudentsCount + ')' :
-             'Inactive (' + (students.length - activeStudentsCount) + ')'}
+             t('adm_inactive') + ' (' + (students.length - activeStudentsCount) + ')'}
           </button>
         ))}
       </div>
@@ -2799,9 +2802,9 @@ const toggleMemberSelection = (username) => {
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
         {[
           { key: 'name', label: 'A-Z' },
-          { key: 'attendance', label: 'Attendance' },
+          { key: 'attendance', label: t('adm_attendance') },
           { key: 'gatha', label: 'Gatha' },
-          { key: 'total', label: 'Score' },
+          { key: 'total', label: t('adm_sort_score') },
         ].map((option) => (
           <button
             key={option.key}
@@ -2845,7 +2848,7 @@ const toggleMemberSelection = (username) => {
                     <div>
                       <p className="font-bold text-gray-800 text-sm">{student.name}</p>
                       <span className={'inline-block text-xs px-1.5 py-0.5 rounded-full bg-gradient-to-r ' + badge.color + ' text-white font-bold'}>
-                        {badge.label}
+                        {t(badge.labelKey)}
                       </span>
                     </div>
                   </div>
@@ -2853,11 +2856,11 @@ const toggleMemberSelection = (username) => {
                   <div className="flex items-center gap-3">
                     <div className="text-center">
                       <p className="text-base font-bold text-green-600">{student.attendance_count || 0}</p>
-                      <p className="text-xs text-gray-400">Att</p>
+                      <p className="text-xs text-gray-400">{t('adm_att_col')}</p>
                     </div>
                     <div className="text-center">
                       <p className="text-base font-bold text-purple-600">{newGathas}</p>
-                      <p className="text-xs text-gray-400">New</p>
+                      <p className="text-xs text-gray-400">{t('adm_new_col')}</p>
                     </div>
                   </div>
                 </div>
@@ -2871,7 +2874,7 @@ const toggleMemberSelection = (username) => {
       {filteredStudents.length === 0 && (
         <div className="bg-white rounded-xl p-8 border-2 border-gray-200 text-center">
           <Users className="w-12 h-12 mx-auto text-gray-300 mb-2" />
-          <p className="text-gray-500">No students found</p>
+          <p className="text-gray-500">{t('adm_no_students')}</p>
         </div>
       )}
     </div>
@@ -2887,37 +2890,37 @@ const toggleMemberSelection = (username) => {
         className="w-full bg-indigo-500 text-white py-2.5 rounded-xl active:scale-[0.98] text-sm font-bold flex items-center justify-center gap-2"
       >
         <RefreshCw className="w-4 h-4" />
-        Refresh
+        {t('adm_refresh')}
       </button>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl p-3 text-white shadow-lg">
           <Calendar className="w-6 h-6 mb-1 opacity-80" />
           <p className="text-2xl font-bold">{totalAttendanceCount}</p>
-          <p className="text-xs opacity-80">Attendance</p>
+          <p className="text-xs opacity-80">{t('adm_attendance')}</p>
         </div>
 
         <div className="bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl p-3 text-white shadow-lg">
           <Star className="w-6 h-6 mb-1 opacity-80" />
           <p className="text-2xl font-bold">{totalNewGathaCount}</p>
-          <p className="text-xs opacity-80">New Gathas</p>
+          <p className="text-xs opacity-80">{t('adm_new_gatha')}</p>
         </div>
 
         <div className="bg-gradient-to-br from-orange-400 to-yellow-500 rounded-xl p-3 text-white shadow-lg">
           <Award className="w-6 h-6 mb-1 opacity-80" />
           <p className="text-2xl font-bold">{totalAttendanceCount + totalNewGathaCount}</p>
-          <p className="text-xs opacity-80">Total Score</p>
+          <p className="text-xs opacity-80">{t('adm_total_score')}</p>
         </div>
 
         <div className="bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl p-3 text-white shadow-lg">
           <Users className="w-6 h-6 mb-1 opacity-80" />
           <p className="text-2xl font-bold">{activeStudentsCount}</p>
-          <p className="text-xs opacity-80">Active Students</p>
+          <p className="text-xs opacity-80">{t('adm_active_students')}</p>
         </div>
       </div>
 
       <div className="bg-white rounded-xl p-3 border-2 border-green-200 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-800 mb-2">Top 5 - Attendance</h3>
+        <h3 className="text-sm font-bold text-gray-800 mb-2">{t('adm_top5_att')}</h3>
         <div className="space-y-1.5">
           {topStudents.topAttendance?.slice(0, 5).map((student, index) => {
             const medals = ['🥇', '🥈', '🥉', '4', '5'];
@@ -2928,7 +2931,7 @@ const toggleMemberSelection = (username) => {
                   <span className="font-semibold text-gray-800 text-sm">{student.name}</span>
                 </div>
                 <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold text-xs">
-                  {student.count} days
+                  {student.count} {t('adm_days_suffix')}
                 </span>
               </div>
             );
@@ -2937,7 +2940,7 @@ const toggleMemberSelection = (username) => {
       </div>
 
       <div className="bg-white rounded-xl p-3 border-2 border-purple-200 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-800 mb-2">Top 5 - New Gathas</h3>
+        <h3 className="text-sm font-bold text-gray-800 mb-2">{t('adm_top5_gatha')}</h3>
         <div className="space-y-1.5">
           {topStudents.topGatha?.slice(0, 5).map((student, index) => {
             const medals = ['🥇', '🥈', '🥉', '4', '5'];
@@ -2948,7 +2951,7 @@ const toggleMemberSelection = (username) => {
                   <span className="font-semibold text-gray-800 text-sm">{student.name}</span>
                 </div>
                 <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold text-xs">
-                  {student.count} gathas
+                  {student.count} {t('adm_gathas_suffix')}
                 </span>
               </div>
             );
@@ -2970,16 +2973,24 @@ const toggleMemberSelection = (username) => {
               </div>
               <div>
                 <h2 className="text-sm font-bold text-gray-800">{user.name}</h2>
-                <p className="text-xs text-indigo-600 font-semibold">Admin Panel</p>
+                <p className="text-xs text-indigo-600 font-semibold">{t('adm_panel')}</p>
               </div>
             </div>
-            <button
-              onClick={onLogout}
-              className="flex items-center gap-1 bg-red-100 text-red-600 px-2.5 py-1.5 rounded-xl active:scale-[0.98] text-xs font-bold"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              Exit
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleLang}
+                className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold text-xs px-2.5 py-1.5 rounded-xl border border-indigo-300 transition-colors"
+              >
+                {lang === 'gu' ? 'EN' : 'ગુ'}
+              </button>
+              <button
+                onClick={onLogout}
+                className="flex items-center gap-1 bg-red-100 text-red-600 px-2.5 py-1.5 rounded-xl active:scale-[0.98] text-xs font-bold"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                {t('adm_exit')}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -3045,21 +3056,21 @@ const toggleMemberSelection = (username) => {
           <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setShowMoreMenu(false)}>
             <div className="absolute bottom-16 left-0 right-0 bg-white rounded-t-3xl p-4 shadow-2xl" onClick={e => e.stopPropagation()}>
               <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
-              <p className="text-sm font-bold text-gray-700 mb-3">More Options</p>
+              <p className="text-sm font-bold text-gray-700 mb-3">{t('adm_more_options')}</p>
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { key: 'bulk-attendance', icon: ClipboardList, label: 'Bulk Attend.', color: 'bg-green-100 text-green-600' },
-                  { key: 'bulk-gatha', icon: BookOpen, label: 'Bulk Gatha', color: 'bg-purple-100 text-purple-600' },
-                  { key: 'register', icon: LayoutGrid, label: 'Register', color: 'bg-blue-100 text-blue-600' },
-                  { key: 'users', icon: UserCog, label: 'Users', color: 'bg-orange-100 text-orange-600' },
-                  { key: 'analytics', icon: TrendingUp, label: 'Analytics', color: 'bg-pink-100 text-pink-600' },
+                  { key: 'bulk-attendance', icon: ClipboardList, labelKey: 'adm_bulk_attend', color: 'bg-green-100 text-green-600' },
+                  { key: 'bulk-gatha', icon: BookOpen, labelKey: 'adm_bulk_gatha', color: 'bg-purple-100 text-purple-600' },
+                  { key: 'register', icon: LayoutGrid, labelKey: 'adm_register', color: 'bg-blue-100 text-blue-600' },
+                  { key: 'users', icon: UserCog, labelKey: 'adm_manage_users', color: 'bg-orange-100 text-orange-600' },
+                  { key: 'analytics', icon: TrendingUp, labelKey: 'adm_analytics', color: 'bg-pink-100 text-pink-600' },
                 ].map(item => (
                   <button key={item.key} onClick={() => { setActiveTab(item.key); setShowMoreMenu(false); setViewingStudentProfile(null); }}
                     className="flex flex-col items-center gap-1.5 p-3 rounded-xl active:scale-95 transition-all">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${item.color}`}>
                       <item.icon className="w-5 h-5" />
                     </div>
-                    <span className="text-[10px] font-bold text-gray-600">{item.label}</span>
+                    <span className="text-[10px] font-bold text-gray-600">{t(item.labelKey)}</span>
                   </button>
                 ))}
               </div>
@@ -3071,11 +3082,11 @@ const toggleMemberSelection = (username) => {
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-indigo-200 p-2 shadow-2xl z-40">
           <div className="max-w-lg mx-auto grid grid-cols-5 gap-1">
             {[
-              { key: 'overview', icon: BarChart3, label: 'Home' },
-              { key: 'students', icon: Users, label: 'Students' },
-              { key: 'bulk-attendance', icon: ClipboardList, label: 'Bulk' },
-              { key: 'approvals', icon: Clock, label: 'Pending', badge: totalPending, alert: newPendingAlert },
-              { key: 'more', icon: Menu, label: 'More' },
+              { key: 'overview', icon: BarChart3, labelKey: 'adm_home' },
+              { key: 'students', icon: Users, labelKey: 'adm_students' },
+              { key: 'bulk-attendance', icon: ClipboardList, labelKey: 'adm_bulk' },
+              { key: 'approvals', icon: Clock, labelKey: 'adm_pending_tab', badge: totalPending, alert: newPendingAlert },
+              { key: 'more', icon: Menu, labelKey: 'adm_more' },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -3097,7 +3108,7 @@ const toggleMemberSelection = (username) => {
                 } ${tab.alert ? 'animate-pulse' : ''}`}
               >
                 <tab.icon className="w-5 h-5" />
-                <span className="text-[10px]">{tab.label}</span>
+                <span className="text-[10px]">{t(tab.labelKey)}</span>
                 {tab.badge > 0 && (
                   <span className={`absolute -top-1 -right-1 w-5 h-5 text-white text-[10px] font-bold rounded-full flex items-center justify-center ${
                     tab.alert ? 'bg-red-500 animate-bounce' : 'bg-red-500'

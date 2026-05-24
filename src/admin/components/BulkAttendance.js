@@ -3,6 +3,7 @@ import {
   Calendar, Check, CheckCircle, Search, RefreshCw,
   AlertTriangle, X as CloseIcon
 } from 'lucide-react';
+import { useLanguage } from '../../LanguageContext';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'https://pathshala-backend.vercel.app/api';
 
@@ -12,6 +13,7 @@ const formatLocalDate = (d = new Date()) => {
 };
 
 export default function BulkAttendance({ students, familyGroups, onSuccess }) {
+  const { t } = useLanguage();
   const [date, setDate] = useState(formatLocalDate());
   const [search, setSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState('all');
@@ -64,7 +66,7 @@ export default function BulkAttendance({ students, familyGroups, onSuccess }) {
       .map(([username, e]) => ({ username, status: 'present', remark: e.remark }));
 
     if (presentEntries.length === 0) {
-      setError('No students marked as present');
+      setError(t('bulk_no_present_err'));
       return;
     }
 
@@ -85,7 +87,7 @@ export default function BulkAttendance({ students, familyGroups, onSuccess }) {
       }
 
       const data = await res.json();
-      setSuccess(`Saved! ${data.added} added, ${data.skipped} already existed.`);
+      setSuccess(t('bulk_att_saved').replace('{added}', data.added).replace('{skipped}', data.skipped));
       setTimeout(() => setSuccess(''), 4000);
       setEntries({});
       if (onSuccess) onSuccess();
@@ -100,9 +102,9 @@ export default function BulkAttendance({ students, familyGroups, onSuccess }) {
     <div className="space-y-3">
       <div className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl p-4 text-white">
         <h3 className="font-bold text-lg flex items-center gap-2">
-          <Calendar className="w-5 h-5" /> Bulk Attendance
+          <Calendar className="w-5 h-5" /> {t('bulk_att_title')}
         </h3>
-        <p className="text-green-100 text-xs mt-1">Mark attendance for multiple students at once</p>
+        <p className="text-green-100 text-xs mt-1">{t('bulk_att_subtitle')}</p>
       </div>
 
       {error && (
@@ -122,7 +124,7 @@ export default function BulkAttendance({ students, familyGroups, onSuccess }) {
 
       {/* Date picker */}
       <div className="bg-white rounded-xl border-2 border-green-200 p-3">
-        <label className="block text-xs font-bold text-gray-600 mb-1">Select Date</label>
+        <label className="block text-xs font-bold text-gray-600 mb-1">{t('bulk_select_date')}</label>
         <input type="date" value={date} onChange={e => setDate(e.target.value)}
           className="w-full px-4 py-3 border-2 border-green-200 rounded-xl text-sm font-bold focus:outline-none focus:border-green-400 bg-white" />
       </div>
@@ -131,12 +133,12 @@ export default function BulkAttendance({ students, familyGroups, onSuccess }) {
       <div className="flex gap-2">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search students..."
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder={t('adm_search_students')}
             className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-green-400" />
         </div>
         <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
           className="px-3 py-2.5 border-2 border-gray-200 rounded-xl text-xs font-bold focus:outline-none focus:border-green-400 bg-white">
-          <option value="all">All Groups</option>
+          <option value="all">{t('bulk_all_groups')}</option>
           {uniqueGroups.map(g => <option key={g} value={g}>{g}</option>)}
         </select>
       </div>
@@ -144,20 +146,20 @@ export default function BulkAttendance({ students, familyGroups, onSuccess }) {
       {/* Quick actions */}
       <div className="flex gap-2">
         <button onClick={markAllPresent} className="flex-1 py-2 bg-green-100 text-green-700 rounded-xl text-xs font-bold active:scale-95">
-          ✓ All Present
+          {t('bulk_all_present')}
         </button>
         <button onClick={markAllAbsent} className="flex-1 py-2 bg-red-100 text-red-700 rounded-xl text-xs font-bold active:scale-95">
-          ✗ All Absent
+          {t('bulk_all_absent')}
         </button>
         <button onClick={clearAll} className="py-2 px-3 bg-gray-100 text-gray-600 rounded-xl text-xs font-bold active:scale-95">
-          Clear
+          {t('bulk_clear')}
         </button>
       </div>
 
       {/* Student list */}
       <div className="bg-white rounded-xl border-2 border-gray-200 overflow-hidden">
         <div className="px-3 py-2 bg-gray-50 border-b flex items-center justify-between">
-          <p className="text-xs font-bold text-gray-600">{filtered.length} students · {selectedCount} marked present</p>
+          <p className="text-xs font-bold text-gray-600">{filtered.length} {t('reg_student_col')} · {selectedCount} {t('bulk_all_present')}</p>
         </div>
         <div className="max-h-96 overflow-y-auto divide-y divide-gray-100">
           {filtered.map(s => {
@@ -179,7 +181,7 @@ export default function BulkAttendance({ students, familyGroups, onSuccess }) {
                   <p className="text-xs font-bold text-gray-700 truncate">{s.name}</p>
                   {group && <p className="text-[10px] text-gray-400">{group}</p>}
                 </div>
-                <input type="text" placeholder="Remark" value={entries[s.username]?.remark || ''}
+                <input type="text" placeholder={t('bulk_remark_ph')} value={entries[s.username]?.remark || ''}
                   onChange={e => setRemark(s.username, e.target.value)}
                   className="w-20 px-2 py-1 border border-gray-200 rounded-lg text-[10px] focus:outline-none focus:border-green-400" />
               </div>
@@ -192,7 +194,7 @@ export default function BulkAttendance({ students, familyGroups, onSuccess }) {
       <button onClick={handleSave} disabled={saving || selectedCount === 0}
         className="w-full py-3.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-bold text-sm active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg">
         {saving ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
-        Save Attendance ({selectedCount} students)
+        {t('adm_att_added')} ({selectedCount} {t('reg_student_col')})
       </button>
     </div>
   );
