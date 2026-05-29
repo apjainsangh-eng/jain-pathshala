@@ -1273,10 +1273,14 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
   if (!isOpen) return null;
 
   const handleSubmit = () => {
+    const selectedType = activeTab === 'other'
+      ? otherSubTypes.find(t => t.name === selectedOtherSubType)
+      : null;
     onSubmit({
       type: activeTab === 'other' ? 'other' : activeTab,
       activityTypeName: activeTab === 'new' ? 'New Learning' : activeTab === 'revision' ? 'Revision' : (selectedOtherSubType || 'Other'),
       customActivityDescription: activeTab === 'other' ? customActivityDescription : null,
+      xpPoints: selectedType?.xpPoints || 0,
       sutra_name: form.sutraName,
       which_gatha: form.whichGatha,
       total_gatha: Number(form.totalGatha),
@@ -1367,7 +1371,9 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
                   >
                     <option value="">{t('other_subtype_placeholder')}</option>
                     {otherSubTypes.map(at => (
-                      <option key={at.id} value={at.name}>{at.name}</option>
+                      <option key={at.id} value={at.name}>
+                        {at.name}{at.xpPoints > 0 ? ` (+${at.xpPoints} XP)` : ''}
+                      </option>
                     ))}
                   </select>
                 </div>

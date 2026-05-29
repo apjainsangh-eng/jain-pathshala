@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   BookOpen, Check, CheckCircle, Search, RefreshCw,
-  AlertTriangle, X as CloseIcon, Plus, Trash2, ChevronDown
+  AlertTriangle, X as CloseIcon, Plus, Trash2, ChevronDown, Zap
 } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 
@@ -32,6 +32,7 @@ function OtherDropdown({ subType, onSubTypeChange, subOptions, onAddOption, onDe
   const [open, setOpen] = useState(false);
   const [showInput, setShowInput] = useState(false);
   const [newOption, setNewOption] = useState('');
+  const [newXpPoints, setNewXpPoints] = useState('1');
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const ref = useRef(null);
@@ -39,7 +40,7 @@ function OtherDropdown({ subType, onSubTypeChange, subOptions, onAddOption, onDe
   useEffect(() => {
     const handler = (e) => {
       if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false); setShowInput(false); setNewOption('');
+        setOpen(false); setShowInput(false); setNewOption(''); setNewXpPoints('1');
       }
     };
     document.addEventListener('mousedown', handler);
@@ -49,19 +50,20 @@ function OtherDropdown({ subType, onSubTypeChange, subOptions, onAddOption, onDe
   const handleSave = async () => {
     const name = newOption.trim();
     if (!name) return;
+    const xpPoints = Math.max(0, parseInt(newXpPoints) || 1);
     setSaving(true);
     try {
       const token = localStorage.getItem('jainPathshalaToken');
       const res = await fetch(`${API_BASE}/activity-types`, {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, xpPoints }),
       });
       const data = await res.json();
       if (res.ok) {
-        onAddOption({ id: data.id, name });
+        onAddOption({ id: data.id, name, xpPoints });
         onSubTypeChange(name);
-        setNewOption(''); setShowInput(false); setOpen(false);
+        setNewOption(''); setNewXpPoints('1'); setShowInput(false); setOpen(false);
       }
     } catch (e) { /* silent */ }
     setSaving(false);
@@ -107,8 +109,13 @@ function OtherDropdown({ subType, onSubTypeChange, subOptions, onAddOption, onDe
           {subOptions.map(opt => (
             <div key={opt.id} className={`flex items-center hover:bg-orange-50 ${subType === opt.name ? 'bg-orange-100' : ''}`}>
               <button type="button" onClick={() => { onSubTypeChange(opt.name); setOpen(false); }}
-                className="flex-1 text-left px-3 py-2.5 text-xs font-medium text-gray-700">
-                {opt.name}
+                className="flex-1 text-left px-3 py-2.5 text-xs font-medium text-gray-700 flex items-center gap-2">
+                <span className="flex-1">{opt.name}</span>
+                {opt.xpPoints > 0 && (
+                  <span className="text-[10px] font-bold text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded-full shrink-0">
+                    +{opt.xpPoints} XP
+                  </span>
+                )}
               </button>
               <button type="button" onClick={(e) => handleDelete(e, opt)} disabled={deletingId === opt.id}
                 className="px-3 py-2.5 text-red-400 hover:text-red-600 disabled:opacity-40">
@@ -126,21 +133,32 @@ function OtherDropdown({ subType, onSubTypeChange, subOptions, onAddOption, onDe
               <Plus className="w-3.5 h-3.5" /> Add Option
             </button>
           ) : (
-            <div className="p-2 border-t border-orange-100 flex gap-1.5">
+            <div className="p-2 border-t border-orange-100 space-y-1.5">
               <input autoFocus type="text" value={newOption}
                 onChange={e => setNewOption(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') { setShowInput(false); setNewOption(''); } }}
-                placeholder="Type option name…"
-                className="flex-1 px-2 py-1.5 border border-orange-300 rounded-lg text-[11px] focus:outline-none focus:border-orange-500"
+                onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') { setShowInput(false); setNewOption(''); setNewXpPoints('1'); } }}
+                placeholder="Option name…"
+                className="w-full px-2 py-1.5 border border-orange-300 rounded-lg text-[11px] focus:outline-none focus:border-orange-500"
               />
-              <button onClick={handleSave} disabled={saving || !newOption.trim()}
-                className="px-2.5 py-1.5 bg-orange-500 text-white rounded-lg text-[11px] font-bold disabled:opacity-50">
-                {saving ? '…' : 'Save'}
-              </button>
-              <button onClick={() => { setShowInput(false); setNewOption(''); }}
-                className="px-2 py-1.5 bg-gray-100 rounded-lg">
-                <CloseIcon className="w-3 h-3 text-gray-500" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1 flex-1 bg-orange-50 border border-orange-200 rounded-lg px-2 py-1.5">
+                  <Zap className="w-3 h-3 text-orange-500 shrink-0" />
+                  <input type="number" min="0" value={newXpPoints}
+                    onChange={e => setNewXpPoints(e.target.value)}
+                    placeholder="XP"
+                    className="w-full bg-transparent text-[11px] font-bold text-orange-700 focus:outline-none"
+                  />
+                  <span className="text-[10px] text-orange-500 font-semibold shrink-0">XP</span>
+                </div>
+                <button onClick={handleSave} disabled={saving || !newOption.trim()}
+                  className="px-2.5 py-1.5 bg-orange-500 text-white rounded-lg text-[11px] font-bold disabled:opacity-50">
+                  {saving ? '…' : 'Save'}
+                </button>
+                <button onClick={() => { setShowInput(false); setNewOption(''); setNewXpPoints('1'); }}
+                  className="px-2 py-1.5 bg-gray-100 rounded-lg">
+                  <CloseIcon className="w-3 h-3 text-gray-500" />
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -207,15 +225,15 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
           setSavedSubOptions(
             data
               .filter(d => !SYSTEM_NAMES.includes(d.name))
-              .map(d => ({ id: d.id, name: d.name }))
+              .map(d => ({ id: d.id, name: d.name, xpPoints: d.xpPoints || 0 }))
           );
         }
       })
       .catch(() => {});
   }, []);
 
-  const handleAddSubOption = ({ id, name }) => {
-    setSavedSubOptions(prev => prev.find(o => o.id === id) ? prev : [...prev, { id, name }]);
+  const handleAddSubOption = ({ id, name, xpPoints }) => {
+    setSavedSubOptions(prev => prev.find(o => o.id === id) ? prev : [...prev, { id, name, xpPoints: xpPoints || 0 }]);
   };
 
   const handleDeleteSubOption = (id) => {
@@ -271,6 +289,7 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
     const activityTypeName = isOther
       ? (fields.otherSubType === 'Other' ? 'Other' : fields.otherSubType)
       : (fields.type === 'new' ? 'New Learning' : 'Revision');
+    const selectedOpt = isOther ? savedSubOptions.find(o => o.name === fields.otherSubType) : null;
 
     return {
       username,
@@ -281,6 +300,7 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
       activityTypeName,
       customActivityDescription: isOther && fields.otherSubType === 'Other'
         ? fields.customActivityDescription : null,
+      xpPoints: isOther ? (selectedOpt?.xpPoints || 0) : 0,
       remark: fields.remark,
     };
   };
