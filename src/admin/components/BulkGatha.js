@@ -28,11 +28,10 @@ function TypeSelect({ value, onChange, className }) {
 }
 
 // Shown when type === 'other'
-function OtherSection({ subType, onSubTypeChange, description, onDescriptionChange, subOptions, onAddOption, onDeleteOption }) {
+function OtherSection({ subType, onSubTypeChange, description, onDescriptionChange, subOptions, onAddOption }) {
   const [showInput, setShowInput] = useState(false);
   const [newOption, setNewOption] = useState('');
   const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
 
   const handleSelectChange = (val) => {
     if (val === '__add__') {
@@ -63,20 +62,6 @@ function OtherSection({ subType, onSubTypeChange, description, onDescriptionChan
       }
     } catch (e) { /* silent */ }
     setSaving(false);
-  };
-
-  const handleDelete = async (opt) => {
-    setDeletingId(opt.id);
-    try {
-      const token = localStorage.getItem('jainPathshalaToken');
-      await fetch(`${API_BASE}/activity-types/${opt.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: 'Bearer ' + token },
-      });
-      onDeleteOption(opt.id);
-      if (subType === opt.name) onSubTypeChange('Other');
-    } catch (e) { /* silent */ }
-    setDeletingId(null);
   };
 
   return (
@@ -120,23 +105,6 @@ function OtherSection({ subType, onSubTypeChange, description, onDescriptionChan
         </div>
       )}
 
-      {/* Delete row — only if there are saved options */}
-      {subOptions.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {subOptions.map(opt => (
-            <span key={opt.id} className="inline-flex items-center gap-1 bg-orange-100 border border-orange-200 rounded-full px-2.5 py-1">
-              <span className="text-[11px] text-gray-700 font-medium">{opt.name}</span>
-              <button
-                onClick={() => handleDelete(opt)}
-                disabled={deletingId === opt.id}
-                className="text-red-400 hover:text-red-600 disabled:opacity-40 active:scale-95"
-              >
-                <CloseIcon className="w-3 h-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
 
       {/* Textarea — only when "Other" is selected */}
       {subType === 'Other' && !showInput && (
@@ -405,7 +373,6 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
                   onDescriptionChange={v => setSameGatha({ ...sameGatha, customActivityDescription: v })}
                   subOptions={savedSubOptions}
                   onAddOption={handleAddSubOption}
-                  onDeleteOption={handleDeleteSubOption}
                 />
               )}
             </div>
