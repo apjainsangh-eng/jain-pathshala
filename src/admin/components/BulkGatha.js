@@ -12,6 +12,20 @@ const formatLocalDate = (d = new Date()) => {
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 };
 
+const TYPE_OPTIONS = [
+  { value: 'new', label: 'New Learning' },
+  { value: 'revision', label: 'Revision' },
+  { value: 'other', label: 'Other' },
+];
+
+function TypeSelect({ value, onChange, className }) {
+  return (
+    <select value={value} onChange={e => onChange(e.target.value)} className={className}>
+      {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  );
+}
+
 export default function BulkGatha({ students, familyGroups, onSuccess }) {
   const { t } = useLanguage();
   const [date, setDate] = useState(formatLocalDate());
@@ -143,16 +157,8 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
     }
   };
 
-  const TypeSelect = ({ value, onChange, className }) => (
-    <select value={value} onChange={e => onChange(e.target.value)} className={className}>
-      <option value="new">{t('new_learning')}</option>
-      <option value="revision">{t('revision')}</option>
-      <option value="other">{t('other_tab')}</option>
-    </select>
-  );
-
-  const OtherFields = ({ fields, setField }) => (
-    fields.type === 'other' ? (
+  const OtherFields = ({ fields, setField }) =>
+    fields.type !== 'other' ? null : (
       <div className="col-span-2 space-y-1.5">
         {otherSubTypes.length > 0 && (
           <select
@@ -160,7 +166,7 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
             onChange={e => setField('otherSubType', e.target.value)}
             className="w-full px-2 py-1.5 border border-orange-200 rounded-lg text-[11px] bg-white focus:outline-none focus:border-orange-400"
           >
-            <option value="">{t('other_subtype_placeholder')}</option>
+            <option value="">-- Select (optional) --</option>
             {otherSubTypes.map(at => <option key={at.id} value={at.name}>{at.name}</option>)}
           </select>
         )}
@@ -172,8 +178,7 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
           className="w-full px-2 py-1.5 border border-orange-200 rounded-lg text-[11px] focus:outline-none focus:border-orange-400 resize-none"
         />
       </div>
-    ) : null
-  );
+    );
 
   return (
     <div className="space-y-3">
