@@ -262,9 +262,11 @@ export default function AdminDashboard({ user, onLogout }) {
     gathaType: 'new',
     activityTypeId: null,
     activityTypeName: 'New Learning',
+    otherSubType: '',
     customActivityDescription: '',
   });
   const [addEntryLoading, setAddEntryLoading] = useState(false);
+  const [adminActivityTypes, setAdminActivityTypes] = useState([]);
 
   // ============ NOTIFICATION HELPERS ============
   
@@ -880,6 +882,20 @@ const toggleMemberSelection = (username) => {
 
   // ============ NEW: ADD ENTRY HANDLERS (Attendance/Gatha) ============
 
+  useEffect(() => {
+    if (!showAddEntryModal) return;
+    const token = localStorage.getItem('jainPathshalaToken');
+    fetch(`${API_BASE}/activity-types`, { headers: { Authorization: 'Bearer ' + token } })
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const SYSTEM_NAMES = ['New Learning', 'Revision', 'Other'];
+          setAdminActivityTypes(data.filter(d => !SYSTEM_NAMES.includes(d.name)));
+        }
+      })
+      .catch(() => {});
+  }, [showAddEntryModal]);
+
   const handleAddEntry = async () => {
     if (!addEntryData.studentUsername) {
       setError(t('adm_select_err'));
@@ -900,22 +916,40 @@ const toggleMemberSelection = (username) => {
           date: addEntryData.date,
         };
       } else {
-        if (!addEntryData.sutraName || !addEntryData.totalGatha) {
+        const isOther = addEntryData.gathaType === 'other';
+        if (!isOther && (!addEntryData.sutraName || !addEntryData.totalGatha)) {
           setError(t('adm_fields_err'));
           setAddEntryLoading(false);
           return;
         }
+        if (isOther && !addEntryData.otherSubType) {
+          setError('Please select an activity type');
+          setAddEntryLoading(false);
+          return;
+        }
+        if (isOther && addEntryData.otherSubType === 'Other' && !addEntryData.customActivityDescription.trim()) {
+          setError('Please describe the activity');
+          setAddEntryLoading(false);
+          return;
+        }
+        const selectedActivityType = isOther
+          ? adminActivityTypes.find(a => a.name === addEntryData.otherSubType)
+          : null;
+        const activityTypeName = isOther
+          ? (addEntryData.otherSubType || 'Other')
+          : addEntryData.activityTypeName || 'New Learning';
         endpoint = '/admin/gatha/add';
         body = {
           username: addEntryData.studentUsername,
           date: addEntryData.date,
-          sutraName: addEntryData.sutraName,
-          whichGatha: addEntryData.whichGatha,
-          totalGatha: parseInt(addEntryData.totalGatha),
+          sutraName: isOther ? '' : addEntryData.sutraName,
+          whichGatha: isOther ? '' : addEntryData.whichGatha,
+          totalGatha: isOther ? 0 : parseInt(addEntryData.totalGatha),
           type: addEntryData.gathaType,
-          activityTypeId: addEntryData.activityTypeId || null,
-          activityTypeName: addEntryData.activityTypeName || 'New Learning',
-          customActivityDescription: addEntryData.activityTypeName === 'Other' ? (addEntryData.customActivityDescription || '') : null,
+          activityTypeName,
+          customActivityDescription: isOther && addEntryData.otherSubType === 'Other'
+            ? (addEntryData.customActivityDescription || '') : null,
+          xpPoints: selectedActivityType?.xpPoints || 0,
         };
       }
 
@@ -942,7 +976,10 @@ const toggleMemberSelection = (username) => {
         sutraName: '',
         whichGatha: '',
         totalGatha: 1,
-        gathaType: 'new'
+        gathaType: 'new',
+        activityTypeName: 'New Learning',
+        otherSubType: '',
+        customActivityDescription: '',
       });
       fetchStudents();
       fetchPendingData(false);
@@ -2119,26 +2156,43 @@ const toggleMemberSelection = (username) => {
                       {t('revision')}
                     </button>
                     <button
-                      onClick={() => setAddEntryData({ ...addEntryData, gathaType: 'other', activityTypeName: 'Other', customActivityDescription: '' })}
+                      onClick={() => setAddEntryData({ ...addEntryData, gathaType: 'other', activityTypeName: 'Other', otherSubType: '', customActivityDescription: '' })}
                       className={`flex-1 py-2.5 rounded-lg text-sm font-bold ${addEntryData.gathaType === 'other' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'}`}
                     >
                       {t('other_tab')}
                     </button>
                   </div>
+
                   {addEntryData.gathaType === 'other' && (
-                    <div className="mt-2">
-                      <label className="block text-sm font-bold text-gray-700 mb-1">{t('describe_activity_label')}</label>
-                      <textarea
-                        value={addEntryData.customActivityDescription || ''}
-                        onChange={e => setAddEntryData({ ...addEntryData, customActivityDescription: e.target.value.slice(0, 500) })}
-                        placeholder={t('describe_activity_placeholder')}
-                        rows={3}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400 resize-none text-sm"
-                      />
+                    <div className="mt-3 space-y-2">
+                      <label className="block text-sm font-bold text-gray-700 mb-1">Activity Type</label>
+                      <select
+                        value={addEntryData.otherSubType}
+                        onChange={e => setAddEntryData({ ...addEntryData, otherSubType: e.target.value, customActivityDescription: '' })}
+                        className="w-full px-4 py-3 border-2 border-orange-200 rounded-xl focus:outline-none focus:border-orange-400 text-sm bg-white"
+                      >
+                        <option value="">-- Select activity --</option>
+                        {adminActivityTypes.map(at => (
+                          <option key={at.id} value={at.name}>
+                            {at.name}{at.xpPoints > 0 ? ` (+${at.xpPoints} XP)` : ''}
+                          </option>
+                        ))}
+                        <option value="Other">Other (free text)</option>
+                      </select>
+                      {addEntryData.otherSubType === 'Other' && (
+                        <textarea
+                          value={addEntryData.customActivityDescription || ''}
+                          onChange={e => setAddEntryData({ ...addEntryData, customActivityDescription: e.target.value.slice(0, 500) })}
+                          placeholder={t('describe_activity_placeholder')}
+                          rows={2}
+                          className="w-full px-4 py-3 border-2 border-orange-200 rounded-xl focus:outline-none focus:border-orange-400 resize-none text-sm"
+                        />
+                      )}
                     </div>
                   )}
                 </div>
 
+                {addEntryData.gathaType !== 'other' && <>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_sutra_name_field')}</label>
                   <input
@@ -2171,6 +2225,7 @@ const toggleMemberSelection = (username) => {
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
                   />
                 </div>
+                </>
               </>
             )}
 
