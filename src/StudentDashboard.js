@@ -2231,9 +2231,13 @@ export default function StudentDashboard({ user, onLogout }) {
   const normalizeEntry = (entry) => ({
     id: entry.id ?? entry._id ?? null,
     type: entry.type,
+    activityTypeName: entry.activityTypeName ?? null,
+    customActivityDescription: entry.customActivityDescription ?? null,
     sutra_name: entry.sutra_name ?? entry.sutraName ?? '',
     which_gatha: entry.which_gatha ?? entry.whichGatha ?? '',
     total_gatha: Number(entry.total_gatha ?? entry.totalGatha ?? 0),
+    date: entry.date ?? null,
+    status: entry.status ?? null,
     created_at: entry.created_at ?? entry.date ?? null,
   });
 
@@ -3020,12 +3024,39 @@ export default function StudentDashboard({ user, onLogout }) {
                   }`}
                 >
                   <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${entry.type === 'new' ? 'bg-purple-200' : 'bg-blue-200'}`}>
-                      {entry.type === 'new' ? <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-purple-700" /> : <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 text-blue-700" />}
+                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                      entry.type === 'new' ? 'bg-purple-200' : entry.type === 'revision' ? 'bg-blue-200' : 'bg-orange-200'
+                    }`}>
+                      {entry.type === 'new'
+                        ? <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-purple-700" />
+                        : entry.type === 'revision'
+                        ? <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 text-blue-700" />
+                        : <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-orange-700" />}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs sm:text-sm font-bold text-gray-800 truncate">{entry.sutra_name}</p>
-                      <p className="text-xs text-gray-500 truncate">{entry.total_gatha} gathas • {entry.which_gatha}</p>
+                      {(entry.type === 'new' || entry.type === 'revision') ? (
+                        <>
+                          <p className="text-xs sm:text-sm font-bold text-gray-800 truncate">
+                            <span className={`text-[10px] font-bold mr-1 px-1.5 py-0.5 rounded-full ${entry.type === 'new' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                              {entry.type === 'new' ? t('new_learning') : t('revision')}
+                            </span>
+                            {entry.sutra_name}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">{entry.total_gatha} gathas • {entry.which_gatha}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-xs sm:text-sm font-bold text-gray-800 truncate">
+                            <span className="text-[10px] font-bold mr-1 px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">Other</span>
+                            {entry.activityTypeName && entry.activityTypeName !== 'Other'
+                              ? entry.activityTypeName
+                              : (entry.customActivityDescription || 'Activity')}
+                          </p>
+                          {entry.customActivityDescription && entry.activityTypeName === 'Other' && (
+                            <p className="text-xs text-gray-500 truncate italic">"{entry.customActivityDescription}"</p>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
