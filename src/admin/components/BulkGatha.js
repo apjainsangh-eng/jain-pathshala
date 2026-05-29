@@ -12,6 +12,7 @@ const formatLocalDate = (d = new Date()) => {
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 };
 
+// Defined outside component so React never remounts it
 const TYPE_OPTIONS = [
   { value: 'new', label: 'New Learning' },
   { value: 'revision', label: 'Revision' },
@@ -26,6 +27,93 @@ function TypeSelect({ value, onChange, className }) {
   );
 }
 
+// Shown when type === 'other': sub-dropdown + optional Add Option + description textarea
+function OtherSection({ subType, onSubTypeChange, description, onDescriptionChange, subOptions, onAddOption }) {
+  const [adding, setAdding] = useState(false);
+  const [newOption, setNewOption] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleAdd = async () => {
+    if (!newOption.trim()) return;
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('jainPathshalaToken');
+      const res = await fetch(`${API_BASE}/activity-types`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newOption.trim() }),
+      });
+      if (res.ok) {
+        onAddOption(newOption.trim());
+        setNewOption('');
+        setAdding(false);
+      }
+    } catch (e) { /* silent */ }
+    setSaving(false);
+  };
+
+  return (
+    <div className="col-span-2 space-y-2 p-2 bg-orange-50 rounded-xl border border-orange-200">
+      {/* Sub-type dropdown */}
+      <div className="flex items-center gap-2">
+        <select
+          value={subType}
+          onChange={e => onSubTypeChange(e.target.value)}
+          className="flex-1 px-3 py-2 border border-orange-300 rounded-lg text-xs bg-white focus:outline-none focus:border-orange-400"
+        >
+          <option value="Other">Other</option>
+          {subOptions.map(opt => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+        {!adding && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-1 px-2 py-2 bg-orange-500 text-white rounded-lg text-[11px] font-bold active:scale-95 whitespace-nowrap"
+          >
+            <Plus className="w-3 h-3" /> Add Option
+          </button>
+        )}
+      </div>
+
+      {/* Add new option input */}
+      {adding && (
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newOption}
+            onChange={e => setNewOption(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') { setAdding(false); setNewOption(''); } }}
+            placeholder="e.g. Chaityavandan Bhashya"
+            className="flex-1 px-3 py-2 border border-orange-300 rounded-lg text-xs focus:outline-none focus:border-orange-500"
+            autoFocus
+          />
+          <button onClick={handleAdd} disabled={saving || !newOption.trim()}
+            className="px-3 py-2 bg-green-500 text-white rounded-lg text-xs font-bold disabled:opacity-50 active:scale-95">
+            {saving ? '...' : 'Save'}
+          </button>
+          <button onClick={() => { setAdding(false); setNewOption(''); }}
+            className="px-2 py-2 bg-gray-200 rounded-lg text-xs active:scale-95">
+            <CloseIcon className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+
+      {/* Description textarea — only when "Other" is selected */}
+      {subType === 'Other' && (
+        <textarea
+          value={description}
+          onChange={e => onDescriptionChange(e.target.value.slice(0, 500))}
+          placeholder="Enter what you learned today..."
+          rows={2}
+          className="w-full px-3 py-2 border border-orange-300 rounded-lg text-xs focus:outline-none focus:border-orange-400 resize-none bg-white"
+        />
+      )}
+    </div>
+  );
+}
+
 export default function BulkGatha({ students, familyGroups, onSuccess }) {
   const { t } = useLanguage();
   const [date, setDate] = useState(formatLocalDate());
@@ -35,13 +123,16 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [otherSubTypes, setOtherSubTypes] = useState([]);
+  const [savedSubOptions, setSavedSubOptions] = useState([]); // options added via API
 
   // Same gatha mode
   const [selectedStudents, setSelectedStudents] = useState({});
   const [sameGatha, setSameGatha] = useState({
     sutraName: '', whichGatha: '', totalGatha: 1,
-    type: 'new', otherSubType: '', customActivityDescription: '', remark: ''
+    type: 'new',
+    otherSubType: 'Other',
+    customActivityDescription: '',
+    remark: '',
   });
 
   // Individual mode
@@ -51,9 +142,15 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
     const token = localStorage.getItem('jainPathshalaToken');
     fetch(`${API_BASE}/activity-types`, { headers: { Authorization: 'Bearer ' + token } })
       .then(r => r.json())
-      .then(data => { if (Array.isArray(data)) setOtherSubTypes(data); })
+      .then(data => {
+        if (Array.isArray(data)) setSavedSubOptions(data.map(d => d.name));
+      })
       .catch(() => {});
   }, []);
+
+  const handleAddSubOption = (name) => {
+    setSavedSubOptions(prev => prev.includes(name) ? prev : [...prev, name]);
+  };
 
   const groupLookup = {};
   (familyGroups || []).forEach(g => { (g.members || []).forEach(m => { groupLookup[m] = g.groupName; }); });
@@ -83,12 +180,12 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
     setRows(prev => [...prev, {
       username, name: student?.name || username,
       sutraName: '', whichGatha: '', totalGatha: 1,
-      type: 'new', otherSubType: '', customActivityDescription: '', remark: ''
+      type: 'new', otherSubType: 'Other', customActivityDescription: '', remark: '',
     }]);
   };
 
-  const updateRow = (idx, field, value) => {
-    setRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+  const updateRow = (idx, fields) => {
+    setRows(prev => prev.map((r, i) => i === idx ? { ...r, ...fields } : r));
   };
 
   const removeRow = (idx) => {
@@ -99,36 +196,47 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
     ? Object.values(selectedStudents).filter(Boolean).length
     : rows.length;
 
-  const buildEntry = (fields, username) => ({
-    username,
-    sutraName: fields.sutraName,
-    whichGatha: fields.whichGatha,
-    totalGatha: parseInt(fields.totalGatha),
-    type: fields.type,
-    activityTypeName: fields.type === 'new' ? 'New Learning' : fields.type === 'revision' ? 'Revision' : (fields.otherSubType || 'Other'),
-    customActivityDescription: fields.type === 'other' ? fields.customActivityDescription : null,
-    remark: fields.remark,
-  });
+  const buildEntry = (fields, username) => {
+    const isOther = fields.type === 'other';
+    const activityTypeName = isOther
+      ? (fields.otherSubType === 'Other' ? 'Other' : fields.otherSubType)
+      : (fields.type === 'new' ? 'New Learning' : 'Revision');
+
+    return {
+      username,
+      sutraName: isOther ? '-' : fields.sutraName,
+      whichGatha: isOther ? '' : fields.whichGatha,
+      totalGatha: isOther ? 0 : parseInt(fields.totalGatha),
+      type: fields.type,
+      activityTypeName,
+      customActivityDescription: isOther && fields.otherSubType === 'Other'
+        ? fields.customActivityDescription : null,
+      remark: fields.remark,
+    };
+  };
 
   const handleSave = async () => {
     let entries = [];
 
     if (mode === 'same') {
-      if (!sameGatha.sutraName || !sameGatha.totalGatha) {
-        setError(t('bulk_fill_sutra_err')); return;
-      }
-      if (sameGatha.type === 'other' && !sameGatha.customActivityDescription.trim()) {
-        setError(t('describe_activity_label') + ' is required'); return;
-      }
       const selected = Object.entries(selectedStudents).filter(([_, v]) => v).map(([u]) => u);
       if (selected.length === 0) { setError(t('bulk_select_one_err')); return; }
+
+      if (sameGatha.type !== 'other' && (!sameGatha.sutraName || !sameGatha.totalGatha)) {
+        setError(t('bulk_fill_sutra_err')); return;
+      }
+      if (sameGatha.type === 'other' && sameGatha.otherSubType === 'Other' && !sameGatha.customActivityDescription.trim()) {
+        setError('Please describe the activity'); return;
+      }
       entries = selected.map(username => buildEntry(sameGatha, username));
     } else {
       if (rows.length === 0) { setError(t('bulk_add_one_err')); return; }
-      const invalid = rows.find(r => !r.sutraName || !r.totalGatha);
-      if (invalid) { setError(t('bulk_fill_all_err')); return; }
-      const otherMissing = rows.find(r => r.type === 'other' && !r.customActivityDescription.trim());
-      if (otherMissing) { setError(t('describe_activity_label') + ' required for Other'); return; }
+      for (const r of rows) {
+        if (r.type !== 'other' && (!r.sutraName || !r.totalGatha)) { setError(t('bulk_fill_all_err')); return; }
+        if (r.type === 'other' && r.otherSubType === 'Other' && !r.customActivityDescription.trim()) {
+          setError(`Please describe activity for ${r.name}`); return;
+        }
+      }
       entries = rows.map(r => buildEntry(r, r.username));
     }
 
@@ -140,9 +248,8 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
       const res = await fetch(`${API_BASE}/admin/bulk/gatha`, {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, entries })
+        body: JSON.stringify({ date, entries }),
       });
-
       if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed'); }
       const data = await res.json();
       setSuccess(t('bulk_gatha_saved').replace('{added}', data.added));
@@ -157,29 +264,6 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
     }
   };
 
-  const OtherFields = ({ fields, setField }) =>
-    fields.type !== 'other' ? null : (
-      <div className="col-span-2 space-y-1.5">
-        {otherSubTypes.length > 0 && (
-          <select
-            value={fields.otherSubType}
-            onChange={e => setField('otherSubType', e.target.value)}
-            className="w-full px-2 py-1.5 border border-orange-200 rounded-lg text-[11px] bg-white focus:outline-none focus:border-orange-400"
-          >
-            <option value="">-- Select (optional) --</option>
-            {otherSubTypes.map(at => <option key={at.id} value={at.name}>{at.name}</option>)}
-          </select>
-        )}
-        <textarea
-          value={fields.customActivityDescription}
-          onChange={e => setField('customActivityDescription', e.target.value.slice(0, 500))}
-          placeholder={t('describe_activity_placeholder')}
-          rows={2}
-          className="w-full px-2 py-1.5 border border-orange-200 rounded-lg text-[11px] focus:outline-none focus:border-orange-400 resize-none"
-        />
-      </div>
-    );
-
   return (
     <div className="space-y-3">
       <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-4 text-white">
@@ -189,8 +273,8 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
 
       {error && (
         <div className="bg-red-50 border-l-4 border-red-500 p-2.5 rounded-xl flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-red-500" />
-          <p className="text-xs text-red-700">{error}</p>
+          <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+          <p className="text-xs text-red-700 flex-1">{error}</p>
           <button onClick={() => setError('')}><CloseIcon className="w-4 h-4 text-red-500" /></button>
         </div>
       )}
@@ -226,33 +310,54 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
           <div className="bg-white rounded-xl border-2 border-purple-200 p-3 space-y-3">
             <p className="text-xs font-bold text-gray-600">{t('bulk_gatha_details')}</p>
             <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t('adm_sutra_name_field')}</label>
-                <input type="text" value={sameGatha.sutraName} onChange={e => setSameGatha({...sameGatha, sutraName: e.target.value})}
-                  placeholder="e.g. Navkar" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t('adm_which_gatha')}</label>
-                <input type="text" value={sameGatha.whichGatha} onChange={e => setSameGatha({...sameGatha, whichGatha: e.target.value})}
-                  placeholder="e.g. 1-5" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t('bulk_count_star')}</label>
-                <input type="number" min="1" value={sameGatha.totalGatha} onChange={e => setSameGatha({...sameGatha, totalGatha: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400" />
-              </div>
-              <div>
+
+              {/* Sutra + Gatha — hidden for 'other' */}
+              {sameGatha.type !== 'other' && (
+                <>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t('adm_sutra_name_field')}</label>
+                    <input type="text" value={sameGatha.sutraName}
+                      onChange={e => setSameGatha({ ...sameGatha, sutraName: e.target.value })}
+                      placeholder="e.g. Navkar"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t('adm_which_gatha')}</label>
+                    <input type="text" value={sameGatha.whichGatha}
+                      onChange={e => setSameGatha({ ...sameGatha, whichGatha: e.target.value })}
+                      placeholder="e.g. 1-5"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t('bulk_count_star')}</label>
+                    <input type="number" min="1" value={sameGatha.totalGatha}
+                      onChange={e => setSameGatha({ ...sameGatha, totalGatha: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400" />
+                  </div>
+                </>
+              )}
+
+              {/* Type dropdown — always visible */}
+              <div className={sameGatha.type !== 'other' ? '' : 'col-span-2'}>
                 <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t('bulk_type_label')}</label>
                 <TypeSelect
                   value={sameGatha.type}
-                  onChange={v => setSameGatha({...sameGatha, type: v, otherSubType: '', customActivityDescription: ''})}
+                  onChange={v => setSameGatha({ ...sameGatha, type: v, otherSubType: 'Other', customActivityDescription: '' })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400 bg-white"
                 />
               </div>
-              <OtherFields
-                fields={sameGatha}
-                setField={(field, val) => setSameGatha({ ...sameGatha, [field]: val })}
-              />
+
+              {/* Other section */}
+              {sameGatha.type === 'other' && (
+                <OtherSection
+                  subType={sameGatha.otherSubType}
+                  onSubTypeChange={v => setSameGatha({ ...sameGatha, otherSubType: v, customActivityDescription: '' })}
+                  description={sameGatha.customActivityDescription}
+                  onDescriptionChange={v => setSameGatha({ ...sameGatha, customActivityDescription: v })}
+                  subOptions={savedSubOptions}
+                  onAddOption={handleAddSubOption}
+                />
+              )}
             </div>
           </div>
 
@@ -321,25 +426,36 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
                   <button onClick={() => removeRow(idx)} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <input type="text" placeholder={t('adm_sutra_name_field')} value={row.sutraName} onChange={e => updateRow(idx, 'sutraName', e.target.value)}
-                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:border-purple-400" />
-                  <input type="text" placeholder={t('adm_which_gatha')} value={row.whichGatha} onChange={e => updateRow(idx, 'whichGatha', e.target.value)}
-                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:border-purple-400" />
-                  <input type="number" min="1" placeholder={t('bulk_count_star')} value={row.totalGatha} onChange={e => updateRow(idx, 'totalGatha', e.target.value)}
-                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:border-purple-400" />
-                  <TypeSelect
-                    value={row.type}
-                    onChange={v => {
-                      updateRow(idx, 'type', v);
-                      updateRow(idx, 'otherSubType', '');
-                      updateRow(idx, 'customActivityDescription', '');
-                    }}
-                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-white"
-                  />
-                  <OtherFields
-                    fields={row}
-                    setField={(field, val) => updateRow(idx, field, val)}
-                  />
+                  {row.type !== 'other' && (
+                    <>
+                      <input type="text" placeholder={t('adm_sutra_name_field')} value={row.sutraName}
+                        onChange={e => updateRow(idx, { sutraName: e.target.value })}
+                        className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:border-purple-400" />
+                      <input type="text" placeholder={t('adm_which_gatha')} value={row.whichGatha}
+                        onChange={e => updateRow(idx, { whichGatha: e.target.value })}
+                        className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:border-purple-400" />
+                      <input type="number" min="1" placeholder={t('bulk_count_star')} value={row.totalGatha}
+                        onChange={e => updateRow(idx, { totalGatha: e.target.value })}
+                        className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:border-purple-400" />
+                    </>
+                  )}
+                  <div className={row.type !== 'other' ? '' : 'col-span-2'}>
+                    <TypeSelect
+                      value={row.type}
+                      onChange={v => updateRow(idx, { type: v, otherSubType: 'Other', customActivityDescription: '' })}
+                      className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-white"
+                    />
+                  </div>
+                  {row.type === 'other' && (
+                    <OtherSection
+                      subType={row.otherSubType}
+                      onSubTypeChange={v => updateRow(idx, { otherSubType: v, customActivityDescription: '' })}
+                      description={row.customActivityDescription}
+                      onDescriptionChange={v => updateRow(idx, { customActivityDescription: v })}
+                      subOptions={savedSubOptions}
+                      onAddOption={handleAddSubOption}
+                    />
+                  )}
                 </div>
               </div>
             ))}
