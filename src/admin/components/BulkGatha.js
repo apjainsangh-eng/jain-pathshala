@@ -27,89 +27,115 @@ function TypeSelect({ value, onChange, className }) {
   );
 }
 
-// Shown when type === 'other': sub-dropdown + optional Add Option + description textarea
-function OtherSection({ subType, onSubTypeChange, description, onDescriptionChange, subOptions, onAddOption }) {
-  const [adding, setAdding] = useState(false);
+// Shown when type === 'other'
+function OtherSection({ subType, onSubTypeChange, description, onDescriptionChange, subOptions, onAddOption, onDeleteOption }) {
   const [newOption, setNewOption] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const handleAdd = async () => {
-    if (!newOption.trim()) return;
+    const name = newOption.trim();
+    if (!name) return;
     setSaving(true);
     try {
       const token = localStorage.getItem('jainPathshalaToken');
       const res = await fetch(`${API_BASE}/activity-types`, {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newOption.trim() }),
+        body: JSON.stringify({ name }),
       });
+      const data = await res.json();
       if (res.ok) {
-        onAddOption(newOption.trim());
+        onAddOption({ id: data.id, name });
         setNewOption('');
-        setAdding(false);
       }
     } catch (e) { /* silent */ }
     setSaving(false);
   };
 
+  const handleDelete = async (opt) => {
+    setDeletingId(opt.id);
+    try {
+      const token = localStorage.getItem('jainPathshalaToken');
+      await fetch(`${API_BASE}/activity-types/${opt.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      onDeleteOption(opt.id);
+      if (subType === opt.name) onSubTypeChange('Other');
+    } catch (e) { /* silent */ }
+    setDeletingId(null);
+  };
+
   return (
-    <div className="col-span-2 space-y-2 p-2 bg-orange-50 rounded-xl border border-orange-200">
-      {/* Sub-type dropdown */}
-      <div className="flex items-center gap-2">
+    <div className="col-span-2 rounded-xl border-2 border-orange-200 bg-orange-50 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 py-2 bg-orange-100 border-b border-orange-200">
+        <p className="text-[11px] font-bold text-orange-700">Other Activity</p>
+      </div>
+
+      <div className="p-3 space-y-2">
+        {/* Selector dropdown */}
         <select
           value={subType}
           onChange={e => onSubTypeChange(e.target.value)}
-          className="flex-1 px-3 py-2 border border-orange-300 rounded-lg text-xs bg-white focus:outline-none focus:border-orange-400"
+          className="w-full px-3 py-2.5 border border-orange-300 rounded-lg text-xs bg-white focus:outline-none focus:border-orange-500 font-medium"
         >
-          <option value="Other">Other</option>
+          <option value="Other">Other (free text)</option>
           {subOptions.map(opt => (
-            <option key={opt} value={opt}>{opt}</option>
+            <option key={opt.id} value={opt.name}>{opt.name}</option>
           ))}
         </select>
-        {!adding && (
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="flex items-center gap-1 px-2 py-2 bg-orange-500 text-white rounded-lg text-[11px] font-bold active:scale-95 whitespace-nowrap"
-          >
-            <Plus className="w-3 h-3" /> Add Option
-          </button>
-        )}
-      </div>
 
-      {/* Add new option input */}
-      {adding && (
+        {/* Saved options list with delete */}
+        {subOptions.length > 0 && (
+          <div className="space-y-1">
+            {subOptions.map(opt => (
+              <div key={opt.id} className="flex items-center justify-between bg-white px-3 py-1.5 rounded-lg border border-orange-100">
+                <span className="text-[11px] font-medium text-gray-700">{opt.name}</span>
+                <button
+                  onClick={() => handleDelete(opt)}
+                  disabled={deletingId === opt.id}
+                  className="p-1 text-red-400 hover:text-red-600 active:scale-95 disabled:opacity-40"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add new option */}
         <div className="flex gap-2">
           <input
             type="text"
             value={newOption}
             onChange={e => setNewOption(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') { setAdding(false); setNewOption(''); } }}
-            placeholder="e.g. Chaityavandan Bhashya"
-            className="flex-1 px-3 py-2 border border-orange-300 rounded-lg text-xs focus:outline-none focus:border-orange-500"
-            autoFocus
+            onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
+            placeholder="Add new option…"
+            className="flex-1 px-3 py-2 border border-orange-300 rounded-lg text-[11px] focus:outline-none focus:border-orange-500 bg-white"
           />
-          <button onClick={handleAdd} disabled={saving || !newOption.trim()}
-            className="px-3 py-2 bg-green-500 text-white rounded-lg text-xs font-bold disabled:opacity-50 active:scale-95">
-            {saving ? '...' : 'Save'}
-          </button>
-          <button onClick={() => { setAdding(false); setNewOption(''); }}
-            className="px-2 py-2 bg-gray-200 rounded-lg text-xs active:scale-95">
-            <CloseIcon className="w-3 h-3" />
+          <button
+            onClick={handleAdd}
+            disabled={saving || !newOption.trim()}
+            className="flex items-center gap-1 px-3 py-2 bg-orange-500 text-white rounded-lg text-[11px] font-bold disabled:opacity-50 active:scale-95 whitespace-nowrap"
+          >
+            {saving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+            Add
           </button>
         </div>
-      )}
 
-      {/* Description textarea — only when "Other" is selected */}
-      {subType === 'Other' && (
-        <textarea
-          value={description}
-          onChange={e => onDescriptionChange(e.target.value.slice(0, 500))}
-          placeholder="Enter what you learned today..."
-          rows={2}
-          className="w-full px-3 py-2 border border-orange-300 rounded-lg text-xs focus:outline-none focus:border-orange-400 resize-none bg-white"
-        />
-      )}
+        {/* Description textarea — only for "Other (free text)" */}
+        {subType === 'Other' && (
+          <textarea
+            value={description}
+            onChange={e => onDescriptionChange(e.target.value.slice(0, 500))}
+            placeholder="Enter what you learned today..."
+            rows={2}
+            className="w-full px-3 py-2 border border-orange-300 rounded-lg text-xs focus:outline-none focus:border-orange-400 resize-none bg-white"
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -123,7 +149,7 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [savedSubOptions, setSavedSubOptions] = useState([]); // options added via API
+  const [savedSubOptions, setSavedSubOptions] = useState([]); // [{id, name}] — custom only
 
   // Same gatha mode
   const [selectedStudents, setSelectedStudents] = useState({});
@@ -143,13 +169,24 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
     fetch(`${API_BASE}/activity-types`, { headers: { Authorization: 'Bearer ' + token } })
       .then(r => r.json())
       .then(data => {
-        if (Array.isArray(data)) setSavedSubOptions(data.map(d => d.name));
+        if (Array.isArray(data)) {
+          const SYSTEM_NAMES = ['New Learning', 'Revision', 'Other'];
+          setSavedSubOptions(
+            data
+              .filter(d => !SYSTEM_NAMES.includes(d.name))
+              .map(d => ({ id: d.id, name: d.name }))
+          );
+        }
       })
       .catch(() => {});
   }, []);
 
-  const handleAddSubOption = (name) => {
-    setSavedSubOptions(prev => prev.includes(name) ? prev : [...prev, name]);
+  const handleAddSubOption = ({ id, name }) => {
+    setSavedSubOptions(prev => prev.find(o => o.id === id) ? prev : [...prev, { id, name }]);
+  };
+
+  const handleDeleteSubOption = (id) => {
+    setSavedSubOptions(prev => prev.filter(o => o.id !== id));
   };
 
   const groupLookup = {};
@@ -356,6 +393,7 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
                   onDescriptionChange={v => setSameGatha({ ...sameGatha, customActivityDescription: v })}
                   subOptions={savedSubOptions}
                   onAddOption={handleAddSubOption}
+                  onDeleteOption={handleDeleteSubOption}
                 />
               )}
             </div>
