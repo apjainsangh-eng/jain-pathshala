@@ -12,19 +12,6 @@ const formatLocalDate = (d = new Date()) => {
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 };
 
-const emptyGatha = (activityTypes) => {
-  const first = activityTypes[0] || null;
-  return {
-    sutraName: '',
-    whichGatha: '',
-    totalGatha: 1,
-    activityTypeId: first?.id || null,
-    activityTypeName: first?.name || 'New Learning',
-    customActivityDescription: '',
-    remark: '',
-  };
-};
-
 export default function BulkGatha({ students, familyGroups, onSuccess }) {
   const { t } = useLanguage();
   const [date, setDate] = useState(formatLocalDate());
