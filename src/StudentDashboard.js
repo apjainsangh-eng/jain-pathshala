@@ -1224,7 +1224,7 @@ const LeaderboardSection = ({ currentUserId, currentUserName, year, month }) => 
 };
 
 // Read-only dropdown for student Other tab (no add/delete)
-function StudentOtherDropdown({ value, onChange, options }) {
+function StudentOtherDropdown({ value, onChange, options, doneTodayNames }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -1260,18 +1260,35 @@ function StudentOtherDropdown({ value, onChange, options }) {
 
       {open && (
         <div className="absolute z-30 left-0 right-0 mt-1 bg-white border-2 border-orange-200 rounded-xl shadow-lg overflow-hidden">
-          {options.map(opt => (
-            <button key={opt.id || opt.name} type="button"
-              onClick={() => { onChange(opt.name); setOpen(false); }}
-              className={`w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-orange-50 ${value === opt.name ? 'bg-orange-100 text-orange-700 font-semibold' : 'text-gray-700'}`}>
-              <span>{opt.name}</span>
-              {opt.xpPoints > 0 && (
-                <span className="text-xs font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">
-                  +{opt.xpPoints} XP
-                </span>
-              )}
-            </button>
-          ))}
+          {options.map(opt => {
+            const done = doneTodayNames?.includes(opt.name);
+            return (
+              <button key={opt.id || opt.name} type="button"
+                onClick={() => { if (!done) { onChange(opt.name); setOpen(false); } }}
+                disabled={done}
+                className={`w-full flex items-center justify-between px-4 py-3 text-sm ${
+                  done
+                    ? 'opacity-50 cursor-not-allowed bg-gray-50'
+                    : value === opt.name
+                    ? 'bg-orange-100 text-orange-700 font-semibold hover:bg-orange-100'
+                    : 'text-gray-700 hover:bg-orange-50'
+                }`}>
+                <span>{opt.name}</span>
+                <div className="flex items-center gap-1.5">
+                  {opt.xpPoints > 0 && !done && (
+                    <span className="text-xs font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">
+                      +{opt.xpPoints} XP
+                    </span>
+                  )}
+                  {done && (
+                    <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Done today
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
           <button type="button"
             onClick={() => { onChange('Other'); setOpen(false); }}
             className={`w-full text-left px-4 py-3 text-sm hover:bg-orange-50 border-t border-orange-100 ${value === 'Other' ? 'bg-orange-100 text-orange-700 font-semibold' : 'text-gray-500'}`}>
@@ -1287,7 +1304,7 @@ function StudentOtherDropdown({ value, onChange, options }) {
 // GATHA ENTRY MODAL
 // ============================================
 
-const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, activeUserName }) => {
+const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, activeUserName, todayGathas }) => {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState(() => {
     if (editData?.type === 'revision') return 'revision';
@@ -1348,9 +1365,15 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
     });
   };
 
+  // Names of Other-type activities already submitted today (approved or pending)
+  const doneTodayNames = (todayGathas || [])
+    .filter(g => g.type !== 'new' && g.type !== 'revision' && g.activityTypeName && g.activityTypeName !== 'Other')
+    .map(g => g.activityTypeName);
+
   const isOtherValid = activeTab !== 'other' || (
     selectedOtherSubType &&
-    (selectedOtherSubType !== 'Other' || customActivityDescription.trim())
+    (selectedOtherSubType !== 'Other' || customActivityDescription.trim()) &&
+    !doneTodayNames.includes(selectedOtherSubType)
   );
   const isValid = activeTab === 'other'
     ? isOtherValid
@@ -1433,6 +1456,7 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
                   value={selectedOtherSubType}
                   onChange={v => { setSelectedOtherSubType(v); setCustomActivityDescription(''); }}
                   options={otherSubTypes.filter(at => !['New Learning', 'Revision', 'Other'].includes(at.name))}
+                  doneTodayNames={doneTodayNames}
                 />
               </div>
               {selectedOtherSubType === 'Other' && (
@@ -3294,6 +3318,10 @@ export default function StudentDashboard({ user, onLogout }) {
         isSubmitting={isSubmitting}
         editData={editingGatha}
         activeUserName={isViewingOther ? (activeUser?.name || activeUsername) : null}
+        todayGathas={[
+          ...todaysApprovedGathas,
+          ...todaysPendingGathas,
+        ]}
       />
 
       <ConfirmationModal
