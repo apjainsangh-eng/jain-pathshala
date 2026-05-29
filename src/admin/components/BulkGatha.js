@@ -29,11 +29,21 @@ function TypeSelect({ value, onChange, className }) {
 
 // Shown when type === 'other'
 function OtherSection({ subType, onSubTypeChange, description, onDescriptionChange, subOptions, onAddOption, onDeleteOption }) {
+  const [showInput, setShowInput] = useState(false);
   const [newOption, setNewOption] = useState('');
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
-  const handleAdd = async () => {
+  const handleSelectChange = (val) => {
+    if (val === '__add__') {
+      setShowInput(true);
+    } else {
+      onSubTypeChange(val);
+      setShowInput(false);
+    }
+  };
+
+  const handleSave = async () => {
     const name = newOption.trim();
     if (!name) return;
     setSaving(true);
@@ -47,7 +57,9 @@ function OtherSection({ subType, onSubTypeChange, description, onDescriptionChan
       const data = await res.json();
       if (res.ok) {
         onAddOption({ id: data.id, name });
+        onSubTypeChange(name);
         setNewOption('');
+        setShowInput(false);
       }
     } catch (e) { /* silent */ }
     setSaving(false);
@@ -68,74 +80,74 @@ function OtherSection({ subType, onSubTypeChange, description, onDescriptionChan
   };
 
   return (
-    <div className="col-span-2 rounded-xl border-2 border-orange-200 bg-orange-50 overflow-hidden">
-      <div className="px-3 py-2 bg-orange-100 border-b border-orange-200">
-        <p className="text-[11px] font-bold text-orange-700">Other Activity</p>
-      </div>
+    <div className="col-span-2 space-y-2">
+      {/* Main dropdown — Other + saved options + Add Option at bottom */}
+      <select
+        value={showInput ? '__add__' : subType}
+        onChange={e => handleSelectChange(e.target.value)}
+        className="w-full px-3 py-2.5 border-2 border-orange-300 rounded-xl text-xs bg-white focus:outline-none focus:border-orange-500 font-medium"
+      >
+        <option value="Other">Other</option>
+        {subOptions.map(opt => (
+          <option key={opt.id} value={opt.name}>{opt.name}</option>
+        ))}
+        <option value="__add__">＋ Add Option</option>
+      </select>
 
-      <div className="p-3 space-y-2">
-
-        {/* Dropdown — contains all added options */}
-        <select
-          value={subType}
-          onChange={e => onSubTypeChange(e.target.value)}
-          className="w-full px-3 py-2.5 border border-orange-300 rounded-lg text-xs bg-white focus:outline-none focus:border-orange-500 font-medium"
-        >
-          <option value="Other">Other</option>
-          {subOptions.map(opt => (
-            <option key={opt.id} value={opt.name}>{opt.name}</option>
-          ))}
-        </select>
-
-        {/* Add new option — always visible inside the box */}
+      {/* Inline input — appears when "Add Option" is selected */}
+      {showInput && (
         <div className="flex gap-2">
           <input
+            autoFocus
             type="text"
             value={newOption}
             onChange={e => setNewOption(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
-            placeholder="Add option (e.g. Chaityavandan Bhashya)"
-            className="flex-1 px-3 py-2 border border-orange-300 rounded-lg text-[11px] focus:outline-none focus:border-orange-500 bg-white"
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleSave();
+              if (e.key === 'Escape') { setShowInput(false); setNewOption(''); }
+            }}
+            placeholder="Type option name…"
+            className="flex-1 px-3 py-2 border-2 border-orange-300 rounded-xl text-xs focus:outline-none focus:border-orange-500 bg-white"
           />
-          <button
-            onClick={handleAdd}
-            disabled={saving || !newOption.trim()}
-            className="flex items-center gap-1 px-3 py-2 bg-orange-500 text-white rounded-lg text-[11px] font-bold disabled:opacity-50 active:scale-95 whitespace-nowrap"
-          >
-            {saving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-            Add
+          <button onClick={handleSave} disabled={saving || !newOption.trim()}
+            className="px-3 py-2 bg-orange-500 text-white rounded-xl text-xs font-bold disabled:opacity-50 active:scale-95">
+            {saving ? '…' : 'Save'}
+          </button>
+          <button onClick={() => { setShowInput(false); setNewOption(''); }}
+            className="px-2 py-2 bg-gray-100 rounded-xl text-xs active:scale-95">
+            <CloseIcon className="w-3.5 h-3.5 text-gray-500" />
           </button>
         </div>
+      )}
 
-        {/* Delete chips for each saved option */}
-        {subOptions.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {subOptions.map(opt => (
-              <div key={opt.id} className="flex items-center gap-1 bg-white border border-orange-200 rounded-full px-2.5 py-1">
-                <span className="text-[11px] text-gray-700 font-medium">{opt.name}</span>
-                <button
-                  onClick={() => handleDelete(opt)}
-                  disabled={deletingId === opt.id}
-                  className="text-red-400 hover:text-red-600 disabled:opacity-40 active:scale-95 ml-0.5"
-                >
-                  <CloseIcon className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+      {/* Delete row — only if there are saved options */}
+      {subOptions.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {subOptions.map(opt => (
+            <span key={opt.id} className="inline-flex items-center gap-1 bg-orange-100 border border-orange-200 rounded-full px-2.5 py-1">
+              <span className="text-[11px] text-gray-700 font-medium">{opt.name}</span>
+              <button
+                onClick={() => handleDelete(opt)}
+                disabled={deletingId === opt.id}
+                className="text-red-400 hover:text-red-600 disabled:opacity-40 active:scale-95"
+              >
+                <CloseIcon className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
-        {/* Description textarea — only when "Other" is selected */}
-        {subType === 'Other' && (
-          <textarea
-            value={description}
-            onChange={e => onDescriptionChange(e.target.value.slice(0, 500))}
-            placeholder="Enter what you learned today..."
-            rows={2}
-            className="w-full px-3 py-2 border border-orange-300 rounded-lg text-xs focus:outline-none focus:border-orange-400 resize-none bg-white"
-          />
-        )}
-      </div>
+      {/* Textarea — only when "Other" is selected */}
+      {subType === 'Other' && !showInput && (
+        <textarea
+          value={description}
+          onChange={e => onDescriptionChange(e.target.value.slice(0, 500))}
+          placeholder="Enter what you learned today..."
+          rows={2}
+          className="w-full px-3 py-2 border-2 border-orange-300 rounded-xl text-xs focus:outline-none focus:border-orange-400 resize-none bg-white"
+        />
+      )}
     </div>
   );
 }
