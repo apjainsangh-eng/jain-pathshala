@@ -2808,9 +2808,9 @@ const toggleMemberSelection = (username) => {
                     </span>
                   </div>
                   <div className="ml-6 text-xs text-gray-600 space-y-0.5">
-                    {item.type !== 'other' && <p className="truncate">{item.sutra_name}</p>}
-                    {item.type !== 'other' && <p>#{item.total_gatha} gathas</p>}
-                    {item.type === 'other' && (
+                    {(item.type === 'new' || item.type === 'revision') && <p className="truncate">{item.sutra_name}</p>}
+                    {(item.type === 'new' || item.type === 'revision') && <p>#{item.total_gatha} gathas</p>}
+                    {item.type !== 'new' && item.type !== 'revision' && (
                       <p className="truncate font-medium text-gray-700">
                         {item.activityTypeName && item.activityTypeName !== 'Other'
                           ? item.activityTypeName

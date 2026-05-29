@@ -289,9 +289,9 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
                 <div key={i} className="bg-purple-50 rounded-lg p-2.5 border border-purple-100">
                   <div className="flex items-center justify-between">
                     <div>
-                      {g.type !== 'other' && <p className="text-xs font-bold text-gray-700">{g.sutraName || t('gatha_label')}</p>}
-                      {g.type !== 'other' && <p className="text-[10px] text-gray-500">{g.whichGatha} · {t('sp_count_col')}: {g.totalGatha}</p>}
-                      {g.type === 'other' && (
+                      {(g.type === 'new' || g.type === 'revision') && <p className="text-xs font-bold text-gray-700">{g.sutraName || t('gatha_label')}</p>}
+                      {(g.type === 'new' || g.type === 'revision') && <p className="text-[10px] text-gray-500">{g.whichGatha} · {t('sp_count_col')}: {g.totalGatha}</p>}
+                      {g.type !== 'new' && g.type !== 'revision' && (
                         <p className="text-xs font-bold text-gray-700">
                           {g.activityTypeName && g.activityTypeName !== 'Other'
                             ? g.activityTypeName
@@ -301,7 +301,7 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
                       <p className="text-[10px] text-gray-400">{formatDate(g.date)} · {t('sp_by_col')}: {g.addedBy}</p>
                     </div>
                     <div className="text-right">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${g.type === 'new' ? 'bg-purple-500 text-white' : g.type === 'revision' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${g.type === 'new' ? 'bg-purple-500 text-white' : g.type === 'revision' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-700'}`}>
                         {g.type === 'new' ? t('new_learning') : g.type === 'revision' ? t('revision') : 'Other'}
                       </span>
                       <p className="text-[10px] text-green-600 mt-0.5 font-semibold">{g.status}</p>
