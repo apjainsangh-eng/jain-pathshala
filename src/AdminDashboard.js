@@ -2804,14 +2804,18 @@ const toggleMemberSelection = (username) => {
                     <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 text-white ${
                       item.type === 'new' ? 'bg-purple-500' : item.type === 'revision' ? 'bg-blue-500' : 'bg-orange-500'
                     }`}>
-                      {item.activityTypeName || (item.type === 'new' ? t('adm_new_type') : item.type === 'revision' ? t('adm_rev_type') : 'Other')}
+                      {item.type === 'new' ? t('adm_new_type') : item.type === 'revision' ? t('adm_rev_type') : 'Other'}
                     </span>
                   </div>
                   <div className="ml-6 text-xs text-gray-600 space-y-0.5">
                     {item.type !== 'other' && <p className="truncate">{item.sutra_name}</p>}
                     {item.type !== 'other' && <p>#{item.total_gatha} gathas</p>}
-                    {item.customActivityDescription && (
-                      <p className="text-gray-500 italic truncate">"{item.customActivityDescription}"</p>
+                    {item.type === 'other' && (
+                      <p className="truncate font-medium text-gray-700">
+                        {item.activityTypeName && item.activityTypeName !== 'Other'
+                          ? item.activityTypeName
+                          : item.customActivityDescription || ''}
+                      </p>
                     )}
                   </div>
                 </div>
