@@ -2801,13 +2801,15 @@ const toggleMemberSelection = (username) => {
                   <div className="flex items-center gap-2 mb-1">
                     <BookOpen className="w-4 h-4 text-purple-600 flex-shrink-0" />
                     <span className="font-bold text-gray-800 text-sm truncate">{item.student_name || item.username}</span>
-                    <span className="text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 bg-purple-500 text-white">
-                      {item.activityTypeName || (item.type === 'new' ? t('adm_new_type') : t('adm_rev_type'))}
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 text-white ${
+                      item.type === 'new' ? 'bg-purple-500' : item.type === 'revision' ? 'bg-blue-500' : 'bg-orange-500'
+                    }`}>
+                      {item.activityTypeName || (item.type === 'new' ? t('adm_new_type') : item.type === 'revision' ? t('adm_rev_type') : 'Other')}
                     </span>
                   </div>
                   <div className="ml-6 text-xs text-gray-600 space-y-0.5">
-                    <p className="truncate">{item.sutra_name}</p>
-                    <p>#{item.total_gatha} gathas</p>
+                    {item.type !== 'other' && <p className="truncate">{item.sutra_name}</p>}
+                    {item.type !== 'other' && <p>#{item.total_gatha} gathas</p>}
                     {item.customActivityDescription && (
                       <p className="text-gray-500 italic truncate">"{item.customActivityDescription}"</p>
                     )}
