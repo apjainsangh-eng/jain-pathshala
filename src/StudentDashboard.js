@@ -1229,8 +1229,13 @@ const LeaderboardSection = ({ currentUserId, currentUserName, year, month }) => 
 
 const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, activeUserName }) => {
   const { t } = useLanguage();
-  const [activityTypes, setActivityTypes] = useState([]);
-  const [selectedActivityType, setSelectedActivityType] = useState(null);
+  const [activeTab, setActiveTab] = useState(() => {
+    if (editData?.type === 'revision') return 'revision';
+    if (editData?.type && editData.type !== 'new' && editData.type !== 'revision') return 'other';
+    return 'new';
+  });
+  const [otherSubTypes, setOtherSubTypes] = useState([]);
+  const [selectedOtherSubType, setSelectedOtherSubType] = useState('');
   const [customActivityDescription, setCustomActivityDescription] = useState('');
   const [form, setForm] = useState({
     sutraName: editData?.sutra_name || '',
@@ -1239,62 +1244,54 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
   });
 
   useEffect(() => {
+    if (!isOpen) return;
     const token = localStorage.getItem('jainPathshalaToken');
     fetch(`${API_BASE}/activity-types`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setActivityTypes(data);
-          if (!selectedActivityType) {
-            if (editData?.activityTypeName) {
-              const match = data.find(at => at.name === editData.activityTypeName);
-              setSelectedActivityType(match || data[0] || null);
-            } else if (editData?.type) {
-              const legacyName = editData.type === 'new' ? 'New Learning' : editData.type === 'revision' ? 'Revision' : editData.type;
-              const match = data.find(at => at.name === legacyName);
-              setSelectedActivityType(match || data[0] || null);
-            } else {
-              setSelectedActivityType(data[0] || null);
-            }
-          }
-        }
-      })
+      .then(data => { if (Array.isArray(data)) setOtherSubTypes(data); })
       .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   useEffect(() => {
     if (editData) {
+      setActiveTab(editData.type === 'revision' ? 'revision' : (editData.type === 'new' || !editData.type) ? 'new' : 'other');
       setCustomActivityDescription(editData.customActivityDescription || '');
+      setSelectedOtherSubType(editData.activityTypeName || '');
       setForm({
         sutraName: editData.sutra_name || '',
         whichGatha: editData.which_gatha || '',
         totalGatha: editData.total_gatha?.toString() || '',
       });
     } else {
+      setActiveTab('new');
       setCustomActivityDescription('');
+      setSelectedOtherSubType('');
       setForm({ sutraName: '', whichGatha: '', totalGatha: '' });
     }
   }, [editData]);
 
   if (!isOpen) return null;
 
-  const isOther = selectedActivityType?.name === 'Other';
-
   const handleSubmit = () => {
     onSubmit({
-      activityTypeId: selectedActivityType?.id || null,
-      activityTypeName: selectedActivityType?.name || 'New Learning',
-      customActivityDescription: isOther ? customActivityDescription : null,
+      type: activeTab === 'other' ? 'other' : activeTab,
+      activityTypeName: activeTab === 'new' ? 'New Learning' : activeTab === 'revision' ? 'Revision' : (selectedOtherSubType || 'Other'),
+      customActivityDescription: activeTab === 'other' ? customActivityDescription : null,
       sutra_name: form.sutraName,
       which_gatha: form.whichGatha,
       total_gatha: Number(form.totalGatha),
     });
   };
 
-  const isValid = form.sutraName && form.whichGatha && form.totalGatha &&
-    (!isOther || customActivityDescription.trim());
+  const isOtherValid = activeTab !== 'other' || (customActivityDescription.trim());
+  const isValid = form.sutraName && form.whichGatha && form.totalGatha && isOtherValid;
   const commonSutras = ['નવકાર', 'પંચ પરમેષ્ઠી', 'લોગસ્સ', 'ઉવસગ્ગહરં', 'ભક્તામર'];
+
+  const headerGradient = activeTab === 'new'
+    ? 'bg-gradient-to-r from-purple-500 to-indigo-600'
+    : activeTab === 'revision'
+    ? 'bg-gradient-to-r from-blue-500 to-cyan-600'
+    : 'bg-gradient-to-r from-orange-500 to-amber-500';
 
   return (
     <div
@@ -1306,7 +1303,7 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
           className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in duration-200"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="p-4 sm:p-5 text-white rounded-t-3xl bg-gradient-to-r from-purple-500 to-indigo-600">
+          <div className={`p-4 sm:p-5 text-white rounded-t-3xl ${headerGradient}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 rounded-2xl flex items-center justify-center flex-shrink-0">
@@ -1328,49 +1325,68 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
             </div>
           </div>
 
-          <div className="max-h-[60vh] overflow-y-auto p-4 sm:p-5 space-y-4">
-            {/* Activity Type Dropdown */}
-            {!editData && (
-              <div>
-                <label className="text-sm font-bold text-gray-700 mb-2 block">
-                  {t('activity_type_label')}
-                </label>
-                <select
-                  value={selectedActivityType?.id || ''}
-                  onChange={e => {
-                    const found = activityTypes.find(at => at.id === e.target.value);
-                    setSelectedActivityType(found || null);
-                    setCustomActivityDescription('');
-                  }}
-                  className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium bg-white"
-                >
-                  {activityTypes.length === 0 && (
-                    <option value="">{t('activity_type_placeholder')}</option>
-                  )}
-                  {activityTypes.map(at => (
-                    <option key={at.id} value={at.id}>{at.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+          {!editData && (
+            <div className="flex p-2 bg-gray-100 gap-1.5">
+              <button
+                onClick={() => setActiveTab('new')}
+                className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
+                  activeTab === 'new' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+                }`}
+              >
+                <Plus className="w-4 h-4 sm:w-5 sm:h-5" /> {t('new_learning')}
+              </button>
+              <button
+                onClick={() => setActiveTab('revision')}
+                className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
+                  activeTab === 'revision' ? 'bg-blue-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+                }`}
+              >
+                <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" /> {t('revision')}
+              </button>
+              <button
+                onClick={() => setActiveTab('other')}
+                className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
+                  activeTab === 'other' ? 'bg-orange-500 text-white shadow-lg' : 'text-gray-600 bg-white'
+                }`}
+              >
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" /> {t('other_tab')}
+              </button>
+            </div>
+          )}
 
-            {/* Other - Describe Activity textarea */}
-            {isOther && !editData && (
+          {/* Other tab — sub-type dropdown + description */}
+          {activeTab === 'other' && !editData && (
+            <div className="px-4 sm:px-5 pt-4 space-y-3">
+              {otherSubTypes.length > 0 && (
+                <div>
+                  <label className="text-sm font-bold text-gray-700 mb-2 block">{t('other_subtype_label')}</label>
+                  <select
+                    value={selectedOtherSubType}
+                    onChange={e => setSelectedOtherSubType(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-orange-200 rounded-xl focus:border-orange-400 focus:outline-none text-sm font-medium bg-white"
+                  >
+                    <option value="">{t('other_subtype_placeholder')}</option>
+                    {otherSubTypes.map(at => (
+                      <option key={at.id} value={at.name}>{at.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
-                <label className="text-sm font-bold text-gray-700 mb-2 block">
-                  {t('describe_activity_label')}
-                </label>
+                <label className="text-sm font-bold text-gray-700 mb-2 block">{t('describe_activity_label')}</label>
                 <textarea
                   value={customActivityDescription}
                   onChange={e => setCustomActivityDescription(e.target.value.slice(0, 500))}
                   placeholder={t('describe_activity_placeholder')}
                   rows={3}
-                  className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium resize-none"
+                  className="w-full px-4 py-3 border-2 border-orange-200 rounded-xl focus:border-orange-400 focus:outline-none text-sm font-medium resize-none"
                 />
                 <p className="text-xs text-gray-400 text-right mt-1">{customActivityDescription.length}/500</p>
               </div>
-            )}
+            </div>
+          )}
 
+          <div className="max-h-[40vh] overflow-y-auto p-4 sm:p-5 space-y-4">
             <div>
               <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
                 {t('sutra_name')}
@@ -1458,7 +1474,11 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting || !isValid}
-                className="flex-1 py-3 font-bold rounded-xl text-white shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform text-sm bg-gradient-to-r from-purple-500 to-purple-600"
+                className={`flex-1 py-3 font-bold rounded-xl text-white shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform text-sm ${
+                  activeTab === 'revision' ? 'bg-gradient-to-r from-blue-500 to-blue-600'
+                  : activeTab === 'other' ? 'bg-gradient-to-r from-orange-500 to-amber-500'
+                  : 'bg-gradient-to-r from-purple-500 to-purple-600'
+                }`}
               >
                 {isSubmitting ? (
                   <Loader className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />

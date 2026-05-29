@@ -21,28 +21,23 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [activityTypes, setActivityTypes] = useState([]);
+  const [otherSubTypes, setOtherSubTypes] = useState([]);
 
+  // Same gatha mode
   const [selectedStudents, setSelectedStudents] = useState({});
-  const [sameGatha, setSameGatha] = useState({ sutraName: '', whichGatha: '', totalGatha: 1, activityTypeId: null, activityTypeName: 'New Learning', customActivityDescription: '', remark: '' });
+  const [sameGatha, setSameGatha] = useState({
+    sutraName: '', whichGatha: '', totalGatha: 1,
+    type: 'new', otherSubType: '', customActivityDescription: '', remark: ''
+  });
 
+  // Individual mode
   const [rows, setRows] = useState([]);
 
   useEffect(() => {
     const token = localStorage.getItem('jainPathshalaToken');
     fetch(`${API_BASE}/activity-types`, { headers: { Authorization: 'Bearer ' + token } })
       .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setActivityTypes(data);
-          const first = data[0] || null;
-          setSameGatha(prev => ({
-            ...prev,
-            activityTypeId: first?.id || null,
-            activityTypeName: first?.name || 'New Learning',
-          }));
-        }
-      })
+      .then(data => { if (Array.isArray(data)) setOtherSubTypes(data); })
       .catch(() => {});
   }, []);
 
@@ -71,32 +66,15 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
   const addRow = (username) => {
     if (rows.find(r => r.username === username)) return;
     const student = students.find(s => s.username === username);
-    const first = activityTypes[0] || null;
     setRows(prev => [...prev, {
-      username,
-      name: student?.name || username,
-      sutraName: '',
-      whichGatha: '',
-      totalGatha: 1,
-      activityTypeId: first?.id || null,
-      activityTypeName: first?.name || 'New Learning',
-      customActivityDescription: '',
-      remark: '',
+      username, name: student?.name || username,
+      sutraName: '', whichGatha: '', totalGatha: 1,
+      type: 'new', otherSubType: '', customActivityDescription: '', remark: ''
     }]);
   };
 
   const updateRow = (idx, field, value) => {
     setRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
-  };
-
-  const updateRowActivityType = (idx, atId) => {
-    const found = activityTypes.find(at => at.id === atId);
-    setRows(prev => prev.map((r, i) => i === idx ? {
-      ...r,
-      activityTypeId: atId,
-      activityTypeName: found?.name || '',
-      customActivityDescription: '',
-    } : r));
   };
 
   const removeRow = (idx) => {
@@ -107,51 +85,37 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
     ? Object.values(selectedStudents).filter(Boolean).length
     : rows.length;
 
+  const buildEntry = (fields, username) => ({
+    username,
+    sutraName: fields.sutraName,
+    whichGatha: fields.whichGatha,
+    totalGatha: parseInt(fields.totalGatha),
+    type: fields.type,
+    activityTypeName: fields.type === 'new' ? 'New Learning' : fields.type === 'revision' ? 'Revision' : (fields.otherSubType || 'Other'),
+    customActivityDescription: fields.type === 'other' ? fields.customActivityDescription : null,
+    remark: fields.remark,
+  });
+
   const handleSave = async () => {
     let entries = [];
 
     if (mode === 'same') {
       if (!sameGatha.sutraName || !sameGatha.totalGatha) {
-        setError(t('bulk_fill_sutra_err'));
-        return;
+        setError(t('bulk_fill_sutra_err')); return;
       }
-      if (sameGatha.activityTypeName === 'Other' && !sameGatha.customActivityDescription.trim()) {
-        setError(t('describe_activity_label') + ' is required');
-        return;
+      if (sameGatha.type === 'other' && !sameGatha.customActivityDescription.trim()) {
+        setError(t('describe_activity_label') + ' is required'); return;
       }
       const selected = Object.entries(selectedStudents).filter(([_, v]) => v).map(([u]) => u);
       if (selected.length === 0) { setError(t('bulk_select_one_err')); return; }
-
-      const legacyType = sameGatha.activityTypeName === 'New Learning' ? 'new' : sameGatha.activityTypeName === 'Revision' ? 'revision' : 'other';
-      entries = selected.map(username => ({
-        username,
-        sutraName: sameGatha.sutraName,
-        whichGatha: sameGatha.whichGatha,
-        totalGatha: parseInt(sameGatha.totalGatha),
-        type: legacyType,
-        activityTypeId: sameGatha.activityTypeId,
-        activityTypeName: sameGatha.activityTypeName,
-        customActivityDescription: sameGatha.activityTypeName === 'Other' ? sameGatha.customActivityDescription : null,
-        remark: sameGatha.remark,
-      }));
+      entries = selected.map(username => buildEntry(sameGatha, username));
     } else {
       if (rows.length === 0) { setError(t('bulk_add_one_err')); return; }
       const invalid = rows.find(r => !r.sutraName || !r.totalGatha);
       if (invalid) { setError(t('bulk_fill_all_err')); return; }
-      const otherMissing = rows.find(r => r.activityTypeName === 'Other' && !r.customActivityDescription.trim());
-      if (otherMissing) { setError(t('describe_activity_label') + ' is required for Other type'); return; }
-
-      entries = rows.map(r => ({
-        username: r.username,
-        sutraName: r.sutraName,
-        whichGatha: r.whichGatha,
-        totalGatha: parseInt(r.totalGatha),
-        type: r.activityTypeName === 'New Learning' ? 'new' : r.activityTypeName === 'Revision' ? 'revision' : 'other',
-        activityTypeId: r.activityTypeId,
-        activityTypeName: r.activityTypeName,
-        customActivityDescription: r.activityTypeName === 'Other' ? r.customActivityDescription : null,
-        remark: r.remark,
-      }));
+      const otherMissing = rows.find(r => r.type === 'other' && !r.customActivityDescription.trim());
+      if (otherMissing) { setError(t('describe_activity_label') + ' required for Other'); return; }
+      entries = rows.map(r => buildEntry(r, r.username));
     }
 
     const token = localStorage.getItem('jainPathshalaToken');
@@ -179,10 +143,36 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
     }
   };
 
-  const ActivityTypeSelect = ({ value, onChange, className }) => (
-    <select value={value || ''} onChange={e => onChange(e.target.value)} className={className}>
-      {activityTypes.map(at => <option key={at.id} value={at.id}>{at.name}</option>)}
+  const TypeSelect = ({ value, onChange, className }) => (
+    <select value={value} onChange={e => onChange(e.target.value)} className={className}>
+      <option value="new">{t('new_learning')}</option>
+      <option value="revision">{t('revision')}</option>
+      <option value="other">{t('other_tab')}</option>
     </select>
+  );
+
+  const OtherFields = ({ fields, setField }) => (
+    fields.type === 'other' ? (
+      <div className="col-span-2 space-y-1.5">
+        {otherSubTypes.length > 0 && (
+          <select
+            value={fields.otherSubType}
+            onChange={e => setField('otherSubType', e.target.value)}
+            className="w-full px-2 py-1.5 border border-orange-200 rounded-lg text-[11px] bg-white focus:outline-none focus:border-orange-400"
+          >
+            <option value="">{t('other_subtype_placeholder')}</option>
+            {otherSubTypes.map(at => <option key={at.id} value={at.name}>{at.name}</option>)}
+          </select>
+        )}
+        <textarea
+          value={fields.customActivityDescription}
+          onChange={e => setField('customActivityDescription', e.target.value.slice(0, 500))}
+          placeholder={t('describe_activity_placeholder')}
+          rows={2}
+          className="w-full px-2 py-1.5 border border-orange-200 rounded-lg text-[11px] focus:outline-none focus:border-orange-400 resize-none"
+        />
+      </div>
+    ) : null
   );
 
   return (
@@ -248,28 +238,17 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t('bulk_type_label')}</label>
-                <ActivityTypeSelect
-                  value={sameGatha.activityTypeId}
-                  onChange={atId => {
-                    const found = activityTypes.find(at => at.id === atId);
-                    setSameGatha({ ...sameGatha, activityTypeId: atId, activityTypeName: found?.name || '', customActivityDescription: '' });
-                  }}
+                <TypeSelect
+                  value={sameGatha.type}
+                  onChange={v => setSameGatha({...sameGatha, type: v, otherSubType: '', customActivityDescription: ''})}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400 bg-white"
                 />
               </div>
+              <OtherFields
+                fields={sameGatha}
+                setField={(field, val) => setSameGatha({ ...sameGatha, [field]: val })}
+              />
             </div>
-            {sameGatha.activityTypeName === 'Other' && (
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t('describe_activity_label')}</label>
-                <textarea
-                  value={sameGatha.customActivityDescription}
-                  onChange={e => setSameGatha({ ...sameGatha, customActivityDescription: e.target.value.slice(0, 500) })}
-                  placeholder={t('describe_activity_placeholder')}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-purple-400 resize-none"
-                />
-              </div>
-            )}
           </div>
 
           {/* Student selection */}
@@ -343,23 +322,20 @@ export default function BulkGatha({ students, familyGroups, onSuccess }) {
                     className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:border-purple-400" />
                   <input type="number" min="1" placeholder={t('bulk_count_star')} value={row.totalGatha} onChange={e => updateRow(idx, 'totalGatha', e.target.value)}
                     className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:border-purple-400" />
-                  <ActivityTypeSelect
-                    value={row.activityTypeId}
-                    onChange={atId => updateRowActivityType(idx, atId)}
+                  <TypeSelect
+                    value={row.type}
+                    onChange={v => {
+                      updateRow(idx, 'type', v);
+                      updateRow(idx, 'otherSubType', '');
+                      updateRow(idx, 'customActivityDescription', '');
+                    }}
                     className="px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-white"
                   />
+                  <OtherFields
+                    fields={row}
+                    setField={(field, val) => updateRow(idx, field, val)}
+                  />
                 </div>
-                {row.activityTypeName === 'Other' && (
-                  <div className="mt-2">
-                    <textarea
-                      value={row.customActivityDescription}
-                      onChange={e => updateRow(idx, 'customActivityDescription', e.target.value.slice(0, 500))}
-                      placeholder={t('describe_activity_placeholder')}
-                      rows={2}
-                      className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-[11px] focus:outline-none focus:border-purple-400 resize-none"
-                    />
-                  </div>
-                )}
               </div>
             ))}
             {rows.length === 0 && (
