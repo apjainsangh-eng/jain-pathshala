@@ -1229,7 +1229,9 @@ const LeaderboardSection = ({ currentUserId, currentUserName, year, month }) => 
 
 const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, activeUserName }) => {
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState(editData?.type || 'new');
+  const [activityTypes, setActivityTypes] = useState([]);
+  const [selectedActivityType, setSelectedActivityType] = useState(null);
+  const [customActivityDescription, setCustomActivityDescription] = useState('');
   const [form, setForm] = useState({
     sutraName: editData?.sutra_name || '',
     whichGatha: editData?.which_gatha || '',
@@ -1237,30 +1239,61 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
   });
 
   useEffect(() => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    fetch(`${API_BASE}/activity-types`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setActivityTypes(data);
+          if (!selectedActivityType) {
+            if (editData?.activityTypeName) {
+              const match = data.find(at => at.name === editData.activityTypeName);
+              setSelectedActivityType(match || data[0] || null);
+            } else if (editData?.type) {
+              const legacyName = editData.type === 'new' ? 'New Learning' : editData.type === 'revision' ? 'Revision' : editData.type;
+              const match = data.find(at => at.name === legacyName);
+              setSelectedActivityType(match || data[0] || null);
+            } else {
+              setSelectedActivityType(data[0] || null);
+            }
+          }
+        }
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  useEffect(() => {
     if (editData) {
-      setActiveTab(editData.type || 'new');
+      setCustomActivityDescription(editData.customActivityDescription || '');
       setForm({
         sutraName: editData.sutra_name || '',
         whichGatha: editData.which_gatha || '',
         totalGatha: editData.total_gatha?.toString() || '',
       });
     } else {
+      setCustomActivityDescription('');
       setForm({ sutraName: '', whichGatha: '', totalGatha: '' });
     }
   }, [editData]);
 
   if (!isOpen) return null;
 
+  const isOther = selectedActivityType?.name === 'Other';
+
   const handleSubmit = () => {
     onSubmit({
-      type: activeTab,
+      activityTypeId: selectedActivityType?.id || null,
+      activityTypeName: selectedActivityType?.name || 'New Learning',
+      customActivityDescription: isOther ? customActivityDescription : null,
       sutra_name: form.sutraName,
       which_gatha: form.whichGatha,
       total_gatha: Number(form.totalGatha),
     });
   };
 
-  const isValid = form.sutraName && form.whichGatha && form.totalGatha;
+  const isValid = form.sutraName && form.whichGatha && form.totalGatha &&
+    (!isOther || customActivityDescription.trim());
   const commonSutras = ['નવકાર', 'પંચ પરમેષ્ઠી', 'લોગસ્સ', 'ઉવસગ્ગહરં', 'ભક્તામર'];
 
   return (
@@ -1273,7 +1306,7 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
           className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in duration-200"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className={`p-4 sm:p-5 text-white rounded-t-3xl ${activeTab === 'new' ? 'bg-gradient-to-r from-purple-500 to-indigo-600' : 'bg-gradient-to-r from-blue-500 to-cyan-600'}`}>
+          <div className="p-4 sm:p-5 text-white rounded-t-3xl bg-gradient-to-r from-purple-500 to-indigo-600">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 rounded-2xl flex items-center justify-center flex-shrink-0">
@@ -1295,28 +1328,49 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
             </div>
           </div>
 
-          {!editData && (
-            <div className="flex p-2 bg-gray-100 gap-2">
-              <button
-                onClick={() => setActiveTab('new')}
-                className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
-                  activeTab === 'new' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-600 bg-white'
-                }`}
-              >
-                <Plus className="w-4 h-4 sm:w-5 sm:h-5" /> {t('new_learning')}
-              </button>
-              <button
-                onClick={() => setActiveTab('revision')}
-                className={`flex-1 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1 sm:gap-2 ${
-                  activeTab === 'revision' ? 'bg-blue-500 text-white shadow-lg' : 'text-gray-600 bg-white'
-                }`}
-              >
-                <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" /> {t('revision')}
-              </button>
-            </div>
-          )}
+          <div className="max-h-[60vh] overflow-y-auto p-4 sm:p-5 space-y-4">
+            {/* Activity Type Dropdown */}
+            {!editData && (
+              <div>
+                <label className="text-sm font-bold text-gray-700 mb-2 block">
+                  {t('activity_type_label')}
+                </label>
+                <select
+                  value={selectedActivityType?.id || ''}
+                  onChange={e => {
+                    const found = activityTypes.find(at => at.id === e.target.value);
+                    setSelectedActivityType(found || null);
+                    setCustomActivityDescription('');
+                  }}
+                  className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium bg-white"
+                >
+                  {activityTypes.length === 0 && (
+                    <option value="">{t('activity_type_placeholder')}</option>
+                  )}
+                  {activityTypes.map(at => (
+                    <option key={at.id} value={at.id}>{at.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-          <div className="max-h-[50vh] overflow-y-auto p-4 sm:p-5 space-y-4">
+            {/* Other - Describe Activity textarea */}
+            {isOther && !editData && (
+              <div>
+                <label className="text-sm font-bold text-gray-700 mb-2 block">
+                  {t('describe_activity_label')}
+                </label>
+                <textarea
+                  value={customActivityDescription}
+                  onChange={e => setCustomActivityDescription(e.target.value.slice(0, 500))}
+                  placeholder={t('describe_activity_placeholder')}
+                  rows={3}
+                  className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:border-purple-400 focus:outline-none text-sm font-medium resize-none"
+                />
+                <p className="text-xs text-gray-400 text-right mt-1">{customActivityDescription.length}/500</p>
+              </div>
+            )}
+
             <div>
               <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
                 {t('sutra_name')}
@@ -1404,11 +1458,7 @@ const GathaEntryModal = ({ isOpen, onClose, onSubmit, isSubmitting, editData, ac
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting || !isValid}
-                className={`flex-1 py-3 font-bold rounded-xl text-white shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform text-sm ${
-                  activeTab === 'new'
-                    ? 'bg-gradient-to-r from-purple-500 to-purple-600'
-                    : 'bg-gradient-to-r from-blue-500 to-blue-600'
-                }`}
+                className="flex-1 py-3 font-bold rounded-xl text-white shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform text-sm bg-gradient-to-r from-purple-500 to-purple-600"
               >
                 {isSubmitting ? (
                   <Loader className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
@@ -1703,46 +1753,25 @@ const HistoryPage = ({ activeUserId }) => {
                 </button>
               </div>
 
-              <div className="space-y-4 max-h-[50vh] overflow-y-auto">
-                <div className="bg-purple-50 rounded-xl p-3 sm:p-4 border-2 border-purple-200">
-                  <h4 className="font-bold text-purple-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
-                    <Plus size={18} className="text-purple-600 flex-shrink-0" />
-                    {t('new_gathas_hist')}: {selectedDay.activity.gathas?.new || 0}
-                  </h4>
-                  {(selectedDay.activity.details || []).filter((d) => d.type === 'new').length === 0 ? (
-                    <p className="text-sm text-purple-600 bg-white/50 px-3 py-2 rounded-lg">{t('no_new_gathas')}</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {(selectedDay.activity.details || []).filter((d) => d.type === 'new').map((entry, idx) => (
-                        <div key={idx} className="bg-white rounded-lg p-3 border border-purple-200">
-                          <p className="text-sm"><strong>{t('sutra_label')}:</strong> {entry.sutra_name}</p>
-                          <p className="text-sm"><strong>{t('gatha_label')}:</strong> {entry.which_gatha}</p>
-                          <p className="text-sm font-bold text-purple-700">{t('count_label')}: {entry.total_gatha}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="bg-blue-50 rounded-xl p-3 sm:p-4 border-2 border-blue-200">
-                  <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2 text-sm sm:text-base">
-                    <RefreshCw size={18} className="text-blue-600 flex-shrink-0" />
-                    {t('revisions')}: {selectedDay.activity.gathas?.revision || 0}
-                  </h4>
-                  {(selectedDay.activity.details || []).filter((d) => d.type === 'revision').length === 0 ? (
-                    <p className="text-sm text-blue-600 bg-white/50 px-3 py-2 rounded-lg">{t('no_revisions')}</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {(selectedDay.activity.details || []).filter((d) => d.type === 'revision').map((entry, idx) => (
-                        <div key={idx} className="bg-white rounded-lg p-3 border border-blue-200">
-                          <p className="text-sm"><strong>{t('sutra_label')}:</strong> {entry.sutra_name}</p>
-                          <p className="text-sm"><strong>{t('gatha_label')}:</strong> {entry.which_gatha}</p>
-                          <p className="text-sm font-bold text-blue-700">{t('count_label')}: {entry.total_gatha}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+              <div className="space-y-3 max-h-[50vh] overflow-y-auto">
+                {(selectedDay.activity.details || []).length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-4">{t('no_new_gathas')}</p>
+                ) : (
+                  (selectedDay.activity.details || []).map((entry, idx) => {
+                    const typeName = entry.activityTypeName || (entry.type === 'new' ? 'New Learning' : entry.type === 'revision' ? 'Revision' : entry.type);
+                    return (
+                      <div key={idx} className="bg-purple-50 rounded-xl p-3 border border-purple-200">
+                        <p className="text-xs font-bold text-purple-600 mb-2 uppercase tracking-wide">{typeName}</p>
+                        <p className="text-sm"><strong>{t('sutra_label')}:</strong> {entry.sutra_name}</p>
+                        <p className="text-sm"><strong>{t('gatha_label')}:</strong> {entry.which_gatha}</p>
+                        <p className="text-sm font-bold text-purple-700">{t('count_label')}: {entry.total_gatha}</p>
+                        {entry.customActivityDescription && (
+                          <p className="text-sm mt-1 text-gray-600 italic">"{entry.customActivityDescription}"</p>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
               <button
@@ -1864,13 +1893,16 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
                     </div>
                     <div className="min-w-0">
                       <p className="font-bold text-gray-800 text-sm">
-                        {item.itemType === 'attendance' ? t('attendance_label') : `${item.type === 'new' ? t('gatha_type_new') : t('gatha_type_revision')}`}
+                        {item.itemType === 'attendance' ? t('attendance_label') : (item.activityTypeName || (item.type === 'new' ? t('gatha_type_new') : t('gatha_type_revision')))}
                       </p>
                       <p className="text-xs sm:text-sm text-gray-600">{formatDateIn(item.date)}</p>
                       {item.itemType === 'gatha' && (
                         <p className="text-xs text-gray-500 mt-1 truncate">
                           {item.sutra_name} • {item.total_gatha} gathas
                         </p>
+                      )}
+                      {item.itemType === 'gatha' && item.customActivityDescription && (
+                        <p className="text-xs text-gray-500 italic truncate">"{item.customActivityDescription}"</p>
                       )}
                     </div>
                   </div>
@@ -1919,7 +1951,7 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-gray-800 text-sm">
-                      {item.itemType === 'attendance' ? t('attendance_label') : `${item.type === 'new' ? t('gatha_type_new') : t('gatha_type_revision')}`}
+                      {item.itemType === 'attendance' ? t('attendance_label') : (item.activityTypeName || (item.type === 'new' ? t('gatha_type_new') : t('gatha_type_revision')))}
                     </p>
                     <p className="text-xs sm:text-sm text-gray-600">{formatDateIn(item.date)}</p>
                     {item.rejection_reason && (

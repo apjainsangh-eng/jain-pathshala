@@ -172,6 +172,174 @@ const getPerformanceBadge = (attendance, gatha) => {
 };
 
 // ============================================
+// ACTIVITY TYPES MANAGER COMPONENT
+// ============================================
+
+function ActivityTypesManager({ activityTypes, onRefresh }) {
+  const { t } = useLanguage();
+  const [newTypeName, setNewTypeName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editingName, setEditingName] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const token = () => localStorage.getItem('jainPathshalaToken');
+
+  const showMsg = (msg, isErr = false) => {
+    if (isErr) { setError(msg); setTimeout(() => setError(''), 3000); }
+    else { setSuccess(msg); setTimeout(() => setSuccess(''), 3000); }
+  };
+
+  const handleAdd = async () => {
+    if (!newTypeName.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/activity-types`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newTypeName.trim() }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Failed');
+      setNewTypeName('');
+      showMsg('Added!');
+      onRefresh();
+    } catch (e) { showMsg(e.message, true); }
+    setSaving(false);
+  };
+
+  const handleToggle = async (at) => {
+    try {
+      const res = await fetch(`${API_BASE}/activity-types/${at.id}`, {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer ' + token(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !at.isActive }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed');
+      showMsg(at.isActive ? 'Disabled' : 'Enabled');
+      onRefresh();
+    } catch (e) { showMsg(e.message, true); }
+  };
+
+  const handleSaveEdit = async (id) => {
+    if (!editingName.trim()) return;
+    try {
+      const res = await fetch(`${API_BASE}/activity-types/${id}`, {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer ' + token(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editingName.trim() }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed');
+      setEditingId(null);
+      showMsg('Updated!');
+      onRefresh();
+    } catch (e) { showMsg(e.message, true); }
+  };
+
+  const handleDelete = async (at) => {
+    if (at.isDefault) { showMsg(t('activity_type_cannot_delete'), true); return; }
+    if (!window.confirm(t('activity_type_delete_confirm'))) return;
+    try {
+      const res = await fetch(`${API_BASE}/activity-types/${at.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer ' + token() },
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed');
+      showMsg('Deleted!');
+      onRefresh();
+    } catch (e) { showMsg(e.message, true); }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl p-4 text-white">
+        <h3 className="font-bold text-lg flex items-center gap-2"><Activity className="w-5 h-5" /> {t('activity_types_title')}</h3>
+        <p className="text-indigo-100 text-xs mt-1">{t('activity_types_subtitle')}</p>
+      </div>
+
+      {error && <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-xl text-xs text-red-700">{error}</div>}
+      {success && <div className="bg-green-50 border-l-4 border-green-500 p-3 rounded-xl text-xs text-green-700 font-semibold">{success}</div>}
+
+      {/* Add new */}
+      <div className="bg-white rounded-xl border-2 border-purple-200 p-3 flex gap-2">
+        <input
+          type="text"
+          value={newTypeName}
+          onChange={e => setNewTypeName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleAdd()}
+          placeholder={t('activity_type_name_placeholder')}
+          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-purple-400"
+        />
+        <button
+          onClick={handleAdd}
+          disabled={saving || !newTypeName.trim()}
+          className="px-4 py-2 bg-purple-500 text-white rounded-lg text-sm font-bold disabled:opacity-50 active:scale-95 flex items-center gap-1"
+        >
+          <Plus className="w-4 h-4" /> {t('add_activity_type')}
+        </button>
+      </div>
+
+      {/* List */}
+      <div className="bg-white rounded-xl border-2 border-gray-200 divide-y divide-gray-100">
+        {activityTypes.length === 0 && (
+          <p className="text-center text-gray-400 text-sm py-6">Loading...</p>
+        )}
+        {activityTypes.map(at => (
+          <div key={at.id} className="flex items-center gap-2 p-3">
+            <div className="flex-1 min-w-0">
+              {editingId === at.id ? (
+                <div className="flex gap-2">
+                  <input
+                    value={editingName}
+                    onChange={e => setEditingName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(at.id); if (e.key === 'Escape') setEditingId(null); }}
+                    className="flex-1 px-2 py-1 border border-purple-300 rounded-lg text-sm focus:outline-none"
+                    autoFocus
+                  />
+                  <button onClick={() => handleSaveEdit(at.id)} className="px-2 py-1 bg-green-500 text-white rounded text-xs font-bold">Save</button>
+                  <button onClick={() => setEditingId(null)} className="px-2 py-1 bg-gray-200 rounded text-xs">Cancel</button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-sm font-bold ${at.isActive ? 'text-gray-800' : 'text-gray-400 line-through'}`}>{at.name}</span>
+                  {at.isDefault && (
+                    <span className="text-[10px] px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-bold">{t('activity_type_default_badge')}</span>
+                  )}
+                  {!at.isActive && (
+                    <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full">{t('activity_type_inactive')}</span>
+                  )}
+                </div>
+              )}
+            </div>
+            {editingId !== at.id && (
+              <div className="flex gap-1 flex-shrink-0">
+                {!at.isDefault && (
+                  <button onClick={() => { setEditingId(at.id); setEditingName(at.name); }}
+                    className="p-1.5 bg-blue-100 text-blue-600 rounded-lg active:scale-95">
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button onClick={() => handleToggle(at)}
+                  className={`px-2 py-1 rounded-lg text-xs font-bold active:scale-95 ${at.isActive ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'}`}>
+                  {at.isActive ? t('activity_type_disable') : t('activity_type_enable')}
+                </button>
+                {!at.isDefault && (
+                  <button onClick={() => handleDelete(at)}
+                    className="p-1.5 bg-red-100 text-red-500 rounded-lg active:scale-95">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 
@@ -259,9 +427,13 @@ export default function AdminDashboard({ user, onLogout }) {
     sutraName: '',
     whichGatha: '',
     totalGatha: 1,
-    gathaType: 'new'
+    gathaType: 'new',
+    activityTypeId: null,
+    activityTypeName: 'New Learning',
+    customActivityDescription: '',
   });
   const [addEntryLoading, setAddEntryLoading] = useState(false);
+  const [adminActivityTypes, setAdminActivityTypes] = useState([]);
 
   // ============ NOTIFICATION HELPERS ============
   
@@ -553,6 +725,15 @@ export default function AdminDashboard({ user, onLogout }) {
       fetchAllUsers();
     }
   }, [activeTab, fetchAllUsers]);
+
+  // Fetch activity types once on mount
+  useEffect(() => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    fetch(`${API_BASE}/activity-types`, { headers: { Authorization: 'Bearer ' + token } })
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setAdminActivityTypes(data); })
+      .catch(() => {});
+  }, []);
 
   // ============ HANDLERS ============
 
@@ -909,6 +1090,9 @@ const toggleMemberSelection = (username) => {
           whichGatha: addEntryData.whichGatha,
           totalGatha: parseInt(addEntryData.totalGatha),
           type: addEntryData.gathaType,
+          activityTypeId: addEntryData.activityTypeId || null,
+          activityTypeName: addEntryData.activityTypeName || 'New Learning',
+          customActivityDescription: addEntryData.activityTypeName === 'Other' ? (addEntryData.customActivityDescription || '') : null,
         };
       }
 
@@ -2098,28 +2282,32 @@ const toggleMemberSelection = (username) => {
               <>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_gatha_type')}</label>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setAddEntryData({ ...addEntryData, gathaType: 'new' })}
-                      className={`flex-1 py-2.5 rounded-lg text-sm font-bold ${
-                        addEntryData.gathaType === 'new'
-                          ? 'bg-purple-500 text-white'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}
-                    >
-                      {t('adm_new_type')}
-                    </button>
-                    <button
-                      onClick={() => setAddEntryData({ ...addEntryData, gathaType: 'revision' })}
-                      className={`flex-1 py-2.5 rounded-lg text-sm font-bold ${
-                        addEntryData.gathaType === 'revision'
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}
-                    >
-                      {t('revision')}
-                    </button>
-                  </div>
+                  <select
+                    value={addEntryData.activityTypeId || ''}
+                    onChange={e => {
+                      const found = adminActivityTypes.find(at => at.id === e.target.value);
+                      const typeName = found?.name || 'New Learning';
+                      const legacyType = typeName === 'New Learning' ? 'new' : typeName === 'Revision' ? 'revision' : 'other';
+                      setAddEntryData({ ...addEntryData, activityTypeId: e.target.value, activityTypeName: typeName, gathaType: legacyType, customActivityDescription: '' });
+                    }}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400 bg-white"
+                  >
+                    {adminActivityTypes.map(at => (
+                      <option key={at.id} value={at.id}>{at.name}</option>
+                    ))}
+                  </select>
+                  {addEntryData.activityTypeName === 'Other' && (
+                    <div className="mt-2">
+                      <label className="block text-sm font-bold text-gray-700 mb-1">{t('describe_activity_label')}</label>
+                      <textarea
+                        value={addEntryData.customActivityDescription || ''}
+                        onChange={e => setAddEntryData({ ...addEntryData, customActivityDescription: e.target.value.slice(0, 500) })}
+                        placeholder={t('describe_activity_placeholder')}
+                        rows={3}
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400 resize-none text-sm"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -2784,15 +2972,16 @@ const toggleMemberSelection = (username) => {
                   <div className="flex items-center gap-2 mb-1">
                     <BookOpen className="w-4 h-4 text-purple-600 flex-shrink-0" />
                     <span className="font-bold text-gray-800 text-sm truncate">{item.student_name || item.username}</span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                      item.type === 'new' ? 'bg-purple-500 text-white' : 'bg-blue-500 text-white'
-                    }`}>
-                      {item.type === 'new' ? t('adm_new_type') : t('adm_rev_type')}
+                    <span className="text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 bg-purple-500 text-white">
+                      {item.activityTypeName || (item.type === 'new' ? t('adm_new_type') : t('adm_rev_type'))}
                     </span>
                   </div>
                   <div className="ml-6 text-xs text-gray-600 space-y-0.5">
                     <p className="truncate">{item.sutra_name}</p>
                     <p>#{item.total_gatha} gathas</p>
+                    {item.customActivityDescription && (
+                      <p className="text-gray-500 italic truncate">"{item.customActivityDescription}"</p>
+                    )}
                   </div>
                 </div>
 
@@ -3086,6 +3275,19 @@ const toggleMemberSelection = (username) => {
           <AttendanceRegister />
         )}
 
+        {activeTab === 'activity-types' && !viewingStudentProfile && (
+          <ActivityTypesManager
+            activityTypes={adminActivityTypes}
+            onRefresh={() => {
+              const token = localStorage.getItem('jainPathshalaToken');
+              fetch(`${API_BASE}/activity-types`, { headers: { Authorization: 'Bearer ' + token } })
+                .then(r => r.json())
+                .then(data => { if (Array.isArray(data)) setAdminActivityTypes(data); })
+                .catch(() => {});
+            }}
+          />
+        )}
+
         {viewingStudentProfile && (
           <StudentProfile
             username={viewingStudentProfile}
@@ -3121,6 +3323,7 @@ const toggleMemberSelection = (username) => {
                   { key: 'register', icon: LayoutGrid, labelKey: 'adm_register', color: 'bg-blue-100 text-blue-600' },
                   { key: 'users', icon: UserCog, labelKey: 'adm_manage_users', color: 'bg-orange-100 text-orange-600' },
                   { key: 'analytics', icon: TrendingUp, labelKey: 'adm_analytics', color: 'bg-pink-100 text-pink-600' },
+                  { key: 'activity-types', icon: Activity, labelKey: 'adm_activity_types_menu', color: 'bg-indigo-100 text-indigo-600' },
                 ].map(item => (
                   <button key={item.key} onClick={() => { setActiveTab(item.key); setShowMoreMenu(false); setViewingStudentProfile(null); }}
                     className="flex flex-col items-center gap-1.5 p-3 rounded-xl active:scale-95 transition-all">
