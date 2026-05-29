@@ -236,7 +236,13 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-gray-700 truncate">
-                        {act.type === 'attendance' ? t('sp_stat_present') : `${act.sutraName || t('gatha_label')} (${act.totalGatha})`}
+                        {act.type === 'attendance'
+                          ? t('sp_stat_present')
+                          : (act.gathaType === 'new' || act.gathaType === 'revision')
+                            ? `${act.sutraName || t('gatha_label')} (${act.totalGatha})`
+                            : (act.activityTypeName && act.activityTypeName !== 'Other'
+                                ? act.activityTypeName
+                                : act.customActivityDescription || 'Other')}
                       </p>
                       <p className="text-[10px] text-gray-400">{formatDate(act.date)}</p>
                     </div>
