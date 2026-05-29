@@ -885,6 +885,21 @@ const LevelDetailsModal = ({ isOpen, onClose, currentXP, xpBreakdown, userLevel,
                   <p className="font-bold text-purple-600 text-sm flex-shrink-0">+{(stats?.monthlyNewGathas || 0) * (XP_VALUES.new_gatha || 2)} XP</p>
                 </div>
 
+                {(xpBreakdown?.other > 0 || stats?.monthlyOtherXP > 0) && (
+                  <div className="flex items-center justify-between p-3 bg-orange-50 rounded-xl border border-orange-200">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <div className="w-9 h-9 sm:w-10 sm:h-10 bg-orange-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-orange-700" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-800 text-sm">Other Activities</p>
+                        <p className="text-xs text-gray-500">Special activities this month</p>
+                      </div>
+                    </div>
+                    <p className="font-bold text-orange-600 text-sm flex-shrink-0">+{xpBreakdown?.other || 0} XP</p>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-xl border border-yellow-200">
                   <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <div className="w-9 h-9 sm:w-10 sm:h-10 bg-yellow-200 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -2395,9 +2410,18 @@ export default function StudentDashboard({ user, onLogout }) {
       })
       .reduce((sum, e) => sum + (e.total_gatha || 0), 0);
 
+    const monthlyOtherXP = gathaEntries
+      .filter(e => {
+        const d = new Date(e.created_at);
+        return d.getFullYear() === year && d.getMonth() + 1 === month
+          && e.type !== 'new' && e.type !== 'revision';
+      })
+      .reduce((sum, e) => sum + (parseInt(e.xpPoints) || 0), 0);
+
     return {
         monthlyAttendance,
         monthlyNewGathas,
+        monthlyOtherXP,
         maxStreak: maxMonthStreak // This is monthly scoped!
     };
   }, [gathaEntries]);

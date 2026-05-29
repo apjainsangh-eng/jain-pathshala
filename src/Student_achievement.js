@@ -223,12 +223,13 @@ export const calculateAchievementProgress = (achievement, stats = {}) => {
 };
 
 export const calculateTotalXP = (stats = {}, achievements = MONTHLY_ACHIEVEMENTS) => {
-  const { monthlyAttendance = 0, monthlyNewGathas = 0 } = stats;
-  
+  const { monthlyAttendance = 0, monthlyNewGathas = 0, monthlyOtherXP = 0 } = stats;
+
   // Basic XP from activities
   const attendanceXP = monthlyAttendance * XP_VALUES.attendance;
   const gathaXP = monthlyNewGathas * XP_VALUES.new_gatha;
-  
+  const otherXP = monthlyOtherXP;
+
   // Bonus XP from Unlocked Achievements
   const achievementXP = achievements.reduce((total, ach) => {
     const { unlocked } = calculateAchievementProgress(ach, stats);
@@ -238,8 +239,9 @@ export const calculateTotalXP = (stats = {}, achievements = MONTHLY_ACHIEVEMENTS
   return {
     attendance: attendanceXP,
     gatha: gathaXP,
+    other: otherXP,
     achievements: achievementXP,
-    total: attendanceXP + gathaXP + achievementXP,
+    total: attendanceXP + gathaXP + otherXP + achievementXP,
   };
 };
 
@@ -360,7 +362,7 @@ const XPBreakdownCard = ({ xpBreakdown, level }) => {
       {/* XP Breakdown */}
       <div className="bg-white/10 rounded-xl p-3">
         <p className="text-xs text-indigo-200 mb-2 font-bold">📊 This Month's XP Breakdown:</p>
-        <div className="grid grid-cols-3 gap-2 text-center">
+        <div className={`grid gap-2 text-center ${xpBreakdown.other > 0 ? 'grid-cols-2' : 'grid-cols-3'}`}>
           <div className="bg-white/10 rounded-lg p-2">
             <p className="text-lg font-bold">{xpBreakdown.attendance}</p>
             <p className="text-xs opacity-80">Attendance</p>
@@ -369,6 +371,12 @@ const XPBreakdownCard = ({ xpBreakdown, level }) => {
             <p className="text-lg font-bold">{xpBreakdown.gatha}</p>
             <p className="text-xs opacity-80">New Gathas</p>
           </div>
+          {xpBreakdown.other > 0 && (
+            <div className="bg-orange-400/30 rounded-lg p-2">
+              <p className="text-lg font-bold">{xpBreakdown.other}</p>
+              <p className="text-xs opacity-80">Activities</p>
+            </div>
+          )}
           <div className="bg-white/10 rounded-lg p-2">
             <p className="text-lg font-bold">{xpBreakdown.achievements}</p>
             <p className="text-xs opacity-80">Badges</p>
