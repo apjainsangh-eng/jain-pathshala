@@ -2192,40 +2192,40 @@ const toggleMemberSelection = (username) => {
                   )}
                 </div>
 
-                {addEntryData.gathaType !== 'other' && <>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_sutra_name_field')}</label>
-                  <input
-                    type="text"
-                    value={addEntryData.sutraName}
-                    onChange={(e) => setAddEntryData({ ...addEntryData, sutraName: e.target.value })}
-                    placeholder="e.g., Namokar Mantra"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_which_gatha')}</label>
-                  <input
-                    type="text"
-                    value={addEntryData.whichGatha}
-                    onChange={(e) => setAddEntryData({ ...addEntryData, whichGatha: e.target.value })}
-                    placeholder="e.g., 1-5 or specific numbers"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_total_gatha')}</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={addEntryData.totalGatha}
-                    onChange={(e) => setAddEntryData({ ...addEntryData, totalGatha: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
-                  />
-                </div>
-                </>
+                {addEntryData.gathaType !== 'other' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_sutra_name_field')}</label>
+                      <input
+                        type="text"
+                        value={addEntryData.sutraName}
+                        onChange={(e) => setAddEntryData({ ...addEntryData, sutraName: e.target.value })}
+                        placeholder="e.g., Namokar Mantra"
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_which_gatha')}</label>
+                      <input
+                        type="text"
+                        value={addEntryData.whichGatha}
+                        onChange={(e) => setAddEntryData({ ...addEntryData, whichGatha: e.target.value })}
+                        placeholder="e.g., 1-5 or specific numbers"
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_total_gatha')}</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={addEntryData.totalGatha}
+                        onChange={(e) => setAddEntryData({ ...addEntryData, totalGatha: e.target.value })}
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
+                      />
+                    </div>
+                  </>
+                )}
               </>
             )}
 
