@@ -1708,11 +1708,11 @@ const HistoryPage = ({ activeUserId }) => {
       const activity = activityData[dateStr];
       const isPresent = activity?.present === true;
       const isToday = dateStr === todayIso;
+      const isFuture = new Date(dateStr) > today;
       const hasNewRevGathas = (activity?.gathas?.new || 0) + (activity?.gathas?.revision || 0) > 0;
       const hasOtherActivity = (activity?.gathas?.other || 0) > 0;
       const hasAnyGatha = hasNewRevGathas || hasOtherActivity;
       const isClickable = (isPresent || hasAnyGatha) && !isFuture;
-      const isFuture = new Date(dateStr) > today;
       const isSunday = new Date(dateStr).getDay() === 0;
       const isPastWeekday = !isFuture && !isSunday && new Date(dateStr) <= today;
       const isAbsentWeekday = isPastWeekday && !isPresent;
