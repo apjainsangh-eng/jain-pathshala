@@ -2721,15 +2721,15 @@ export default function StudentDashboard({ user, onLogout }) {
   }, [statsMonth, attendanceHistory, gathaEntries, workingDays, calculateMonthlyStats]);
 
   // For homepage display (current month)
+  // Note: maxStreak comes from calculateMonthlyStats (monthly scoped) — do NOT override with global
   const statsForCurrentMonth = useMemo(() => {
     const now = new Date();
     return {
         ...calculateMonthlyStats(now.getFullYear(), now.getMonth() + 1, attendanceHistory, gathaEntries),
         workingDays,
-        currentStreak, // Global current streak for flame icon
-        maxStreak      // Global max streak
+        currentStreak, // Global current streak for flame icon only
     };
-  }, [attendanceHistory, gathaEntries, workingDays, currentStreak, maxStreak, calculateMonthlyStats]);
+  }, [attendanceHistory, gathaEntries, workingDays, currentStreak, calculateMonthlyStats]);
 
   const todayAttendanceMarked = useMemo(
     () => attendanceHistory.some((r) => formatLocalDateString(r.date) === todayIso),
