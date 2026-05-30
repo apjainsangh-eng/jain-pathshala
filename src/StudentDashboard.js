@@ -1664,17 +1664,18 @@ const HistoryPage = ({ activeUserId }) => {
   const todayIso = formatLocalDateString(today);
 
   const monthlySummary = useMemo(() => {
-    let presentCount = 0, newGathas = 0, revisionGathas = 0;
+    let presentCount = 0, newGathas = 0, revisionGathas = 0, otherActivities = 0;
 
     Object.entries(activityData).forEach(([_, activity]) => {
       const normalized = activity || {};
-      const gathas = normalized.gathas || { new: 0, revision: 0 };
+      const gathas = normalized.gathas || { new: 0, revision: 0, other: 0 };
       if (normalized.present) presentCount += 1;
       newGathas += Number(gathas.new || 0);
       revisionGathas += Number(gathas.revision || 0);
+      otherActivities += Number(gathas.other || 0);
     });
 
-    return { presentDays: presentCount, newGathas, revisionGathas };
+    return { presentDays: presentCount, newGathas, revisionGathas, otherActivities };
   }, [activityData]);
 
   const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
@@ -1707,7 +1708,10 @@ const HistoryPage = ({ activeUserId }) => {
       const activity = activityData[dateStr];
       const isPresent = activity?.present === true;
       const isToday = dateStr === todayIso;
-      const hasGathas = (activity?.gathas?.new || 0) + (activity?.gathas?.revision || 0) > 0;
+      const hasNewRevGathas = (activity?.gathas?.new || 0) + (activity?.gathas?.revision || 0) > 0;
+      const hasOtherActivity = (activity?.gathas?.other || 0) > 0;
+      const hasAnyGatha = hasNewRevGathas || hasOtherActivity;
+      const isClickable = (isPresent || hasAnyGatha) && !isFuture;
       const isFuture = new Date(dateStr) > today;
       const isSunday = new Date(dateStr).getDay() === 0;
       const isPastWeekday = !isFuture && !isSunday && new Date(dateStr) <= today;
@@ -1716,11 +1720,13 @@ const HistoryPage = ({ activeUserId }) => {
       days.push(
         <button
           key={day}
-          onClick={() => isPresent && setSelectedDay({ dateStr, activity })}
-          disabled={!isPresent || isFuture}
+          onClick={() => isClickable && setSelectedDay({ dateStr, activity })}
+          disabled={!isClickable}
           className={`h-9 w-9 sm:h-11 sm:w-11 rounded-lg sm:rounded-xl flex items-center justify-center text-xs sm:text-sm font-bold transition-all ${
             isPresent
               ? 'bg-gradient-to-br from-green-400 to-green-600 text-white shadow-md active:scale-95'
+              : hasAnyGatha && !isPresent
+              ? 'bg-orange-100 text-orange-700 border-2 border-orange-300 active:scale-95'
               : isToday && !isPresent
               ? 'bg-orange-100 text-orange-600 border-2 border-orange-400 ring-2 ring-orange-200'
               : isSunday
@@ -1733,9 +1739,12 @@ const HistoryPage = ({ activeUserId }) => {
           }`}
         >
           <div className="relative">
-            {isAbsentWeekday ? <span className="text-red-400">✗</span> : day}
-            {hasGathas && isPresent && (
+            {isAbsentWeekday && !hasAnyGatha ? <span className="text-red-400">✗</span> : day}
+            {hasNewRevGathas && isPresent && (
               <span className="absolute -top-1 -right-2 w-2 h-2 bg-purple-500 rounded-full" />
+            )}
+            {hasOtherActivity && (
+              <span className="absolute -top-1 -right-2 w-2 h-2 bg-orange-500 rounded-full" />
             )}
           </div>
         </button>
@@ -1823,7 +1832,7 @@ const HistoryPage = ({ activeUserId }) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <div className="bg-green-50 border-2 border-green-200 rounded-xl p-2 sm:p-3 text-center">
                 <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 mx-auto mb-1" />
                 <p className="text-xl sm:text-2xl font-bold text-green-600">{monthlySummary.presentDays}</p>
@@ -1844,6 +1853,13 @@ const HistoryPage = ({ activeUserId }) => {
                 <p className="text-xl sm:text-2xl font-bold text-blue-600">{monthlySummary.revisionGathas}</p>
                 <p className="text-xs text-gray-500">{t('revisions')}</p>
               </div>
+              {monthlySummary.otherActivities > 0 && (
+                <div className="col-span-2 bg-orange-50 border-2 border-orange-200 rounded-xl p-2 sm:p-3 text-center">
+                  <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500 mx-auto mb-1" />
+                  <p className="text-xl sm:text-2xl font-bold text-orange-600">{monthlySummary.otherActivities}</p>
+                  <p className="text-xs text-gray-500">Other Activities</p>
+                </div>
+              )}
             </div>
           </>
         )}
