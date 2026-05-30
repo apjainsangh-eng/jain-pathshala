@@ -1915,7 +1915,14 @@ const HistoryPage = ({ activeUserId }) => {
                     const typeName = entry.activityTypeName || (entry.type === 'new' ? 'New Learning' : entry.type === 'revision' ? 'Revision' : entry.type);
                     return (
                       <div key={idx} className={`rounded-xl p-3 border ${isOtherType ? 'bg-orange-50 border-orange-200' : 'bg-purple-50 border-purple-200'}`}>
-                        <p className={`text-xs font-bold mb-2 uppercase tracking-wide ${isOtherType ? 'text-orange-600' : 'text-purple-600'}`}>{typeName}</p>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className={`text-xs font-bold uppercase tracking-wide ${isOtherType ? 'text-orange-600' : 'text-purple-600'}`}>{typeName}</p>
+                          {entry.status === 'pending' && (
+                            <span className="text-[10px] font-bold bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                              <Clock className="w-2.5 h-2.5" /> Pending
+                            </span>
+                          )}
+                        </div>
                         {isOtherType ? (
                           <>
                             {entry.activityTypeName && entry.activityTypeName !== 'Other' && (
