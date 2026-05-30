@@ -1830,6 +1830,15 @@ const HistoryPage = ({ activeUserId }) => {
                 <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-md bg-red-50 border border-red-200" />
                 <span className="text-gray-600">{t('sunday')}</span>
               </div>
+              {monthlySummary.otherActivities > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <div className="relative w-4 h-4 sm:w-5 sm:h-5">
+                    <div className="w-full h-full rounded-md bg-gradient-to-br from-green-400 to-green-600" />
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-orange-500 rounded-full" />
+                  </div>
+                  <span className="text-gray-600">Other activity</span>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
@@ -1878,14 +1887,18 @@ const HistoryPage = ({ activeUserId }) => {
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-green-100 rounded-2xl flex items-center justify-center flex-shrink-0">
-                    <Check className="w-6 h-6 sm:w-7 sm:h-7 text-green-600" />
+                  <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${selectedDay.activity?.present ? 'bg-green-100' : 'bg-orange-100'}`}>
+                    {selectedDay.activity?.present
+                      ? <Check className="w-6 h-6 sm:w-7 sm:h-7 text-green-600" />
+                      : <Sparkles className="w-6 h-6 sm:w-7 sm:h-7 text-orange-600" />}
                   </div>
                   <div className="min-w-0">
                     <h3 className="font-bold text-gray-800 text-base sm:text-lg">
                       {formatDateIn(selectedDay.dateStr, { weekday: 'short', day: 'numeric', month: 'short' })}
                     </h3>
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">{t('present_badge')}</span>
+                    {selectedDay.activity?.present
+                      ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">{t('present_badge')}</span>
+                      : <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-bold">Other Activity</span>}
                   </div>
                 </div>
                 <button onClick={() => setSelectedDay(null)} className="p-2 bg-gray-100 rounded-xl flex-shrink-0">
@@ -1898,15 +1911,29 @@ const HistoryPage = ({ activeUserId }) => {
                   <p className="text-sm text-gray-500 text-center py-4">{t('no_new_gathas')}</p>
                 ) : (
                   (selectedDay.activity.details || []).map((entry, idx) => {
+                    const isOtherType = entry.type !== 'new' && entry.type !== 'revision';
                     const typeName = entry.activityTypeName || (entry.type === 'new' ? 'New Learning' : entry.type === 'revision' ? 'Revision' : entry.type);
                     return (
-                      <div key={idx} className="bg-purple-50 rounded-xl p-3 border border-purple-200">
-                        <p className="text-xs font-bold text-purple-600 mb-2 uppercase tracking-wide">{typeName}</p>
-                        <p className="text-sm"><strong>{t('sutra_label')}:</strong> {entry.sutra_name}</p>
-                        <p className="text-sm"><strong>{t('gatha_label')}:</strong> {entry.which_gatha}</p>
-                        <p className="text-sm font-bold text-purple-700">{t('count_label')}: {entry.total_gatha}</p>
-                        {entry.customActivityDescription && (
-                          <p className="text-sm mt-1 text-gray-600 italic">"{entry.customActivityDescription}"</p>
+                      <div key={idx} className={`rounded-xl p-3 border ${isOtherType ? 'bg-orange-50 border-orange-200' : 'bg-purple-50 border-purple-200'}`}>
+                        <p className={`text-xs font-bold mb-2 uppercase tracking-wide ${isOtherType ? 'text-orange-600' : 'text-purple-600'}`}>{typeName}</p>
+                        {isOtherType ? (
+                          <>
+                            {entry.activityTypeName && entry.activityTypeName !== 'Other' && (
+                              <p className="text-sm font-semibold text-gray-800">{entry.activityTypeName}</p>
+                            )}
+                            {entry.customActivityDescription && (
+                              <p className="text-sm text-gray-600 italic">"{entry.customActivityDescription}"</p>
+                            )}
+                            {entry.xpPoints > 0 && (
+                              <p className="text-xs font-bold text-orange-600 mt-1">+{entry.xpPoints} XP</p>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm"><strong>{t('sutra_label')}:</strong> {entry.sutra_name}</p>
+                            <p className="text-sm"><strong>{t('gatha_label')}:</strong> {entry.which_gatha}</p>
+                            <p className={`text-sm font-bold ${isOtherType ? 'text-orange-700' : 'text-purple-700'}`}>{t('count_label')}: {entry.total_gatha}</p>
+                          </>
                         )}
                       </div>
                     );
