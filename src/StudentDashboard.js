@@ -2223,6 +2223,21 @@ const NextBadges = ({ stats, onBadgeClick }) => {
 
 // ============================================
 // MAIN STUDENT DASHBOARD COMPONENT
+// Module-level normalizeEntry — no component state needed
+const normalizeEntry = (entry) => ({
+  id: entry.id ?? entry._id ?? null,
+  type: entry.type,
+  activityTypeName: entry.activityTypeName ?? null,
+  customActivityDescription: entry.customActivityDescription ?? null,
+  xpPoints: parseInt(entry.xpPoints) || 0,
+  sutra_name: entry.sutra_name ?? entry.sutraName ?? '',
+  which_gatha: entry.which_gatha ?? entry.whichGatha ?? '',
+  total_gatha: Number(entry.total_gatha ?? entry.totalGatha ?? 0),
+  date: entry.date ?? null,
+  status: entry.status ?? null,
+  created_at: entry.created_at ?? entry.date ?? null,
+});
+
 // ============================================
 
 export default function StudentDashboard({ user, onLogout }) {
@@ -2282,19 +2297,6 @@ export default function StudentDashboard({ user, onLogout }) {
     setSuccessMessage(msg);
     setTimeout(() => setSuccessMessage(''), 3000);
   };
-
-  const normalizeEntry = (entry) => ({
-    id: entry.id ?? entry._id ?? null,
-    type: entry.type,
-    activityTypeName: entry.activityTypeName ?? null,
-    customActivityDescription: entry.customActivityDescription ?? null,
-    sutra_name: entry.sutra_name ?? entry.sutraName ?? '',
-    which_gatha: entry.which_gatha ?? entry.whichGatha ?? '',
-    total_gatha: Number(entry.total_gatha ?? entry.totalGatha ?? 0),
-    date: entry.date ?? null,
-    status: entry.status ?? null,
-    created_at: entry.created_at ?? entry.date ?? null,
-  });
 
   // ============================================
   // FIXED STREAK CALCULATION (SUNDAY-SAFE)
@@ -2717,7 +2719,8 @@ export default function StudentDashboard({ user, onLogout }) {
   );
 
   const todaysPendingGathas = useMemo(
-    () => pendingStatus.gatha?.filter((p) => formatLocalDateString(p.date) === todayIso && p.status === 'pending') || [],
+    () => (pendingStatus.gatha?.filter((p) => formatLocalDateString(p.date) === todayIso && p.status === 'pending') || [])
+      .map(p => normalizeEntry(p)),
     [pendingStatus.gatha, todayIso]
   );
 
