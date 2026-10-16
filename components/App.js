@@ -90,11 +90,8 @@ function LoginScreen({ onLogin }) {
             <div className="w-20 h-20 bg-chandan-100 rounded-full mx-auto mb-3 flex items-center justify-center ring-4 ring-sona-400/60 shadow-lg">
               <Lotus className="w-12 h-12" />
             </div>
-            <h1 className="font-display text-3xl font-bold leading-tight">જય જિનેન્દ્ર</h1>
+            <h1 className="font-display text-3xl font-bold leading-tight">પ્રણામ</h1>
             <p className="text-chandan-200 text-sm mt-1">{t('app_tagline')}</p>
-            <p className="mt-3 inline-block text-[11px] tracking-wide text-sona-300 border-t border-b border-sona-400/40 px-3 py-1">
-              નમો અરિહંતાણં · નમો સિદ્ધાણં
-            </p>
             <TempleArch className="absolute -bottom-px left-0 text-white" />
           </div>
 
@@ -168,6 +165,16 @@ function LoginScreen({ onLogin }) {
           <Toran className="rotate-180" />
         </div>
         <p className="text-center text-kumkum-800/60 text-xs mt-4 font-display">॥ સમ્યગ્ દર્શન · સમ્યગ્ જ્ઞાન · સમ્યગ્ ચારિત્ર ॥</p>
+
+        {/* Credit */}
+        <div className="mt-3 text-center text-[11px] text-gray-500 leading-relaxed">
+          <p>Created by <span className="font-semibold text-kumkum-800">Moksh Mehta</span></p>
+          <p>
+            <a href="tel:+918141392124" className="hover:text-kumkum-700 underline-offset-2 hover:underline">+91 81413 92124</a>
+            <span className="mx-1.5">·</span>
+            <a href="mailto:mehtamoksh.mm@gmail.com" className="hover:text-kumkum-700 underline-offset-2 hover:underline">mehtamoksh.mm@gmail.com</a>
+          </p>
+        </div>
       </div>
     </div>
   );
