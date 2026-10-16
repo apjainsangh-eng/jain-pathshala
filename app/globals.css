@@ -1,0 +1,213 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom CSS animations for Jain Pathshala Student Dashboard */
+html, body { height: 100%; }
+
+/* ===== PAGE TRANSITION ANIMATIONS ===== */
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+  animation: pageEnter 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ===== STAGGERED CARD ENTRANCE ===== */
+@keyframes cardSlideUp {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.card-animate {
+  animation: cardSlideUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-animate {
+    animation: none;
+  }
+  .page-enter {
+    animation: none;
+  }
+}
+.card-animate-1 { animation-delay: 0.03s; }
+.card-animate-2 { animation-delay: 0.08s; }
+.card-animate-3 { animation-delay: 0.13s; }
+.card-animate-4 { animation-delay: 0.18s; }
+.card-animate-5 { animation-delay: 0.23s; }
+.card-animate-6 { animation-delay: 0.28s; }
+.card-animate-7 { animation-delay: 0.33s; }
+.card-animate-8 { animation-delay: 0.38s; }
+.card-animate-9 { animation-delay: 0.43s; }
+.card-animate-10 { animation-delay: 0.48s; }
+
+/* ===== BUTTON GLOW / PULSE EFFECTS ===== */
+@keyframes softGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(59, 130, 246, 0.3), 0 4px 12px rgba(0,0,0,0.1); }
+  50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5), 0 4px 16px rgba(0,0,0,0.15); }
+}
+@keyframes purpleGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(147, 51, 234, 0.3), 0 4px 12px rgba(0,0,0,0.1); }
+  50% { box-shadow: 0 0 20px rgba(147, 51, 234, 0.5), 0 4px 16px rgba(0,0,0,0.15); }
+}
+@keyframes urgentGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(239, 68, 68, 0.3), 0 4px 12px rgba(0,0,0,0.1); }
+  50% { box-shadow: 0 0 24px rgba(239, 68, 68, 0.5), 0 4px 16px rgba(0,0,0,0.15); }
+}
+.btn-glow-blue { animation: softGlow 2s ease-in-out infinite; }
+.btn-glow-purple { animation: purpleGlow 2s ease-in-out infinite; }
+.btn-glow-urgent { animation: urgentGlow 1.5s ease-in-out infinite; }
+
+/* ===== NUMBER POP EFFECT ===== */
+@keyframes numberPop {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.number-pop { animation: numberPop 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+/* ===== PROGRESS BAR FILL ===== */
+@keyframes progressFill { from { width: 0%; } }
+.progress-animate { animation: progressFill 1s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+/* ===== DAY CELL HOVER (WEEK STRIP) ===== */
+.day-cell { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.day-cell:hover { transform: scale(1.15); z-index: 5; }
+
+/* ===== WEEK STRIP SCROLL ===== */
+.week-strip-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.week-strip-scroll::-webkit-scrollbar { display: none; }
+
+/* ===== FIRE FLICKER FOR STREAKS ===== */
+@keyframes fireFlicker {
+  0%, 100% { text-shadow: 0 0 4px rgba(255,165,0,0.6); transform: scale(1); }
+  50% { text-shadow: 0 0 12px rgba(255,50,0,0.9); transform: scale(1.1); }
+}
+.fire-flicker { animation: fireFlicker 1.5s ease-in-out infinite; display: inline-block; }
+/* ===== PATHSHALA THEME ===== */
+/* Chandan (sandalwood) background with a faint saffron mandala, used by every screen's root */
+.bg-pathshala {
+  background-color: #fdf8ee;
+  background-image:
+    radial-gradient(circle at 15% 0%, rgba(242, 118, 14, 0.10), transparent 45%),
+    radial-gradient(circle at 100% 30%, rgba(163, 38, 64, 0.07), transparent 40%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cg fill='none' stroke='%23d9600f' stroke-opacity='0.09' stroke-width='1'%3E%3Ccircle cx='48' cy='48' r='6'/%3E%3Ccircle cx='48' cy='48' r='14'/%3E%3Cpath d='M48 20c5 8 5 20 0 28c-5-8-5-20 0-28zM48 76c5-8 5-20 0-28c-5 8-5 20 0 28zM20 48c8-5 20-5 28 0c-8 5-20 5-28 0zM76 48c-8-5-20-5-28 0c8 5 20 5 28 0z'/%3E%3Cpath d='M28 28c9 1 17 9 20 20c-11-3-19-11-20-20zM68 68c-9-1-17-9-20-20c11 3 19 11 20 20zM68 28c-1 9-9 17-20 20c3-11 11-19 20-20zM28 68c1-9 9-17 20-20c-3 11-11 19-20 20z'/%3E%3C/g%3E%3C/svg%3E");
+  background-attachment: fixed;
+}
+
+/* Heading face (Rasa) */
+.font-display { letter-spacing: 0.01em; }
+
+/* Gentle swing for the toran's bells */
+@keyframes toranSway {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+.toran-sway { transform-origin: top center; animation: toranSway 4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .toran-sway { animation: none; }
+}
+
+/* =====================================================================
+   CLAYMORPHISM (student app). Everything is scoped to .clay-ui so the
+   admin screens keep their flat style. Soft puffy surfaces: big radii,
+   a soft outer shadow, an inner top-left highlight and inner bottom-right shade.
+   ===================================================================== */
+.clay-ui {
+  --clay-card:
+    10px 12px 24px rgba(150, 80, 30, 0.16),
+    -6px -6px 16px rgba(255, 255, 255, 0.85),
+    inset 3px 3px 6px rgba(255, 255, 255, 0.95),
+    inset -5px -5px 10px rgba(205, 140, 80, 0.16);
+  --clay-soft:
+    6px 7px 14px rgba(150, 80, 30, 0.13),
+    -4px -4px 10px rgba(255, 255, 255, 0.75),
+    inset 2px 2px 5px rgba(255, 255, 255, 0.85),
+    inset -3px -3px 7px rgba(120, 60, 20, 0.08);
+  --clay-colored:
+    10px 14px 26px rgba(134, 29, 53, 0.28),
+    inset 5px 5px 12px rgba(255, 255, 255, 0.35),
+    inset -7px -7px 16px rgba(60, 10, 20, 0.22);
+  --clay-btn:
+    4px 6px 12px rgba(134, 29, 53, 0.2),
+    inset 2px 2px 5px rgba(255, 255, 255, 0.5),
+    inset -3px -4px 7px rgba(60, 10, 20, 0.16);
+  --clay-pressed:
+    inset 4px 4px 9px rgba(60, 10, 20, 0.2),
+    inset -3px -3px 7px rgba(255, 255, 255, 0.45);
+  --clay-input:
+    inset 4px 4px 9px rgba(150, 80, 30, 0.14),
+    inset -4px -4px 9px rgba(255, 255, 255, 0.95);
+
+  font-family: var(--font-clay), var(--font-body), system-ui, sans-serif;
+  background-color: #f8ebdc;
+}
+.clay-ui .font-display { font-family: var(--font-clay), var(--font-display), serif; letter-spacing: 0; }
+
+/* Puffier corners */
+.clay-ui .rounded-xl { border-radius: 1.1rem; }
+.clay-ui .rounded-2xl { border-radius: 1.5rem; }
+.clay-ui .rounded-3xl { border-radius: 2rem; }
+
+/* White cards */
+.clay-ui .bg-white:is(.rounded-xl, .rounded-2xl, .rounded-3xl) {
+  border-color: transparent !important;
+  background-color: #fffaf3;
+  box-shadow: var(--clay-card) !important;
+}
+/* Tinted panels (bg-*-50 / bg-*-100) */
+.clay-ui :is(.rounded-xl, .rounded-2xl, .rounded-3xl):is(
+  [class*="bg-orange-5"], [class*="bg-amber-5"], [class*="bg-yellow-5"], [class*="bg-green-5"], [class*="bg-emerald-5"],
+  [class*="bg-blue-5"], [class*="bg-purple-5"], [class*="bg-pink-5"], [class*="bg-red-5"], [class*="bg-gray-5"],
+  [class*="bg-indigo-5"], [class*="bg-cyan-5"], [class*="bg-chandan"], [class*="bg-kesar-5"], [class*="bg-kumkum-5"],
+  [class*="-100 "], [class$="-100"]
+):not(button):not(input):not(textarea) {
+  border-color: transparent !important;
+  box-shadow: var(--clay-soft) !important;
+}
+/* Coloured gradient cards */
+.clay-ui div[class*="bg-gradient-to"]:is(.rounded-xl, .rounded-2xl, .rounded-3xl),
+.clay-ui section[class*="bg-gradient-to"] {
+  box-shadow: var(--clay-colored) !important;
+}
+
+/* Buttons: raised, and they sink in when pressed */
+.clay-ui button:is(.rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl, .rounded-full):not(:disabled)[class*="bg-"] {
+  box-shadow: var(--clay-btn);
+  border-color: transparent;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+.clay-ui button[class*="bg-gradient-to"]:not(:disabled) { box-shadow: var(--clay-colored); }
+.clay-ui button:not(:disabled):hover { filter: brightness(1.03); }
+.clay-ui button:not(:disabled):active {
+  box-shadow: var(--clay-pressed) !important;
+  transform: translateY(2px) scale(0.98);
+}
+/* White/tinted buttons read as soft clay rather than coloured blobs */
+.clay-ui button.bg-white:is(.rounded-lg, .rounded-xl, .rounded-2xl) { background-color: #fffaf3; box-shadow: var(--clay-soft); }
+
+/* Inputs look pressed into the surface */
+.clay-ui :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select) {
+  border-color: transparent !important;
+  background-color: #fbf1e4 !important;
+  box-shadow: var(--clay-input) !important;
+  border-radius: 1.1rem;
+}
+.clay-ui :is(input, textarea, select):focus {
+  outline: none;
+  box-shadow: var(--clay-input), 0 0 0 3px rgba(217, 96, 15, 0.35) !important;
+}
+
+/* Small pills/badges inside cards: gentle depth only */
+.clay-ui span.rounded-full[class*="bg-"] {
+  box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.6), inset -1px -1px 2px rgba(0, 0, 0, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clay-ui button:not(:disabled):active { transform: none; }
+}

@@ -1,70 +1,104 @@
-# Getting Started with Create React App
+# Jain Pathshala Portal
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+One Next.js app that serves many pathshalas. Everyone logs in on the same page with their
+**mobile number and password**; the number decides which pathshala they belong to. Each pathshala's
+admins and students only ever see their own pathshala's data. A super admin creates pathshalas and
+their admins at `/superadmin`.
 
-## Available Scripts
+## Roles and logins
 
-In the project directory, you can run:
+| Role | Logs in at | With | Can do |
+|---|---|---|---|
+| Super admin | `/superadmin` | username + password | Create pathshalas, add/disable/delete their admins, set admin mobile numbers, reset admin passwords, deactivate a pathshala, open any pathshala's admin panel |
+| Pathshala admin | `/` | mobile + password | Everything in the admin dashboard, for their pathshala only |
+| Family / student | `/` | mobile + password | Attendance, gathas, history, leaderboard, achievements |
 
-### `npm start`
+**Families:** students who share a mobile number (siblings on a parent's phone) share one login and one
+password, and switch between each other inside the app. A mobile number belongs to one pathshala only.
+An admin can also be a parent with the same number: the admin password opens the admin panel, the
+family password opens the family.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+**Admins with several pathshalas:** an admin is one person with one mobile number and password. To let
+an admin manage another pathshala, open that pathshala's **Admins** at `/superadmin` and enter their
+mobile number. They then get a pathshala switcher in the admin dashboard header and land in the
+pathshala they used last when logging in. Removing them from a pathshala takes effect within a minute;
+removing them from their last pathshala deletes the admin login. Students and families always belong to
+exactly one pathshala.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Local setup
 
-### `npm test`
+```bash
+npm install
+cp .env.example .env.local     # fill in MONGODB_URI and JWT_SECRET
+npm run dev                    # http://localhost:3000
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+| Variable | Required | Purpose |
+|---|---|---|
+| `MONGODB_URI` | yes | MongoDB connection string |
+| `DB_NAME` | no | Database name, default `pathshala` |
+| `JWT_SECRET` | yes | Random string (32+ chars) that signs login tokens. `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
 
-### `npm run build`
+## Moving the live app over (one time)
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+1. **Back up the database** (Atlas snapshot or `mongodump`).
+2. Migrate the existing data into the first pathshala:
+   ```powershell
+   node --env-file=.env.local scripts/migrate-to-multi-pathshala.mjs vasupujya "Shree Somchintamani Vasupujyaswami Jain Pathshala" "Aadinath Parshwanath Jain Sangh"
+   ```
+   Assigns every existing record to that pathshala, moves the three hardcoded admins into the database,
+   adds the hardcoded students who never logged in, hashes plain-text passwords, and creates indexes.
+   Safe to run again.
+3. Create your super admin:
+   ```powershell
+   $env:SUPERADMIN_PASSWORD = '<strong password>'
+   node --env-file=.env.local scripts/create-superadmin.mjs <username> "<Your Name>"
+   Remove-Item Env:SUPERADMIN_PASSWORD
+   ```
+4. At `/superadmin` → your pathshala → **Admins**: add a mobile number to each admin (pencil icon).
+   Admins without a number can't log in.
+5. Admins add each student's mobile number (**Users** → edit). A student keeps their current password,
+   so they log in with mobile number + old password. Students without a number can't log in.
+   Give siblings the same number to make them one family login.
+6. The old app stores its data in the **`jainpathshala`** database; the new app uses `DB_NAME`
+   (`pathshala`). Copy the history (attendance, gatha, pending entries, audit log, activity types):
+   ```powershell
+   node --env-file=.env.local scripts/import-old-data.mjs jainpathshala vasupujya --dry-run   # preview
+   node --env-file=.env.local scripts/import-old-data.mjs jainpathshala vasupujya
+   ```
+   It only reads the old database and is safe to repeat; each run brings over what the old app saved since.
+7. Deploy to Vercel with `MONGODB_URI`, `DB_NAME` and `JWT_SECRET`. Right before pointing people to
+   it, run the import (step 6) one last time. Everyone logs in again once.
+8. Delete `scripts/legacy-pathshala-data.mjs` (old hardcoded passwords).
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Adding a new sangh
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+At `/superadmin`: **New pathshala** (name, sangh, short code) → **Admins** → add an admin with their
+mobile number and a password → send them the site link. Their admin adds students with mobile numbers.
 
-### `npm run eject`
+## How data is kept separate
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Every pathshala record (`users`, `attendance`, `gatha`, `pending_*`, `family_groups`, `activity_types`,
+`audit_log`, `admin_notes`, `profiles`, `passwords`, `achievements`) has a `pathshalaId`. The login token
+carries the pathshala, and `getCollection()` in `lib/server/db.js` returns a wrapper that adds
+`pathshalaId` to every filter, insert and aggregate for the current request, so a missed filter can't
+leak data. Platform data uses `getGlobalCollection()`: `pathshalas`, `admins` (unique mobile per admin)
+and `accounts` (one per mobile number: pathshala + family password).
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Structure
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+```
+app/
+  page.js               login + student/admin dashboards
+  superadmin/page.js    super admin dashboard
+  [slug]/page.js        old per-pathshala links redirect to /
+  api/[...path]/route.js  API: auth, pathshala scoping, dispatch to controllers
+components/             React UI (StudentDashboard, AdminDashboard, superadmin/, i18n)
+lib/server/
+  routes.js             route table with access level per route
+  db.js / tenant.js     Mongo connection, per-pathshala scoping
+  accounts.js           mobile-number login accounts
+  auth.js               signed tokens (HMAC-SHA256)
+  controllers/          request handlers (ported from the Express backend)
+scripts/                migration and super admin setup
+```

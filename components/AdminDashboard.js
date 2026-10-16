@@ -1,0 +1,3229 @@
+'use client';
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useLanguage } from './LanguageContext';
+import jsPDF from 'jspdf';
+import { autoTable } from 'jspdf-autotable';
+import StudentProfile from './admin/components/StudentProfile';
+import BulkAttendance from './admin/components/BulkAttendance';
+import BulkGatha from './admin/components/BulkGatha';
+import AttendanceRegister from './admin/components/AttendanceRegister';
+import PathshalaSwitcher from './admin/components/PathshalaSwitcher';
+import Toasts from './Toast';
+import { Toran } from './Decor';
+import TrendsPanel from './admin/components/TrendsPanel';
+import {
+  BookOpen,
+  Calendar,
+  Check,
+  Clock,
+  LogOut,
+  X as CloseIcon,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  Users,
+  Shield,
+  TrendingUp,
+  Award,
+  BarChart3,
+  ChevronDown,
+  Search,
+  Star,
+  Activity,
+  Target,
+  Zap,
+  CalendarDays,
+  UserCheck,
+  Download,
+  FileText,
+  Share2,
+  Copy,
+  CheckCheck,
+  BellRing,
+  Wifi,
+  WifiOff,
+  UserPlus,
+  Edit3,
+  Trash2,
+  Save,
+  Plus,
+  UserCog,
+  Menu,
+  LayoutGrid,
+  ClipboardList,
+} from 'lucide-react';
+
+const API_BASE = '/api';
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+const formatDateShort = (dateStr) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+  });
+};
+
+const countWorkingDays = (startStr, endStr) => {
+  const start = new Date(startStr);
+  const end = new Date(endStr);
+  let count = 0;
+  const cur = new Date(start);
+  while (cur <= end) {
+    if (cur.getDay() !== 0) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+};
+
+const getYearOptions = () => {
+  const currentYear = new Date().getFullYear();
+  const years = [];
+  for (let y = currentYear; y >= 2020; y--) {
+    years.push(y);
+  }
+  return years;
+};
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+const MONTH_NAMES_SHORT = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+];
+
+const formatLocalDateString = (input = new Date()) => {
+  const parsed = input instanceof Date ? input : new Date(input);
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, '0');
+  const d = String(parsed.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const getDateRangePreset = (preset, month, year, customStart, customEnd) => {
+  const today = new Date();
+
+  switch (preset) {
+    case 'today':
+      return {
+        start: formatLocalDateString(today),
+        end: formatLocalDateString(today),
+      };
+    case 'week':
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - today.getDay());
+      return {
+        start: formatLocalDateString(startOfWeek),
+        end: formatLocalDateString(today),
+      };
+    case 'month':
+      const monthStart = new Date(year, month - 1, 1);
+      const monthEnd = new Date(year, month, 0);
+      return {
+        start: formatLocalDateString(monthStart),
+        end: formatLocalDateString(monthEnd),
+      };
+    case 'year':
+      const yearStart = new Date(year, 0, 1);
+      const yearEnd = new Date(year, 11, 31);
+      return {
+        start: formatLocalDateString(yearStart),
+        end: formatLocalDateString(yearEnd),
+      };
+    case 'all':
+      return {
+        start: '2020-01-01',
+        end: '2099-12-31',
+      };
+    case 'custom':
+      return {
+        start: customStart || formatLocalDateString(today),
+        end: customEnd || formatLocalDateString(today),
+      };
+    default:
+      return getDateRangePreset('month', month, year);
+  }
+};
+
+const getPerformanceBadge = (attendance, gatha) => {
+  const total = (attendance || 0) + (gatha || 0);
+  if (total >= 50) return { labelKey: 'badge_champion', color: 'from-yellow-400 to-orange-500', icon: '🏆' };
+  if (total >= 30) return { labelKey: 'badge_star', color: 'from-purple-400 to-pink-500', icon: '⭐' };
+  if (total >= 15) return { labelKey: 'badge_rising', color: 'from-blue-400 to-indigo-500', icon: '🚀' };
+  if (total >= 5) return { labelKey: 'badge_active', color: 'from-green-400 to-emerald-500', icon: '✨' };
+  return { labelKey: 'badge_new', color: 'from-gray-400 to-gray-500', icon: '🌱' };
+};
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
+
+export default function AdminDashboard({ user, onLogout }) {
+  const { t, lang, toggleLang } = useLanguage();
+
+  // ============ STATE VARIABLES ============
+  const [pendingData, setPendingData] = useState({ attendance: [], gatha: [] });
+  const [stats, setStats] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(null);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [activeTab, setActiveTab] = useState('overview');
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [viewingStudentProfile, setViewingStudentProfile] = useState(null);
+  const [familyGroups, setFamilyGroups] = useState([]);
+  const [familyGroupsLoading, setFamilyGroupsLoading] = useState(false);
+  const [showAddGroupModal, setShowAddGroupModal] = useState(false);
+  const [newGroup, setNewGroup] = useState({ groupName: '', members: [] });
+  const [selectedMembers, setSelectedMembers] = useState([]);
+  // null = creating a new group; otherwise the id of the group being edited
+  const [editingGroupId, setEditingGroupId] = useState(null);
+  const [showFamilyGroups, setShowFamilyGroups] = useState(false);
+  const [userStatusFilter, setUserStatusFilter] = useState('all');
+  
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [refreshInterval, setRefreshInterval] = useState(30);
+  const [lastRefreshed, setLastRefreshed] = useState(new Date());
+  const [newPendingAlert, setNewPendingAlert] = useState(false);
+  const [countdown, setCountdown] = useState(30);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const previousPendingCount = useRef(0);
+  const refreshTimerRef = useRef(null);
+  const countdownRef = useRef(null);
+  const isFirstLoad = useRef(true);
+  
+  // Students & Analytics state
+  const [students, setStudents] = useState([]);
+  const [topStudents, setTopStudents] = useState({ topAttendance: [], topGatha: [] });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('name');
+  const [studentFilter, setStudentFilter] = useState('all');
+  const [approvalFilter, setApprovalFilter] = useState('all');
+
+  // Date picker state
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [datePreset, setDatePreset] = useState('month');
+  const [customStartDate, setCustomStartDate] = useState(formatLocalDateString(new Date()));
+  const [customEndDate, setCustomEndDate] = useState(formatLocalDateString(new Date()));
+  const [dateRange, setDateRange] = useState(() => 
+    getDateRangePreset('month', new Date().getMonth() + 1, new Date().getFullYear())
+  );
+  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+
+  // Export state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportCopied, setExportCopied] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportData, setExportData] = useState(null);
+  const [exportLoading, setExportLoading] = useState(false);
+
+  // ============ NEW: USER MANAGEMENT STATE ============
+  const [allUsers, setAllUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [newUser, setNewUser] = useState({ name: '', mobile: '', password: '' });
+  const [userFormError, setUserFormError] = useState('');
+
+  // ============ NEW: ADD ENTRY STATE (Attendance/Gatha) ============
+  const [showAddEntryModal, setShowAddEntryModal] = useState(false);
+  const [addEntryType, setAddEntryType] = useState('attendance');
+  const [addEntryData, setAddEntryData] = useState({
+    studentUsername: '',
+    date: formatLocalDateString(new Date()),
+    sutraName: '',
+    whichGatha: '',
+    totalGatha: 1,
+    gathaType: 'new',
+    activityTypeId: null,
+    activityTypeName: 'New Learning',
+    otherSubType: '',
+    customActivityDescription: '',
+  });
+  const [addEntryLoading, setAddEntryLoading] = useState(false);
+  const [adminActivityTypes, setAdminActivityTypes] = useState([]);
+
+  // ============ NOTIFICATION HELPERS ============
+  
+  const playNotificationSound = useCallback(() => {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = 800;
+      oscillator.type = 'sine';
+      gainNode.gain.value = 0.3;
+      
+      oscillator.start();
+      setTimeout(() => {
+        oscillator.stop();
+        audioContext.close();
+      }, 200);
+    } catch (e) {
+      console.log('Audio not supported');
+    }
+  }, []);
+
+  const showBrowserNotification = useCallback((count) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('Jain Pathshala', {
+        body: count + ' new pending request' + (count > 1 ? 's' : '') + '!',
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        tag: 'pending-notification',
+      });
+    }
+  }, []);
+
+  const requestNotificationPermission = useCallback(async () => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      await Notification.requestPermission();
+    }
+  }, []);
+
+  // ============ ONLINE/OFFLINE DETECTION ============
+  
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // ============ EFFECTS ============
+  
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showMonthDropdown || showYearDropdown) {
+        const isOutside = !event.target.closest('[data-dropdown]');
+        if (isOutside) {
+          setShowMonthDropdown(false);
+          setShowYearDropdown(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMonthDropdown, showYearDropdown]);
+
+  useEffect(() => {
+    if (datePreset === 'custom') {
+      setDateRange(getDateRangePreset('custom', selectedMonth, selectedYear, customStartDate, customEndDate));
+    } else {
+      setDateRange(getDateRangePreset(datePreset, selectedMonth, selectedYear));
+    }
+  }, [datePreset, selectedMonth, selectedYear, customStartDate, customEndDate]);
+
+  useEffect(() => {
+    requestNotificationPermission();
+  }, [requestNotificationPermission]);
+
+  useEffect(() => {
+    if (activeTab === 'approvals') {
+      setNewPendingAlert(false);
+    }
+  }, [activeTab]);
+
+  // ============ FETCH FUNCTIONS ============
+
+  const fetchPendingData = useCallback(async (isAutoRefresh = false) => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    
+    if (!isAutoRefresh) {
+      setIsLoading(true);
+    }
+
+    try {
+      const [pendingRes, statsRes] = await Promise.all([
+        fetch(API_BASE + '/admin/pending', {
+          headers: { Authorization: 'Bearer ' + token },
+        }),
+        fetch(API_BASE + '/admin/stats', {
+          headers: { Authorization: 'Bearer ' + token },
+        }),
+      ]);
+
+      if (!pendingRes.ok || !statsRes.ok) {
+        throw new Error('Failed to fetch data');
+      }
+
+      const pending = await pendingRes.json();
+      const statsData = await statsRes.json();
+
+      const newTotalPending = pending.attendance.length + pending.gatha.length;
+      
+      if (!isFirstLoad.current && isAutoRefresh && newTotalPending > previousPendingCount.current) {
+        const newCount = newTotalPending - previousPendingCount.current;
+        setNewPendingAlert(true);
+        playNotificationSound();
+        showBrowserNotification(newCount);
+        
+        if ('vibrate' in navigator) {
+          navigator.vibrate([200, 100, 200]);
+        }
+      }
+      
+      isFirstLoad.current = false;
+      previousPendingCount.current = newTotalPending;
+      setPendingData(pending);
+      setStats(statsData);
+      setLastRefreshed(new Date());
+      setCountdown(refreshInterval);
+      setError('');
+    } catch (err) {
+      // A missed background refresh (server restarting, brief network drop) is retried on the next tick;
+      // warn rather than error so it doesn't raise the development error overlay
+      if (isAutoRefresh) {
+        console.warn('Background refresh failed, will retry:', err?.message || err);
+      } else {
+        console.error('Fetch error:', err);
+        setError(t('adm_load_fail'));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [refreshInterval, playNotificationSound, showBrowserNotification, t]);
+
+  const fetchStudents = useCallback(async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    try {
+      const res = await fetch(
+        API_BASE + '/admin/students?startDate=' + dateRange.start + '&endDate=' + dateRange.end,
+        { headers: { Authorization: 'Bearer ' + token } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setStudents(data);
+      }
+    } catch (err) {
+      console.error('Error fetching students:', err);
+    }
+  }, [dateRange]);
+
+  const fetchTopStudents = useCallback(async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    try {
+      const res = await fetch(
+        API_BASE + '/admin/top-students?startDate=' + dateRange.start + '&endDate=' + dateRange.end + '&limit=5&gathaType=new',
+        { headers: { Authorization: 'Bearer ' + token } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setTopStudents(data);
+      }
+    } catch (err) {
+      console.error('Error fetching top students:', err);
+    }
+  }, [dateRange]);
+
+  const fetchExportData = useCallback(async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    setExportLoading(true);
+    try {
+      const res = await fetch(
+        API_BASE + '/admin/export-report?startDate=' + dateRange.start + '&endDate=' + dateRange.end,
+        { headers: { Authorization: 'Bearer ' + token } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setExportData(data);
+      }
+    } catch (err) {
+      console.error('Error fetching export data:', err);
+    } finally {
+      setExportLoading(false);
+    }
+  }, [dateRange]);
+
+  const fetchFamilyGroups = useCallback(async () => {
+  const token = localStorage.getItem('jainPathshalaToken');
+  setFamilyGroupsLoading(true);
+  try {
+    const res = await fetch(API_BASE + '/admin/family-groups', {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setFamilyGroups(data);
+    }
+  } catch (err) {
+    console.error('Error fetching family groups:', err);
+  } finally {
+    setFamilyGroupsLoading(false);
+  }
+}, []);
+  
+  // ============ NEW: FETCH ALL USERS ============
+  const fetchAllUsers = useCallback(async () => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    setUsersLoading(true);
+    try {
+      const res = await fetch(API_BASE + '/admin/users', {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAllUsers(data);
+      } else {
+        throw new Error('Failed to fetch users');
+      }
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setError(t('adm_users_fail'));
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [t]);
+
+  // ============ AUTO-REFRESH EFFECT ============
+
+  useEffect(() => {
+  if (activeTab === 'users') {
+    fetchFamilyGroups();
+  }
+}, [activeTab, fetchFamilyGroups]);
+  
+  useEffect(() => {
+    if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+
+    fetchPendingData(false);
+
+    if (autoRefresh && isOnline) {
+      refreshTimerRef.current = setInterval(() => {
+        // Nothing to refresh while the tab is in the background or the device is offline
+        if (document.hidden || !navigator.onLine) return;
+        fetchPendingData(true);
+      }, refreshInterval * 1000);
+
+      setCountdown(refreshInterval);
+      countdownRef.current = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) return refreshInterval;
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, [autoRefresh, refreshInterval, isOnline, fetchPendingData]);
+
+  useEffect(() => {
+    fetchStudents();
+    fetchTopStudents();
+  }, [fetchStudents, fetchTopStudents]);
+
+  useEffect(() => {
+    if (showExportModal) {
+      fetchExportData();
+    }
+  }, [showExportModal, fetchExportData]);
+
+  // Fetch users when users tab is active
+  useEffect(() => {
+    if (activeTab === 'users') {
+      fetchAllUsers();
+    }
+  }, [activeTab, fetchAllUsers]);
+
+
+  // ============ HANDLERS ============
+
+  const handleSaveGroup = async () => {
+  if (!newGroup.groupName || selectedMembers.length < 2) {
+    setError(t('adm_group_req_err'));
+    return;
+  }
+
+  const token = localStorage.getItem('jainPathshalaToken');
+  setActionLoading('create-group');
+
+  try {
+    const res = await fetch(API_BASE + '/admin/family-groups' + (editingGroupId ? '/' + editingGroupId : ''), {
+      method: editingGroupId ? 'PUT' : 'POST',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        groupName: newGroup.groupName,
+        members: selectedMembers
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to save group');
+    }
+
+    setSuccessMessage(t(editingGroupId ? 'adm_group_updated' : 'adm_group_created'));
+    setTimeout(() => setSuccessMessage(''), 3000);
+    setShowAddGroupModal(false);
+    setNewGroup({ groupName: '', members: [] });
+    setSelectedMembers([]);
+    setEditingGroupId(null);
+    fetchFamilyGroups();
+    fetchAllUsers();
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setActionLoading(null);
+  }
+};
+
+const handleDeleteGroup = async (groupId) => {
+  if (!window.confirm('Delete this family group?')) return;
+
+  const token = localStorage.getItem('jainPathshalaToken');
+  setActionLoading('delete-group-' + groupId);
+
+  try {
+    const res = await fetch(API_BASE + '/admin/family-groups/' + groupId, {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer ' + token },
+    });
+
+    if (!res.ok) throw new Error('Failed to delete group');
+
+    setSuccessMessage(t('adm_group_deleted'));
+    setTimeout(() => setSuccessMessage(''), 3000);
+    fetchFamilyGroups();
+    fetchAllUsers();
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setActionLoading(null);
+  }
+};
+
+const toggleMemberSelection = (username) => {
+  setSelectedMembers(prev => 
+    prev.includes(username) 
+      ? prev.filter(u => u !== username)
+      : [...prev, username]
+  );
+};
+  
+  const handleApprove = async (type, id) => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    setActionLoading('approve-' + type + '-' + id);
+    setError('');
+
+    try {
+      const endpoint = type === 'attendance' 
+        ? '/admin/attendance/approve/' + id
+        : '/admin/gatha/approve/' + id;
+
+      const res = await fetch(API_BASE + endpoint, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Approval failed');
+      }
+
+      setSuccessMessage(t('adm_entry_approved'));
+      setTimeout(() => setSuccessMessage(''), 3000);
+      fetchPendingData(false);
+      fetchStudents();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleReject = async (type, id) => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    setActionLoading('reject-' + type + '-' + id);
+    setError('');
+
+    try {
+      const endpoint = type === 'attendance'
+        ? '/admin/attendance/reject/' + id
+        : '/admin/gatha/reject/' + id;
+
+      const res = await fetch(API_BASE + endpoint, {
+        method: 'POST',
+        headers: { 
+          Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reason: 'Rejected by admin' }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Rejection failed');
+      }
+
+      setSuccessMessage(t('adm_entry_rejected'));
+      setTimeout(() => setSuccessMessage(''), 3000);
+      fetchPendingData(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleApproveAll = async () => {
+    if (!window.confirm('Approve ALL pending entries?')) return;
+
+    const token = localStorage.getItem('jainPathshalaToken');
+    setActionLoading('approve-all');
+    setError('');
+
+    try {
+      const res = await fetch(API_BASE + '/admin/approve-all', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+      });
+
+      if (!res.ok) throw new Error('Bulk approval failed');
+
+      const data = await res.json();
+      setSuccessMessage('✓ ' + data.approved.attendance + ' ' + t('adm_attendance') + ' + ' + data.approved.gatha + ' ' + t('adm_gathas_suffix') + '!');
+      setTimeout(() => setSuccessMessage(''), 5000);
+      fetchPendingData(false);
+      fetchStudents();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // ============ NEW: USER MANAGEMENT HANDLERS ============
+
+  const validateUserForm = (userData) => {
+    if (!userData.name || userData.name.trim().length < 2) {
+      return 'Name must be at least 2 characters';
+    }
+    // Optional: students without a number log in through a family member's number
+    if (userData.mobile && !/^[6-9]\d{9}$/.test(userData.mobile)) {
+      return t('err_mobile_format');
+    }
+    if (userData.password && userData.password.length < 4) {
+      return 'Password must be at least 4 characters';
+    }
+    return null;
+  };
+
+  const handleAddUser = async () => {
+    const validationError = validateUserForm(newUser);
+    if (validationError) {
+      setUserFormError(validationError);
+      return;
+    }
+
+    const token = localStorage.getItem('jainPathshalaToken');
+    setActionLoading('add-user');
+    setUserFormError('');
+
+    try {
+      const res = await fetch(API_BASE + '/admin/users', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newUser),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to add user');
+      }
+
+      setSuccessMessage(newUser.mobile ? t('adm_user_added') : t('adm_user_added_no_mobile'));
+      setTimeout(() => setSuccessMessage(''), 3000);
+      setShowAddUserModal(false);
+      setNewUser({ name: '', mobile: '', password: '' });
+      fetchAllUsers();
+      fetchStudents();
+    } catch (err) {
+      setUserFormError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+
+    const validationError = validateUserForm(editingUser);
+    if (validationError) {
+      setUserFormError(validationError);
+      return;
+    }
+
+    const token = localStorage.getItem('jainPathshalaToken');
+    setActionLoading('update-user');
+    setUserFormError('');
+
+    try {
+      const res = await fetch(API_BASE + '/admin/users/' + editingUser.id, {
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: editingUser.name,
+          mobile: editingUser.mobile,
+          password: editingUser.password,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update user');
+      }
+
+      setSuccessMessage(t('adm_user_updated'));
+      setTimeout(() => setSuccessMessage(''), 3000);
+      setShowEditUserModal(false);
+      setEditingUser(null);
+      fetchAllUsers();
+      fetchStudents();
+    } catch (err) {
+      setUserFormError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Students who stop coming for a while: kept with all their data, but hidden from lists and unable to log in
+  const handleToggleUserActive = async (u) => {
+    const makeActive = u.isActive === false;
+    if (!makeActive && !window.confirm(t('adm_confirm_inactive').replace('{name}', u.name))) return;
+
+    const token = localStorage.getItem('jainPathshalaToken');
+    setActionLoading('active-user-' + u.id);
+    try {
+      const res = await fetch(API_BASE + '/admin/users/' + u.id, {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: makeActive }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to update user');
+      }
+      setSuccessMessage(makeActive ? t('adm_user_activated') : t('adm_user_deactivated'));
+      setTimeout(() => setSuccessMessage(''), 3000);
+      fetchAllUsers();
+      fetchStudents();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteUser = async (userId, username) => {
+    if (!window.confirm('Are you sure you want to delete user "' + username + '"? This action cannot be undone.')) {
+      return;
+    }
+
+    const token = localStorage.getItem('jainPathshalaToken');
+    setActionLoading('delete-user-' + userId);
+
+    try {
+      const res = await fetch(API_BASE + '/admin/users/' + userId, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer ' + token },
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete user');
+      }
+
+      setSuccessMessage(t('adm_user_deleted'));
+      setTimeout(() => setSuccessMessage(''), 3000);
+      fetchAllUsers();
+      fetchStudents();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+
+  // ============ NEW: ADD ENTRY HANDLERS (Attendance/Gatha) ============
+
+  useEffect(() => {
+    if (!showAddEntryModal) return;
+    const token = localStorage.getItem('jainPathshalaToken');
+    fetch(`${API_BASE}/activity-types`, { headers: { Authorization: 'Bearer ' + token } })
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const SYSTEM_NAMES = ['New Learning', 'Revision', 'Other'];
+          setAdminActivityTypes(data.filter(d => !SYSTEM_NAMES.includes(d.name)));
+        }
+      })
+      .catch(() => {});
+  }, [showAddEntryModal]);
+
+  const handleAddEntry = async () => {
+    if (!addEntryData.studentUsername) {
+      setError(t('adm_select_err'));
+      return;
+    }
+
+    const token = localStorage.getItem('jainPathshalaToken');
+    setAddEntryLoading(true);
+    setError('');
+
+    try {
+      let endpoint, body;
+
+      if (addEntryType === 'attendance') {
+        endpoint = '/admin/attendance/add';
+        body = {
+          username: addEntryData.studentUsername,
+          date: addEntryData.date,
+        };
+      } else {
+        const isOther = addEntryData.gathaType === 'other';
+        if (!isOther && (!addEntryData.sutraName || !addEntryData.totalGatha)) {
+          setError(t('adm_fields_err'));
+          setAddEntryLoading(false);
+          return;
+        }
+        if (isOther && !addEntryData.otherSubType) {
+          setError('Please select an activity type');
+          setAddEntryLoading(false);
+          return;
+        }
+        if (isOther && addEntryData.otherSubType === 'Other' && !addEntryData.customActivityDescription.trim()) {
+          setError('Please describe the activity');
+          setAddEntryLoading(false);
+          return;
+        }
+        const selectedActivityType = isOther
+          ? adminActivityTypes.find(a => a.name === addEntryData.otherSubType)
+          : null;
+        const activityTypeName = isOther
+          ? (addEntryData.otherSubType || 'Other')
+          : addEntryData.activityTypeName || 'New Learning';
+        endpoint = '/admin/gatha/add';
+        body = {
+          username: addEntryData.studentUsername,
+          date: addEntryData.date,
+          sutraName: isOther ? '' : addEntryData.sutraName,
+          whichGatha: isOther ? '' : addEntryData.whichGatha,
+          totalGatha: isOther ? 0 : parseInt(addEntryData.totalGatha),
+          type: addEntryData.gathaType,
+          activityTypeName,
+          customActivityDescription: isOther && addEntryData.otherSubType === 'Other'
+            ? (addEntryData.customActivityDescription || '') : null,
+          xpPoints: selectedActivityType?.xpPoints || 0,
+        };
+      }
+
+      const res = await fetch(API_BASE + endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to add entry');
+      }
+
+      setSuccessMessage(addEntryType === 'attendance' ? t('adm_att_added') : t('adm_gatha_added'));
+      setTimeout(() => setSuccessMessage(''), 3000);
+      setShowAddEntryModal(false);
+      setAddEntryData({
+        studentUsername: '',
+        date: formatLocalDateString(new Date()),
+        sutraName: '',
+        whichGatha: '',
+        totalGatha: 1,
+        gathaType: 'new',
+        activityTypeName: 'New Learning',
+        otherSubType: '',
+        customActivityDescription: '',
+      });
+      fetchStudents();
+      fetchPendingData(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAddEntryLoading(false);
+    }
+  };
+
+  // ============ EXPORT FUNCTIONS ============
+  
+  const generateTextReport = () => {
+    if (!exportData) return '';
+    
+    const { students: reportStudents, summary, topPerformers } = exportData;
+    
+    let report = 'JAIN PATHSHALA REPORT\n';
+    report += '================================\n';
+    report += 'Period: ' + formatDate(dateRange.start) + ' to ' + formatDate(dateRange.end) + '\n';
+    report += 'Total Students: ' + summary.totalStudents + '\n';
+    report += 'Active Students: ' + summary.activeStudents + '\n';
+    report += 'Total Attendance: ' + summary.totalAttendance + '\n';
+    report += 'Total New Gathas: ' + summary.totalNewGathas + '\n';
+    report += 'Total Revisions: ' + summary.totalRevisionGathas + '\n';
+    report += '================================\n\n';
+    
+    report += 'TOP PERFORMERS\n';
+    report += '================================\n';
+    report += '\nBy Attendance:\n';
+    topPerformers.byAttendance.slice(0, 5).forEach((s, i) => {
+      report += '  ' + (i + 1) + '. ' + s.name + ' - ' + s.attendanceCount + ' days\n';
+    });
+    
+    report += '\nBy New Gathas:\n';
+    topPerformers.byGatha.slice(0, 5).forEach((s, i) => {
+      report += '  ' + (i + 1) + '. ' + s.name + ' - ' + s.newGathas + ' gathas\n';
+    });
+    
+    report += '\n================================\n';
+    report += 'STUDENT-WISE DETAILS (A-Z):\n';
+    report += '================================\n\n';
+
+    reportStudents.forEach((student, idx) => {
+      report += (idx + 1) + '. ' + student.name + '\n';
+      report += '   Attendance: ' + student.attendanceCount + ' days\n';
+      report += '   New Gathas: ' + student.newGathas + '\n';
+      report += '   Revisions: ' + student.revisionGathas + '\n';
+      report += '   Total Score: ' + (student.attendanceCount + student.newGathas) + '\n\n';
+    });
+
+    report += '================================\n';
+    report += 'Generated: ' + new Date().toLocaleString('en-IN') + '\n';
+    report += 'Jai Jinendra!\n';
+
+    return report;
+  };
+
+  const generateCSVReport = () => {
+    if (!exportData) return '';
+    
+    const { students: reportStudents, summary } = exportData;
+    
+    let csv = 'Jain Pathshala Report - ' + formatDate(dateRange.start) + ' to ' + formatDate(dateRange.end) + '\n\n';
+    csv += 'S.No,Name,Username,Attendance (Days),New Gathas,Revision Gathas,Total Score\n';
+
+    reportStudents.forEach((student, index) => {
+      const totalScore = student.attendanceCount + student.newGathas;
+      csv += (index + 1) + ',"' + student.name + '","' + student.username + '",' + student.attendanceCount + ',' + student.newGathas + ',' + student.revisionGathas + ',' + totalScore + '\n';
+    });
+
+    csv += '\n\nSUMMARY\n';
+    csv += 'Total Students,' + summary.totalStudents + '\n';
+    csv += 'Active Students,' + summary.activeStudents + '\n';
+    csv += 'Total Attendance,' + summary.totalAttendance + '\n';
+    csv += 'Total New Gathas,' + summary.totalNewGathas + '\n';
+    csv += 'Total Revision Gathas,' + summary.totalRevisionGathas + '\n';
+
+    return csv;
+  };
+
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setExportCopied(true);
+      setTimeout(() => setExportCopied(false), 2000);
+    } catch (err) {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setExportCopied(true);
+      setTimeout(() => setExportCopied(false), 2000);
+    }
+  };
+
+  const shareReport = async () => {
+    const report = generateTextReport();
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Jain Pathshala Report',
+          text: report,
+        });
+      } catch (err) {
+        copyToClipboard(report);
+      }
+    } else {
+      copyToClipboard(report);
+    }
+  };
+
+  const downloadReport = (type) => {
+    setIsExporting(true);
+    
+    setTimeout(() => {
+      let content, filename, mimeType;
+      
+      if (type === 'csv') {
+        content = generateCSVReport();
+        filename = 'pathshala-report-' + dateRange.start + '-to-' + dateRange.end + '.csv';
+        mimeType = 'text/csv';
+      } else {
+        content = generateTextReport();
+        filename = 'pathshala-report-' + dateRange.start + '-to-' + dateRange.end + '.txt';
+        mimeType = 'text/plain';
+      }
+
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setIsExporting(false);
+      setSuccessMessage(t('adm_report_dl'));
+      setTimeout(() => setSuccessMessage(''), 3000);
+    }, 500);
+  };
+
+  // ============ GENERATE PDF REPORT ============
+  const generatePDFReport = () => {
+    if (!exportData) return;
+    
+    setIsExporting(true);
+    
+    try {
+      const { students: reportStudents, summary } = exportData;
+      const pdfWorkingDays = countWorkingDays(dateRange.start, dateRange.end);
+
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+
+      const colors = {
+        primary: [99, 102, 241],
+        secondary: [168, 85, 247],
+        accent: [236, 72, 153],
+        success: [34, 197, 94],
+        warning: [249, 115, 22],
+        danger: [239, 68, 68],
+        gold: [234, 179, 8],
+        teal: [20, 184, 166],
+        dark: [31, 41, 55],
+        light: [248, 250, 252],
+        white: [255, 255, 255],
+      };
+
+      // ── Header gradient bands ──
+      doc.setFillColor(...colors.primary);
+      doc.rect(0, 0, pageWidth, 36, 'F');
+      doc.setFillColor(...colors.secondary);
+      doc.rect(0, 36, pageWidth, 5, 'F');
+      doc.setFillColor(...colors.accent);
+      doc.rect(0, 41, pageWidth, 2, 'F');
+
+      // Decorative corner squares
+      doc.setFillColor(255, 255, 255, 0.15);
+      doc.setFillColor(129, 140, 248);
+      doc.roundedRect(pageWidth - 30, 2, 20, 20, 4, 4, 'F');
+      doc.roundedRect(10, 2, 14, 14, 3, 3, 'F');
+
+      doc.setTextColor(...colors.white);
+      doc.setFontSize(22);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Shree Somchintamani Vasupujyaswami Jain Pathshala', pageWidth / 2, 18, { align: 'center' });
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Student Progress Report', pageWidth / 2, 29, { align: 'center' });
+
+      // Date badge
+      doc.setFillColor(...colors.gold);
+      const dateText = formatDate(dateRange.start) + '  to  ' + formatDate(dateRange.end);
+      const dateTextWidth = doc.getTextWidth(dateText) + 18;
+      doc.roundedRect((pageWidth - dateTextWidth) / 2, 47, dateTextWidth, 11, 3, 3, 'F');
+      doc.setTextColor(...colors.dark);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text(dateText, pageWidth / 2, 54, { align: 'center' });
+
+      let yPos = 68;
+
+      // ── Summary section header ──
+      doc.setFillColor(239, 246, 255);
+      doc.roundedRect(12, yPos - 5, pageWidth - 24, 7, 2, 2, 'F');
+      doc.setTextColor(...colors.primary);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('SUMMARY OVERVIEW', 14, yPos);
+      yPos += 8;
+
+      const cardWidth = 43;
+      const cardHeight = 32;
+      const cardGap = 4;
+      const cardStartX = 14;
+
+      const summaryCards = [
+        { value: summary.totalStudents, label: 'Total Students', sub: 'Enrolled', bgColor: [239, 246, 255], borderColor: colors.primary, textColor: colors.primary },
+        { value: pdfWorkingDays, label: 'Working Days', sub: 'Excl. Sundays', bgColor: [255, 247, 237], borderColor: colors.warning, textColor: colors.warning },
+        { value: summary.totalAttendance, label: 'Attendance', sub: 'Total Records', bgColor: [240, 253, 244], borderColor: colors.success, textColor: colors.success },
+        { value: summary.totalNewGathas, label: 'New Gathas', sub: 'Learned', bgColor: [243, 232, 255], borderColor: colors.secondary, textColor: colors.secondary },
+      ];
+
+      summaryCards.forEach((card, index) => {
+        const x = cardStartX + (cardWidth + cardGap) * index;
+
+        doc.setFillColor(...card.bgColor);
+        doc.roundedRect(x, yPos, cardWidth, cardHeight, 4, 4, 'F');
+
+        // Top accent bar on each card
+        doc.setFillColor(...card.borderColor);
+        doc.roundedRect(x, yPos, cardWidth, 4, 2, 2, 'F');
+        doc.rect(x, yPos + 2, cardWidth, 2, 'F');
+
+        doc.setDrawColor(...card.borderColor);
+        doc.setLineWidth(0.5);
+        doc.roundedRect(x, yPos, cardWidth, cardHeight, 4, 4, 'S');
+
+        doc.setTextColor(...card.textColor);
+        doc.setFontSize(20);
+        doc.setFont('helvetica', 'bold');
+        doc.text(String(card.value), x + cardWidth / 2, yPos + 18, { align: 'center' });
+
+        doc.setTextColor(60, 60, 60);
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'bold');
+        doc.text(card.label, x + cardWidth / 2, yPos + 25, { align: 'center' });
+
+        doc.setTextColor(150, 150, 150);
+        doc.setFontSize(6);
+        doc.setFont('helvetica', 'normal');
+        doc.text(card.sub, x + cardWidth / 2, yPos + 30, { align: 'center' });
+      });
+
+      yPos += cardHeight + 14;
+
+      // ── Table section header ──
+      doc.setFillColor(239, 246, 255);
+      doc.roundedRect(12, yPos - 5, pageWidth - 24, 7, 2, 2, 'F');
+      doc.setTextColor(...colors.dark);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('STUDENT-WISE REPORT  (A – Z)', 14, yPos);
+      yPos += 6;
+
+      const tableData = reportStudents.map((student, index) => [
+        index + 1,
+        student.name,
+        student.attendanceCount,
+        Math.max(0, pdfWorkingDays - student.attendanceCount),
+        student.newGathas,
+        student.revisionGathas,
+        student.attendanceCount + student.newGathas,
+      ]);
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['#', 'Student Name', 'Present', 'Absent', 'New\nGathas', 'Revision', 'Score']],
+        body: tableData,
+        theme: 'grid',
+        styles: {
+          font: 'helvetica',
+          fontSize: 8,
+          cellPadding: 3,
+          lineColor: [220, 220, 230],
+          lineWidth: 0.15,
+        },
+        headStyles: {
+          fillColor: colors.primary,
+          textColor: colors.white,
+          fontStyle: 'bold',
+          fontSize: 8,
+          halign: 'center',
+          cellPadding: 4,
+        },
+        bodyStyles: {
+          halign: 'center',
+          valign: 'middle',
+        },
+        columnStyles: {
+          0: { cellWidth: 10, halign: 'center', fontStyle: 'bold' },
+          1: { cellWidth: 52, halign: 'left' },
+          2: { cellWidth: 18, halign: 'center' },
+          3: { cellWidth: 18, halign: 'center' },
+          4: { cellWidth: 20, halign: 'center' },
+          5: { cellWidth: 20, halign: 'center' },
+          6: { cellWidth: 17, halign: 'center' },
+        },
+        alternateRowStyles: {
+          fillColor: [245, 247, 255],
+        },
+        margin: { left: 14, right: 14 },
+        didParseCell: function(data) {
+          if (data.section !== 'body') return;
+          // Absent column — red if > 50%, green if ≤ 10%
+          if (data.column.index === 3) {
+            const absent = Number(data.cell.raw);
+            const pct = pdfWorkingDays > 0 ? absent / pdfWorkingDays : 0;
+            if (pct >= 0.5) {
+              data.cell.styles.textColor = [220, 38, 38];
+              data.cell.styles.fontStyle = 'bold';
+            } else if (pct <= 0.1) {
+              data.cell.styles.textColor = [22, 163, 74];
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+          // Present column — bold green if attendance ≥ 80%
+          if (data.column.index === 2) {
+            const present = Number(data.cell.raw);
+            const pct = pdfWorkingDays > 0 ? present / pdfWorkingDays : 0;
+            if (pct >= 0.8) {
+              data.cell.styles.textColor = [22, 163, 74];
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+        },
+        didDrawPage: function(data) {
+          const pageCount = doc.internal.getNumberOfPages();
+          const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+
+          // Footer band
+          doc.setFillColor(...colors.primary);
+          doc.rect(0, pageHeight - 13, pageWidth, 13, 'F');
+          doc.setFillColor(...colors.secondary);
+          doc.rect(0, pageHeight - 14, pageWidth, 1, 'F');
+
+          doc.setTextColor(...colors.white);
+          doc.setFontSize(7);
+          doc.setFont('helvetica', 'normal');
+
+          const generatedDate = new Date().toLocaleString('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+
+          doc.text('Generated: ' + generatedDate, 14, pageHeight - 5);
+          doc.text('Page ' + currentPage + ' of ' + pageCount, pageWidth / 2, pageHeight - 5, { align: 'center' });
+          doc.setFont('helvetica', 'bold');
+          doc.text('|| Jai Jinendra ||', pageWidth - 14, pageHeight - 5, { align: 'right' });
+        },
+      });
+
+      const fileName = 'Jain-Pathshala-Report-' + dateRange.start + '-to-' + dateRange.end + '.pdf';
+      doc.save(fileName);
+      
+      setSuccessMessage(t('adm_pdf_dl'));
+      setTimeout(() => setSuccessMessage(''), 3000);
+      
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      setError(t('adm_pdf_fail'));
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // ============ COMPUTED VALUES ============
+  
+  const totalPending = pendingData.attendance.length + pendingData.gatha.length;
+
+  const filteredStudents = students
+    .filter(student => {
+      const matchesSearch = student.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        student.username?.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      if (!matchesSearch) return false;
+      
+      if (studentFilter === 'active') {
+        return (student.attendance_count || 0) + (student.new_gathas || 0) > 0;
+      } else if (studentFilter === 'inactive') {
+        return (student.attendance_count || 0) + (student.new_gathas || 0) === 0;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'name') {
+        return (a.name || '').localeCompare(b.name || '');
+      } else if (sortBy === 'attendance') {
+        return (b.attendance_count || 0) - (a.attendance_count || 0);
+      } else if (sortBy === 'gatha') {
+        return (b.new_gathas || 0) - (a.new_gathas || 0);
+      } else if (sortBy === 'total') {
+        const totalA = (a.attendance_count || 0) + (a.new_gathas || 0);
+        const totalB = (b.attendance_count || 0) + (b.new_gathas || 0);
+        return totalB - totalA;
+      }
+      return 0;
+    });
+
+  const filteredPendingAttendance = approvalFilter === 'gatha' ? [] : pendingData.attendance;
+  const filteredPendingGatha = approvalFilter === 'attendance' ? [] : pendingData.gatha;
+
+  const activeStudentsCount = students.filter(s => 
+    (s.attendance_count || 0) + (s.new_gathas || 0) > 0
+  ).length;
+  
+  const totalAttendanceCount = students.reduce((sum, s) => sum + (s.attendance_count || 0), 0);
+  const totalNewGathaCount = students.reduce((sum, s) => sum + (s.new_gathas || 0), 0);
+  const workingDays = countWorkingDays(dateRange.start, dateRange.end);
+
+  const attendanceRate = students.length > 0 
+    ? Math.round((stats?.today_attendance || 0) / students.length * 100)
+    : 0;
+
+  // Filter users for display
+  const filteredUsers = allUsers
+    .filter(u =>
+      userStatusFilter === 'all' ||
+      (userStatusFilter === 'active' ? u.isActive !== false : u.isActive === false)
+    )
+    .filter(u =>
+      u.name?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+      u.username?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+      (/\d/.test(userSearchQuery) && u.mobile?.includes(userSearchQuery.replace(/\D/g, '')))
+    )
+    // Active students first
+    .sort((a, b) => (a.isActive === false) - (b.isActive === false));
+
+
+  // ============ RENDER DATE PICKER ============
+  const renderDatePicker = () => (
+    <div className="bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-bold text-gray-700 flex items-center gap-2">
+          <CalendarDays className="w-5 h-5 text-indigo-500" />
+          {t('adm_date_range')}
+        </p>
+        <button
+          onClick={() => setShowExportModal(true)}
+          className="flex items-center gap-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold active:scale-[0.98]"
+        >
+          <Download className="w-3.5 h-3.5" />
+          {t('adm_export_btn')}
+        </button>
+      </div>
+      
+      <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+        {[
+          { key: 'today', labelKey: 'adm_today' },
+          { key: 'week', labelKey: 'adm_week' },
+          { key: 'month', labelKey: 'adm_month' },
+          { key: 'year', labelKey: 'adm_year' },
+          { key: 'all', labelKey: 'adm_all_time' },
+          { key: 'custom', labelKey: 'adm_custom' },
+        ].map((preset) => (
+          <button
+            key={preset.key}
+            onClick={() => {
+              setDatePreset(preset.key);
+              if (preset.key === 'custom') {
+                setShowCustomDatePicker(true);
+              } else {
+                setShowCustomDatePicker(false);
+              }
+              setShowMonthDropdown(false);
+              setShowYearDropdown(false);
+            }}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex-shrink-0 ${
+              datePreset === preset.key
+                ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg'
+                : 'bg-gray-100 text-gray-600 active:scale-95'
+            }`}
+          >
+            {t(preset.labelKey)}
+          </button>
+        ))}
+      </div>
+
+      {(datePreset === 'custom' || showCustomDatePicker) && (
+        <div className="mt-3 p-3 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl border-2 border-orange-200">
+          <p className="text-xs font-bold text-orange-700 mb-3 flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            {t('adm_custom_range_title')}
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">{t('adm_from_date')}</label>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => {
+                  setCustomStartDate(e.target.value);
+                  setDatePreset('custom');
+                }}
+                className="w-full px-3 py-2.5 border-2 border-orange-200 rounded-xl text-sm font-bold focus:outline-none focus:border-orange-400 bg-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">{t('adm_to_date')}</label>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => {
+                  setCustomEndDate(e.target.value);
+                  setDatePreset('custom');
+                }}
+                className="w-full px-3 py-2.5 border-2 border-orange-200 rounded-xl text-sm font-bold focus:outline-none focus:border-orange-400 bg-white"
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              setDatePreset('custom');
+              setShowCustomDatePicker(false);
+            }}
+            className="w-full mt-3 py-2.5 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-xl font-bold text-sm active:scale-[0.98]"
+          >
+            {t('adm_apply_custom')}
+          </button>
+        </div>
+      )}
+
+      {(datePreset === 'month' || datePreset === 'year') && (
+        <div className="mt-3 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-100">
+          <div className="flex gap-2">
+            {datePreset === 'month' && (
+              <div className="flex-1 relative" data-dropdown="month">
+                <button
+                  onClick={() => {
+                    setShowMonthDropdown(!showMonthDropdown);
+                    setShowYearDropdown(false);
+                  }}
+                  className={`w-full px-3 py-2.5 rounded-xl border-2 text-left font-bold text-sm flex items-center justify-between ${
+                    showMonthDropdown 
+                      ? 'border-indigo-500 bg-white shadow-lg' 
+                      : 'border-indigo-200 bg-white'
+                  }`}
+                >
+                  <span className="text-gray-800 text-xs">{MONTH_NAMES_SHORT[selectedMonth - 1]}</span>
+                  <ChevronDown className={`w-4 h-4 text-indigo-500 transition-transform ${showMonthDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {showMonthDropdown && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl border-2 border-indigo-200 shadow-2xl z-50 max-h-48 overflow-y-auto">
+                    <div className="p-1">
+                      {MONTH_NAMES.map((month, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setSelectedMonth(idx + 1);
+                            setShowMonthDropdown(false);
+                          }}
+                          className={`w-full px-3 py-2 rounded-lg text-left text-sm flex items-center justify-between ${
+                            selectedMonth === idx + 1
+                              ? 'bg-indigo-500 text-white'
+                              : 'text-gray-700 hover:bg-indigo-50'
+                          }`}
+                        >
+                          <span>{month}</span>
+                          {selectedMonth === idx + 1 && <Check className="w-4 h-4" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className={datePreset === 'month' ? 'w-24' : 'flex-1'} data-dropdown="year">
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setShowYearDropdown(!showYearDropdown);
+                    setShowMonthDropdown(false);
+                  }}
+                  className={`w-full px-3 py-2.5 rounded-xl border-2 text-left font-bold text-sm flex items-center justify-between ${
+                    showYearDropdown 
+                      ? 'border-purple-500 bg-white shadow-lg' 
+                      : 'border-purple-200 bg-white'
+                  }`}
+                >
+                  <span className="text-gray-800 text-xs">{selectedYear}</span>
+                  <ChevronDown className={`w-4 h-4 text-purple-500 transition-transform ${showYearDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {showYearDropdown && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl border-2 border-purple-200 shadow-2xl z-50 max-h-48 overflow-y-auto">
+                    <div className="p-1">
+                      {getYearOptions().map((year) => (
+                        <button
+                          key={year}
+                          onClick={() => {
+                            setSelectedYear(year);
+                            setShowYearDropdown(false);
+                          }}
+                          className={`w-full px-3 py-2 rounded-lg text-left text-sm flex items-center justify-between ${
+                            selectedYear === year
+                              ? 'bg-purple-500 text-white'
+                              : 'text-gray-700 hover:bg-purple-50'
+                          }`}
+                        >
+                          <span>{year}</span>
+                          {selectedYear === year && <Check className="w-4 h-4" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-2.5 border-2 border-green-200">
+        <div className="flex items-center justify-center gap-2 text-xs">
+          <span className="font-bold text-green-700">{formatDate(dateRange.start)}</span>
+          <span className="text-green-500">→</span>
+          <span className="font-bold text-green-700">{formatDate(dateRange.end)}</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ============ RENDER EXPORT MODAL ============
+  const renderExportModal = () => {
+    if (!showExportModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+        <div className="bg-white w-full max-h-[90vh] rounded-t-3xl sm:rounded-2xl sm:max-w-md overflow-hidden animate-slide-up">
+          <div className="bg-gradient-to-r from-indigo-500 to-purple-500 p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FileText className="w-6 h-6" />
+                <div>
+                  <h3 className="font-bold text-lg">{t('adm_export_report')}</h3>
+                  <p className="text-xs opacity-80">
+                    {formatDateShort(dateRange.start)} - {formatDateShort(dateRange.end)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="p-2 hover:bg-white/20 rounded-full"
+              >
+                <CloseIcon className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {exportLoading ? (
+            <div className="p-8 text-center">
+              <RefreshCw className="w-10 h-10 animate-spin text-indigo-500 mx-auto" />
+              <p className="mt-4 text-gray-600">{t('adm_loading_report')}</p>
+            </div>
+          ) : exportData ? (
+            <>
+              <div className="p-4 bg-gray-50 border-b">
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-indigo-600">{exportData.summary.totalStudents}</p>
+                    <p className="text-xs text-gray-500">{t('adm_students')}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-orange-500">{workingDays}</p>
+                    <p className="text-xs text-gray-500">{t('adm_working_days')}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-green-600">{exportData.summary.totalAttendance}</p>
+                    <p className="text-xs text-gray-500">{t('adm_days_suffix')}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-purple-600">{exportData.summary.totalNewGathas}</p>
+                    <p className="text-xs text-gray-500">{t('adm_gathas_suffix')}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 space-y-3 border-t bg-white">
+                <button
+                  onClick={generatePDFReport}
+                  disabled={isExporting}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-500 to-pink-500 text-white py-3.5 rounded-xl font-bold text-sm active:scale-[0.98] disabled:opacity-50 shadow-lg"
+                >
+                  {isExporting ? (
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <FileText className="w-5 h-5" />
+                  )}
+                  {t('adm_download_pdf')}
+                </button>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => downloadReport('txt')}
+                    disabled={isExporting}
+                    className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-bold text-xs active:scale-[0.98] disabled:opacity-50"
+                  >
+                    <Download className="w-4 h-4" />
+                    {t('adm_text_file')}
+                  </button>
+                  <button
+                    onClick={() => downloadReport('csv')}
+                    disabled={isExporting}
+                    className="flex items-center justify-center gap-2 bg-green-100 text-green-700 py-2.5 rounded-xl font-bold text-xs active:scale-[0.98] disabled:opacity-50"
+                  >
+                    <Download className="w-4 h-4" />
+                    CSV/Excel
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => copyToClipboard(generateTextReport())}
+                  className="w-full flex items-center justify-center gap-2 bg-gray-50 text-gray-600 py-2.5 rounded-xl font-bold text-xs active:scale-[0.98] border border-gray-200"
+                >
+                  {exportCopied ? (
+                    <>
+                      <CheckCheck className="w-4 h-4 text-green-500" />
+                      <span className="text-green-600">{t('adm_copied')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      {t('adm_copy')}
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={shareReport}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2.5 rounded-xl font-bold text-xs active:scale-[0.98]"
+                >
+                  <Share2 className="w-4 h-4" />
+                  {t('adm_share')}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="p-8 text-center text-gray-500">
+              <AlertTriangle className="w-10 h-10 mx-auto text-yellow-500 mb-2" />
+              <p>{t('adm_failed_report')}</p>
+              <button
+                onClick={fetchExportData}
+                className="mt-4 px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm"
+              >
+                {t('adm_retry')}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ============ RENDER ADD USER MODAL ============
+  const renderAddUserModal = () => {
+    if (!showAddUserModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+        <div className="bg-white w-full max-h-[90vh] rounded-t-3xl sm:rounded-2xl sm:max-w-md overflow-hidden animate-slide-up">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <UserPlus className="w-6 h-6" />
+                <h3 className="font-bold text-lg">{t('adm_add_new_user')}</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAddUserModal(false);
+                  setNewUser({ name: '', mobile: '', password: '' });
+                  setUserFormError('');
+                }}
+                className="p-2 hover:bg-white/20 rounded-full"
+              >
+                <CloseIcon className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 space-y-4">
+            {userFormError && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-lg">
+                <p className="text-sm text-red-700">{userFormError}</p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_full_name')}</label>
+              <input
+                type="text"
+                value={newUser.name}
+                onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                placeholder={t('adm_enter_name')}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_mobile_field')}</label>
+              <input
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                value={newUser.mobile || ''}
+                onChange={(e) => setNewUser({ ...newUser, mobile: e.target.value.replace(/\D/g, '') })}
+                placeholder={t('adm_enter_mobile')}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-400"
+              />
+              <p className="text-xs text-gray-500 mt-1">{t('adm_mobile_hint')}</p>
+            </div>
+
+            {newUser.mobile ? (
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_pw_new_number')}</label>
+                <input
+                  type="text"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  placeholder={t('adm_enter_password')}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-400"
+                />
+                <p className="text-xs text-gray-500 mt-1">{t('adm_pw_new_number_hint')}</p>
+              </div>
+            ) : (
+              <p className="text-xs text-purple-700 bg-purple-50 rounded-lg p-2">{t('adm_no_mobile_family_hint')}</p>
+            )}
+
+            <button
+              onClick={handleAddUser}
+              disabled={actionLoading === 'add-user'}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3.5 rounded-xl font-bold active:scale-[0.98] disabled:opacity-50"
+            >
+              {actionLoading === 'add-user' ? (
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              ) : (
+                <UserPlus className="w-5 h-5" />
+              )}
+              {t('adm_add_user')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============ RENDER EDIT USER MODAL ============
+  const renderEditUserModal = () => {
+    if (!showEditUserModal || !editingUser) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+        <div className="bg-white w-full max-h-[90vh] rounded-t-3xl sm:rounded-2xl sm:max-w-md overflow-hidden animate-slide-up">
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Edit3 className="w-6 h-6" />
+                <h3 className="font-bold text-lg">{t('adm_edit_user')}</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEditUserModal(false);
+                  setEditingUser(null);
+                  setUserFormError('');
+                }}
+                className="p-2 hover:bg-white/20 rounded-full"
+              >
+                <CloseIcon className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 space-y-4">
+            {userFormError && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-lg">
+                <p className="text-sm text-red-700">{userFormError}</p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_full_name')}</label>
+              <input
+                type="text"
+                value={editingUser.name}
+                onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_mobile_field')}</label>
+              <input
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                value={editingUser.mobile || ''}
+                onChange={(e) => setEditingUser({ ...editingUser, mobile: e.target.value.replace(/\D/g, '') })}
+                placeholder={t('adm_enter_mobile')}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-400"
+              />
+              <p className="text-xs text-gray-500 mt-1">{t('adm_mobile_hint')}</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_password_field')}</label>
+              <input
+                type="text"
+                value={editingUser.password || ''}
+                onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })}
+                placeholder={t('adm_leave_empty_pw')}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-400"
+              />
+              <p className="text-xs text-gray-500 mt-1">{t('adm_pw_shared_hint')}</p>
+            </div>
+
+            <button
+              onClick={handleUpdateUser}
+              disabled={actionLoading === 'update-user'}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-3.5 rounded-xl font-bold active:scale-[0.98] disabled:opacity-50"
+            >
+              {actionLoading === 'update-user' ? (
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              ) : (
+                <Save className="w-5 h-5" />
+              )}
+              {t('adm_save_changes')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============ RENDER ADD ENTRY MODAL ============
+  const renderAddEntryModal = () => {
+    if (!showAddEntryModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+        <div className="bg-white w-full max-h-[90vh] rounded-t-3xl sm:rounded-2xl sm:max-w-md overflow-hidden animate-slide-up">
+          <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Plus className="w-6 h-6" />
+                <h3 className="font-bold text-lg">{t('adm_add_entry_title')}</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAddEntryModal(false);
+                  setAddEntryData({
+                    studentUsername: '',
+                    date: formatLocalDateString(new Date()),
+                    sutraName: '',
+                    whichGatha: '',
+                    totalGatha: 1,
+                    gathaType: 'new'
+                  });
+                }}
+                className="p-2 hover:bg-white/20 rounded-full"
+              >
+                <CloseIcon className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 space-y-4">
+            {/* Entry Type Toggle */}
+            <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
+              <button
+                onClick={() => setAddEntryType('attendance')}
+                className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                  addEntryType === 'attendance' ? 'bg-white text-green-600 shadow' : 'text-gray-600'
+                }`}
+              >
+                <Calendar className="w-4 h-4" />
+                {t('adm_attendance')}
+              </button>
+              <button
+                onClick={() => setAddEntryType('gatha')}
+                className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                  addEntryType === 'gatha' ? 'bg-white text-purple-600 shadow' : 'text-gray-600'
+                }`}
+              >
+                <BookOpen className="w-4 h-4" />
+                Gatha
+              </button>
+            </div>
+
+            {/* Select Student */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_select_student')}</label>
+              <select
+                value={addEntryData.studentUsername}
+                onChange={(e) => setAddEntryData({ ...addEntryData, studentUsername: e.target.value })}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
+              >
+                <option value="">{t('adm_select_student_ph')}</option>
+                {students.map((s) => (
+                  <option key={s.username} value={s.username}>
+                    {s.name} (@{s.username})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Date */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_date_field')}</label>
+              <input
+                type="date"
+                value={addEntryData.date}
+                onChange={(e) => setAddEntryData({ ...addEntryData, date: e.target.value })}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
+              />
+            </div>
+
+            {/* Gatha specific fields */}
+            {addEntryType === 'gatha' && (
+              <>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_gatha_type')}</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setAddEntryData({ ...addEntryData, gathaType: 'new', activityTypeName: 'New Learning', customActivityDescription: '' })}
+                      className={`flex-1 py-2.5 rounded-lg text-sm font-bold ${addEntryData.gathaType === 'new' ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-600'}`}
+                    >
+                      {t('adm_new_type')}
+                    </button>
+                    <button
+                      onClick={() => setAddEntryData({ ...addEntryData, gathaType: 'revision', activityTypeName: 'Revision', customActivityDescription: '' })}
+                      className={`flex-1 py-2.5 rounded-lg text-sm font-bold ${addEntryData.gathaType === 'revision' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600'}`}
+                    >
+                      {t('revision')}
+                    </button>
+                    <button
+                      onClick={() => setAddEntryData({ ...addEntryData, gathaType: 'other', activityTypeName: 'Other', otherSubType: '', customActivityDescription: '' })}
+                      className={`flex-1 py-2.5 rounded-lg text-sm font-bold ${addEntryData.gathaType === 'other' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'}`}
+                    >
+                      {t('other_tab')}
+                    </button>
+                  </div>
+
+                  {addEntryData.gathaType === 'other' && (
+                    <div className="mt-3 space-y-2">
+                      <label className="block text-sm font-bold text-gray-700 mb-1">Activity Type</label>
+                      <select
+                        value={addEntryData.otherSubType}
+                        onChange={e => setAddEntryData({ ...addEntryData, otherSubType: e.target.value, customActivityDescription: '' })}
+                        className="w-full px-4 py-3 border-2 border-orange-200 rounded-xl focus:outline-none focus:border-orange-400 text-sm bg-white"
+                      >
+                        <option value="">-- Select activity --</option>
+                        {adminActivityTypes.map(at => (
+                          <option key={at.id} value={at.name}>
+                            {at.name}{at.xpPoints > 0 ? ` (+${at.xpPoints} XP)` : ''}
+                          </option>
+                        ))}
+                        <option value="Other">Other (free text)</option>
+                      </select>
+                      {addEntryData.otherSubType === 'Other' && (
+                        <textarea
+                          value={addEntryData.customActivityDescription || ''}
+                          onChange={e => setAddEntryData({ ...addEntryData, customActivityDescription: e.target.value.slice(0, 500) })}
+                          placeholder={t('describe_activity_placeholder')}
+                          rows={2}
+                          className="w-full px-4 py-3 border-2 border-orange-200 rounded-xl focus:outline-none focus:border-orange-400 resize-none text-sm"
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {addEntryData.gathaType !== 'other' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_sutra_name_field')}</label>
+                      <input
+                        type="text"
+                        value={addEntryData.sutraName}
+                        onChange={(e) => setAddEntryData({ ...addEntryData, sutraName: e.target.value })}
+                        placeholder="e.g., Namokar Mantra"
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_which_gatha')}</label>
+                      <input
+                        type="text"
+                        value={addEntryData.whichGatha}
+                        onChange={(e) => setAddEntryData({ ...addEntryData, whichGatha: e.target.value })}
+                        placeholder="e.g., 1-5 or specific numbers"
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_total_gatha')}</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={addEntryData.totalGatha}
+                        onChange={(e) => setAddEntryData({ ...addEntryData, totalGatha: e.target.value })}
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
+                      />
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            <button
+              onClick={handleAddEntry}
+              disabled={addEntryLoading}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3.5 rounded-xl font-bold active:scale-[0.98] disabled:opacity-50"
+            >
+              {addEntryLoading ? (
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              ) : (
+                <Plus className="w-5 h-5" />
+              )}
+              {addEntryType === 'attendance' ? t('adm_add_attendance') : t('adm_add_gatha_btn')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============ RENDER FAMILY GROUPS SECTION ============
+  const renderFamilyGroupsSection = () => (
+    <div className="mt-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <Users className="w-5 h-5 text-purple-500" />
+          {t('adm_family_groups')}
+        </h3>
+        <button
+          onClick={() => {
+            setSelectedMembers([]);
+            setNewGroup({ groupName: '', members: [] });
+            setEditingGroupId(null);
+            setError('');
+            setShowAddGroupModal(true);
+          }}
+          className="flex items-center gap-1 bg-purple-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold active:scale-[0.98]"
+        >
+          <Plus className="w-4 h-4" />
+          {t('adm_create_group')}
+        </button>
+      </div>
+
+      <div className="bg-purple-50 rounded-xl p-3 border-2 border-purple-200">
+        <p className="text-xs text-purple-700">
+          {t('adm_family_info')}
+        </p>
+      </div>
+
+      {/* The list is long, so it stays collapsed until asked for */}
+      <button
+        onClick={() => setShowFamilyGroups((v) => !v)}
+        className="w-full flex items-center justify-between bg-white border-2 border-purple-200 rounded-xl px-4 py-2.5 text-sm font-bold text-purple-700 active:scale-[0.99]"
+      >
+        <span>
+          {showFamilyGroups ? t('adm_hide_groups') : t('adm_show_groups')}
+          {!familyGroupsLoading && ` (${familyGroups.length})`}
+        </span>
+        <ChevronDown className={`w-4 h-4 transition-transform ${showFamilyGroups ? 'rotate-180' : ''}`} />
+      </button>
+
+      {!showFamilyGroups ? null : familyGroupsLoading ? (
+        <div className="text-center py-4">
+          <RefreshCw className="w-6 h-6 animate-spin text-purple-500 mx-auto" />
+        </div>
+      ) : familyGroups.length === 0 ? (
+        <div className="bg-white rounded-xl p-6 border-2 border-gray-200 text-center">
+          <Users className="w-10 h-10 mx-auto text-gray-300 mb-2" />
+          <p className="text-gray-500 text-sm">{t('adm_no_groups')}</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {familyGroups.map((group) => (
+            <div key={group.id} className="bg-white rounded-xl border-2 border-purple-200 p-3 shadow-sm">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-bold text-gray-800">{group.groupName}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {group.members.length} {t('adm_members')}
+                  </p>
+                </div>
+                <div className="flex gap-1.5">
+                <button
+                  onClick={() => {
+                    setEditingGroupId(group.id);
+                    setNewGroup({ groupName: group.groupName, members: group.members });
+                    setSelectedMembers(group.members);
+                    setError('');
+                    setShowAddGroupModal(true);
+                  }}
+                  className="p-2 bg-blue-100 text-blue-600 rounded-lg active:scale-95"
+                  title={t('adm_edit_family_group')}
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleDeleteGroup(group.id)}
+                  disabled={actionLoading === 'delete-group-' + group.id}
+                  className="p-2 bg-red-100 text-red-600 rounded-lg active:scale-95"
+                >
+                  {actionLoading === 'delete-group-' + group.id ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                </button>
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {(group.memberDetails || []).map((member) => (
+                  <span
+                    key={member.username}
+                    className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium"
+                  >
+                    {member.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // ============ RENDER ADD GROUP MODAL ============
+  const renderAddGroupModal = () => {
+    if (!showAddGroupModal) return null;
+
+    // Get students not in any group
+    const studentsInGroups = familyGroups.filter(g => g.id !== editingGroupId).flatMap(g => g.members);
+    const availableStudents = students.filter(s => !studentsInGroups.includes(s.username));
+    // The family logs in with a member's mobile number, so at least one member needs one
+    const mobileOf = Object.fromEntries(allUsers.map(u => [u.username, u.mobile]));
+    const hasMobileMember = selectedMembers.some(u => mobileOf[u]);
+
+    return (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+        <div className="bg-white w-full max-h-[90vh] rounded-t-3xl sm:rounded-2xl sm:max-w-md overflow-hidden animate-slide-up">
+          <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Users className="w-6 h-6" />
+                <h3 className="font-bold text-lg">{t(editingGroupId ? 'adm_edit_family_group' : 'adm_create_family_group')}</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAddGroupModal(false);
+                  setSelectedMembers([]);
+                  setEditingGroupId(null);
+                }}
+                className="p-2 hover:bg-white/20 rounded-full"
+              >
+                <CloseIcon className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-lg">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('adm_group_name')}</label>
+              <input
+                type="text"
+                value={newGroup.groupName}
+                onChange={(e) => setNewGroup({ ...newGroup, groupName: e.target.value })}
+                placeholder="e.g., Sharma Family"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                {t('adm_select_members')} * ({selectedMembers.length} {t('adm_selected')})
+              </label>
+              <p className="text-xs text-gray-500 mb-1">{t('adm_min_2_members')}</p>
+              <p className={`text-xs mb-2 ${selectedMembers.length > 0 && !hasMobileMember ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                📱 {t('adm_family_needs_mobile')}
+              </p>
+
+              <div className="max-h-48 overflow-y-auto border-2 border-gray-200 rounded-xl p-2 space-y-1">
+                {availableStudents.map((student) => (
+                  <button
+                    key={student.username}
+                    onClick={() => toggleMemberSelection(student.username)}
+                    className={`w-full flex items-center justify-between p-2 rounded-lg text-left ${
+                      selectedMembers.includes(student.username)
+                        ? 'bg-purple-100 border-2 border-purple-400'
+                        : 'bg-gray-50 border-2 border-transparent'
+                    }`}
+                  >
+                    <span className="text-sm font-medium text-gray-800">
+                      {student.name}
+                      {mobileOf[student.username] && <span className="ml-1.5 text-xs text-gray-500">📱 {mobileOf[student.username]}</span>}
+                    </span>
+                    {selectedMembers.includes(student.username) && (
+                      <Check className="w-4 h-4 text-purple-600" />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {selectedMembers.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {selectedMembers.map(username => {
+                    const student = students.find(s => s.username === username);
+                    return (
+                      <span
+                        key={username}
+                        className="bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1"
+                      >
+                        {student?.name || username}
+                        <button onClick={() => toggleMemberSelection(username)}>
+                          <CloseIcon className="w-3 h-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="p-4 border-t">
+            <button
+              onClick={handleSaveGroup}
+              disabled={actionLoading === 'create-group' || selectedMembers.length < 2 || !newGroup.groupName.trim() || !hasMobileMember}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3.5 rounded-xl font-bold active:scale-[0.98] disabled:opacity-50"
+            >
+              {actionLoading === 'create-group' ? (
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              ) : (
+                <Users className="w-5 h-5" />
+              )}
+              {t(editingGroupId ? 'adm_save_changes' : 'adm_create_group')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============ RENDER USER MANAGEMENT ============
+  const renderUserManagement = () => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <UserCog className="w-5 h-5 text-indigo-500" />
+          {t('adm_user_mgmt')}
+        </h3>
+        <button
+          onClick={fetchAllUsers}
+          disabled={usersLoading}
+          className="p-2 bg-indigo-100 text-indigo-600 rounded-xl active:scale-[0.98]"
+        >
+          <RefreshCw className={`w-4 h-4 ${usersLoading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {/* Render Family Groups Here */}
+      {renderFamilyGroupsSection()}
+      
+      {/* Render Add Group Modal Here */}
+      {renderAddGroupModal()}
+
+      {/* Action Buttons */}
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={() => setShowAddUserModal(true)}
+          className="flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-xl font-bold active:scale-[0.98] shadow-lg"
+        >
+          <UserPlus className="w-5 h-5" />
+          {t('adm_add_user')}
+        </button>
+        <button
+          onClick={() => setShowAddEntryModal(true)}
+          className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-bold active:scale-[0.98] shadow-lg"
+        >
+          <Plus className="w-5 h-5" />
+          {t('adm_add_entry')}
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="bg-white rounded-xl p-3 border-2 border-indigo-200 shadow-sm">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={userSearchQuery}
+            onChange={(e) => setUserSearchQuery(e.target.value)}
+            placeholder={t('adm_search_users')}
+            className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400 text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Stats (tap to filter the list) */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { key: 'all', value: allUsers.length, label: t('adm_total_users'),
+            text: 'text-blue-600', idle: 'border-blue-200', selected: 'border-blue-500 ring-2 ring-blue-200' },
+          { key: 'active', value: allUsers.filter(u => u.isActive !== false).length, label: t('adm_active'),
+            text: 'text-green-600', idle: 'border-green-200', selected: 'border-green-500 ring-2 ring-green-200' },
+          { key: 'inactive', value: allUsers.filter(u => u.isActive === false).length, label: t('adm_inactive'),
+            text: 'text-gray-500', idle: 'border-gray-200', selected: 'border-gray-500 ring-2 ring-gray-200' },
+        ].map(({ key, value, label, text, idle, selected }) => (
+          <button
+            key={key}
+            onClick={() => setUserStatusFilter(key)}
+            className={`bg-white rounded-xl p-3 border-2 text-center transition-all ${userStatusFilter === key ? selected : idle}`}
+          >
+            <p className={`text-xl font-bold ${text}`}>{value}</p>
+            <p className="text-xs text-gray-500">{label}</p>
+          </button>
+        ))}
+      </div>
+
+      {/* Users List */}
+      {usersLoading ? (
+        <div className="bg-white rounded-xl p-8 border-2 border-indigo-200 text-center">
+          <RefreshCw className="w-10 h-10 animate-spin text-indigo-500 mx-auto" />
+          <p className="mt-4 text-gray-600">{t('adm_loading_users')}</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filteredUsers.map((u) => (
+            <div key={u.id} className={`rounded-xl border-2 p-3 shadow-sm ${
+              u.isActive === false ? 'bg-gray-50 border-gray-200' : 'bg-white border-indigo-200'
+            }`}>
+              <div className="flex items-start justify-between">
+                <div className={`flex-1 min-w-0 ${u.isActive === false ? 'opacity-60' : ''}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-bold text-gray-800 text-sm truncate">{u.name}</span>
+                    {u.isActive === false && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-gray-200 text-gray-600">
+                        {t('adm_inactive')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    {u.mobile ? (
+                      <span>📱 {u.mobile}</span>
+                    ) : u.loginVia ? (
+                      <span className="text-purple-700">👪 {t('adm_login_via')} {u.loginVia.name} ({u.loginVia.mobile})</span>
+                    ) : (
+                      <span className="font-semibold text-red-600">{u.familyGroup ? t('adm_family_no_mobile') : t('adm_no_mobile')}</span>
+                    )}
+                  </div>
+                  {u.familyGroup && (
+                    <p className="text-[11px] text-gray-400 mt-0.5">{t('adm_family_groups')}: {u.familyGroup}</p>
+                  )}
+                </div>
+
+                <div className="flex gap-1.5 ml-2 items-start">
+                  <button
+                    onClick={() => handleToggleUserActive(u)}
+                    disabled={actionLoading === 'active-user-' + u.id}
+                    title={u.isActive === false ? t('adm_mark_active') : t('adm_mark_inactive')}
+                    className={`px-2.5 py-2 rounded-lg text-xs font-bold active:scale-95 disabled:opacity-50 ${
+                      u.isActive === false ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-700'
+                    }`}
+                  >
+                    {actionLoading === 'active-user-' + u.id
+                      ? <RefreshCw className="w-4 h-4 animate-spin" />
+                      : (u.isActive === false ? t('adm_inactive') : t('adm_active'))}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingUser({ ...u, password: '' });
+                      setShowEditUserModal(true);
+                    }}
+                    className="p-2 bg-blue-100 text-blue-600 rounded-lg active:scale-95"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteUser(u.id, u.username)}
+                    disabled={actionLoading === 'delete-user-' + u.id || u.role === 'admin'}
+                    className="p-2 bg-red-100 text-red-600 rounded-lg active:scale-95 disabled:opacity-50"
+                  >
+                    {actionLoading === 'delete-user-' + u.id ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {filteredUsers.length === 0 && (
+            <div className="bg-white rounded-xl p-8 border-2 border-gray-200 text-center">
+              <Users className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+              <p className="text-gray-500">{t('adm_no_users')}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  // ============ RENDER OVERVIEW ============
+  const renderOverview = () => (
+    <div className="space-y-4">
+
+      {newPendingAlert && (
+        <button
+          onClick={() => {
+            setActiveTab('approvals');
+            setNewPendingAlert(false);
+          }}
+          className="w-full bg-gradient-to-r from-red-500 to-orange-500 text-white p-3 rounded-xl flex items-center justify-between animate-pulse"
+        >
+          <div className="flex items-center gap-2">
+            <BellRing className="w-5 h-5" />
+            <span className="font-bold text-sm">{t('adm_new_pending_alert')}</span>
+          </div>
+          <span className="bg-white text-red-500 px-2 py-1 rounded-lg text-xs font-bold">
+            {t('adm_view_now')}
+          </span>
+        </button>
+      )}
+
+      <div className="relative overflow-hidden bg-gradient-to-br from-kumkum-700 via-kumkum-600 to-kesar-600 rounded-2xl p-4 pt-6 text-white shadow-temple">
+        <Toran className="absolute top-0 left-0 right-0" />
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Activity className="w-5 h-5" />
+            <span className="font-bold">{t('adm_todays_summary')}</span>
+          </div>
+          <span className="text-xs bg-white/20 px-2 py-1 rounded-full">
+            {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+          </span>
+        </div>
+        
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-white/20 backdrop-blur rounded-xl p-2.5 text-center">
+            <UserCheck className="w-5 h-5 mx-auto mb-1" />
+            <p className="text-xl font-bold">{stats?.today_attendance || 0}</p>
+            <p className="text-xs opacity-80">{t('present')}</p>
+          </div>
+          <div className="bg-white/20 backdrop-blur rounded-xl p-2.5 text-center">
+            <Users className="w-5 h-5 mx-auto mb-1" />
+            <p className="text-xl font-bold">{students.length}</p>
+            <p className="text-xs opacity-80">{t('adm_students')}</p>
+          </div>
+          <div className="bg-white/20 backdrop-blur rounded-xl p-2.5 text-center">
+            <Clock className="w-5 h-5 mx-auto mb-1" />
+            <p className="text-xl font-bold">{totalPending}</p>
+            <p className="text-xs opacity-80">{t('adm_pending_tab')}</p>
+          </div>
+        </div>
+      </div>
+
+      <TrendsPanel />
+
+      {renderDatePicker()}
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white rounded-xl p-3 border-2 border-blue-200 shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <Users className="w-6 h-6 text-blue-500" />
+            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold">
+              {activeStudentsCount} {t('adm_active_badge')}
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{students.length}</p>
+          <p className="text-xs text-gray-500">{t('adm_total_students')}</p>
+        </div>
+
+        <div className="bg-white rounded-xl p-3 border-2 border-green-200 shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <Target className="w-6 h-6 text-green-500" />
+            <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
+              attendanceRate >= 70 ? 'bg-green-100 text-green-700' :
+              attendanceRate >= 40 ? 'bg-yellow-100 text-yellow-700' :
+              'bg-red-100 text-red-700'
+            }`}>
+              {attendanceRate}%
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{stats?.today_attendance || 0}/{students.length}</p>
+          <p className="text-xs text-gray-500">{t('adm_todays_att')}</p>
+        </div>
+
+        <div className="bg-white rounded-xl p-3 border-2 border-purple-200 shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <BookOpen className="w-6 h-6 text-purple-500" />
+            <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-bold">
+              New
+            </span>
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{totalNewGathaCount}</p>
+          <p className="text-xs text-gray-500">{t('adm_new_gathas_range')}</p>
+        </div>
+
+        <button
+          onClick={() => setActiveTab('approvals')}
+          className="bg-white rounded-xl p-3 border-2 border-yellow-200 shadow-sm text-left relative overflow-hidden active:scale-[0.98]"
+        >
+          {totalPending > 0 && (
+            <div className="absolute top-0 right-0 w-16 h-16 bg-yellow-400 transform rotate-45 translate-x-8 -translate-y-8"></div>
+          )}
+          <div className="flex items-center justify-between mb-1">
+            <Clock className="w-6 h-6 text-yellow-500" />
+            {totalPending > 0 && (
+              <Zap className="w-4 h-4 text-yellow-600 animate-pulse relative z-10" />
+            )}
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{totalPending}</p>
+          <p className="text-xs text-gray-500">{t('adm_pending_tab')}</p>
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl p-4 border-2 border-indigo-200 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+            <Award className="w-5 h-5 text-yellow-500" />
+            {t('adm_top_performers')}
+          </h3>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className="text-xs text-indigo-600 font-bold"
+          >
+            {t('adm_view_all')}
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-2">
+          <div className="relative bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-xl p-3 overflow-hidden">
+            <div className="absolute top-1 right-1 text-2xl">🏆</div>
+            <p className="text-xs font-bold text-yellow-800 mb-0.5">{t('adm_attendance')}</p>
+            <p className="text-sm font-bold text-gray-800 truncate pr-6">
+              {topStudents.topAttendance?.[0]?.name || 'N/A'}
+            </p>
+            <p className="text-xs font-bold text-yellow-700 mt-1">
+              {topStudents.topAttendance?.[0]?.count || 0} {t('adm_days_suffix')}
+            </p>
+          </div>
+
+          <div className="relative bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-3 overflow-hidden">
+            <div className="absolute top-1 right-1 text-2xl">📚</div>
+            <p className="text-xs font-bold text-purple-800 mb-0.5">{t('adm_new_gatha')}</p>
+            <p className="text-sm font-bold text-gray-800 truncate pr-6">
+              {topStudents.topGatha?.[0]?.name || 'N/A'}
+            </p>
+            <p className="text-xs font-bold text-purple-700 mt-1">
+              {topStudents.topGatha?.[0]?.count || 0} {t('adm_new_type')}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={() => setActiveTab('students')}
+          className="flex items-center gap-3 bg-white rounded-xl p-3 border-2 border-blue-200 shadow-sm active:scale-[0.98]"
+        >
+          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+            <Users className="w-5 h-5 text-blue-600" />
+          </div>
+          <div className="text-left">
+            <p className="font-bold text-gray-800 text-sm">{t('adm_students')}</p>
+            <p className="text-xs text-gray-500">{t('adm_view_all_sub')}</p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('users')}
+          className="flex items-center gap-3 bg-white rounded-xl p-3 border-2 border-purple-200 shadow-sm active:scale-[0.98]"
+        >
+          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+            <UserCog className="w-5 h-5 text-purple-600" />
+          </div>
+          <div className="text-left">
+            <p className="font-bold text-gray-800 text-sm">{t('adm_manage_users')}</p>
+            <p className="text-xs text-gray-500">{t('adm_add_edit')}</p>
+          </div>
+        </button>
+      </div>
+    </div>
+  );
+
+  // ============ RENDER APPROVALS ============
+  const renderApprovals = () => (
+    <div className="space-y-4">
+
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold text-gray-800">{t('adm_pending_section')}</h3>
+      </div>
+
+      {totalPending > 0 && (
+        <button
+          onClick={handleApproveAll}
+          disabled={actionLoading === 'approve-all'}
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-3 rounded-xl active:scale-[0.98] font-bold shadow-lg"
+        >
+          <Check className="w-5 h-5" />
+          {actionLoading === 'approve-all' ? t('adm_approving') : t('adm_approve_all') + ' (' + totalPending + ')'}
+        </button>
+      )}
+
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+        {[
+          { key: 'all', label: t('adm_all_filter') + ' (' + totalPending + ')' },
+          { key: 'attendance', label: t('adm_attendance').slice(0, 5) + ' (' + pendingData.attendance.length + ')' },
+          { key: 'gatha', label: 'Gatha (' + pendingData.gatha.length + ')' },
+        ].map((filter) => (
+          <button
+            key={filter.key}
+            onClick={() => setApprovalFilter(filter.key)}
+            className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold transition-all ${
+              approvalFilter === filter.key ? 'bg-white text-gray-800 shadow' : 'text-gray-600'
+            }`}
+          >
+            {filter.label}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="bg-white rounded-xl p-8 border-2 border-indigo-200 text-center">
+          <RefreshCw className="w-10 h-10 animate-spin text-indigo-500 mx-auto" />
+          <p className="mt-4 text-gray-600 text-sm">{t('adm_loading_report')}</p>
+        </div>
+      ) : totalPending === 0 ? (
+        <div className="bg-white rounded-xl p-8 border-2 border-green-200 text-center">
+          <CheckCircle className="w-16 h-16 mx-auto text-green-400 mb-4" />
+          <p className="text-lg font-bold text-gray-800">{t('adm_all_caught_up')}</p>
+          <p className="text-sm text-gray-500">{t('no_pending_approvals')}</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredPendingAttendance.map((item) => (
+            <div key={'att-' + item.id} className="bg-white border-2 border-yellow-200 rounded-xl p-3 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Calendar className="w-4 h-4 text-yellow-600 flex-shrink-0" />
+                    <span className="font-bold text-gray-800 text-sm truncate">{item.student_name || item.username}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 ml-6">{formatDate(item.date)}</p>
+                </div>
+
+                <div className="flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => handleApprove('attendance', item.id)}
+                    disabled={actionLoading === 'approve-attendance-' + item.id}
+                    className="p-2.5 bg-green-500 text-white rounded-xl active:scale-95"
+                  >
+                    {actionLoading === 'approve-attendance-' + item.id ? (
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Check className="w-5 h-5" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleReject('attendance', item.id)}
+                    disabled={actionLoading === 'reject-attendance-' + item.id}
+                    className="p-2.5 bg-red-500 text-white rounded-xl active:scale-95"
+                  >
+                    <XCircle className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {filteredPendingGatha.map((item) => (
+            <div key={'gatha-' + item.id} className="bg-white border-2 border-purple-200 rounded-xl p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <BookOpen className="w-4 h-4 text-purple-600 flex-shrink-0" />
+                    <span className="font-bold text-gray-800 text-sm truncate">{item.student_name || item.username}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 text-white ${
+                      item.type === 'new' ? 'bg-purple-500' : item.type === 'revision' ? 'bg-blue-500' : 'bg-orange-500'
+                    }`}>
+                      {item.type === 'new' ? t('adm_new_type') : item.type === 'revision' ? t('adm_rev_type') : 'Other'}
+                    </span>
+                  </div>
+                  <div className="ml-6 text-xs text-gray-600 space-y-0.5">
+                    {(item.type === 'new' || item.type === 'revision') && <p className="truncate">{item.sutra_name}</p>}
+                    {(item.type === 'new' || item.type === 'revision') && <p>#{item.total_gatha} gathas</p>}
+                    {item.type !== 'new' && item.type !== 'revision' && (
+                      <p className="truncate font-medium text-gray-700">
+                        {item.activityTypeName && item.activityTypeName !== 'Other'
+                          ? item.activityTypeName
+                          : item.customActivityDescription || ''}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5 flex-shrink-0">
+                  <button
+                    onClick={() => handleApprove('gatha', item.id)}
+                    disabled={actionLoading === 'approve-gatha-' + item.id}
+                    className="p-2 bg-green-500 text-white rounded-lg active:scale-95"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleReject('gatha', item.id)}
+                    disabled={actionLoading === 'reject-gatha-' + item.id}
+                    className="p-2 bg-red-500 text-white rounded-lg active:scale-95"
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // ============ RENDER STUDENTS LIST ============
+  const renderStudentsList = () => (
+    <div className="space-y-3">
+      <div className="bg-white rounded-xl p-3 border-2 border-indigo-200 shadow-sm">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t('adm_search_students')}
+            className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-400 text-sm"
+          />
+        </div>
+      </div>
+
+      {renderDatePicker()}
+
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        {['all', 'active', 'inactive'].map((filter) => (
+          <button
+            key={filter}
+            onClick={() => setStudentFilter(filter)}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap ${
+              studentFilter === filter
+                ? 'bg-indigo-500 text-white'
+                : 'bg-white text-gray-600 border border-gray-200'
+            }`}
+          >
+            {filter === 'all' ? 'All (' + students.length + ')' : 
+             filter === 'active' ? 'Active (' + activeStudentsCount + ')' :
+             t('adm_inactive') + ' (' + (students.length - activeStudentsCount) + ')'}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+        {[
+          { key: 'name', label: 'A-Z' },
+          { key: 'attendance', label: t('adm_attendance') },
+          { key: 'gatha', label: 'Gatha' },
+          { key: 'total', label: t('adm_sort_score') },
+        ].map((option) => (
+          <button
+            key={option.key}
+            onClick={() => setSortBy(option.key)}
+            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold ${
+              sortBy === option.key ? 'bg-white text-gray-800 shadow' : 'text-gray-600'
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      <p className="text-xs text-gray-600 font-semibold">
+        {filteredStudents.length} students
+      </p>
+
+      <div className="space-y-2">
+        {filteredStudents.map((student, index) => {
+          const newGathas = student.new_gathas || 0;
+          const badge = getPerformanceBadge(student.attendance_count, newGathas);
+          
+          return (
+            <div key={student.id} className="bg-white rounded-xl border-2 border-indigo-200 overflow-hidden shadow-sm">
+              <button
+                onClick={() => {
+                  setViewingStudentProfile(student.username);
+                }}
+                className="w-full p-3 text-left active:bg-gray-50"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <div className={'w-10 h-10 bg-gradient-to-br ' + badge.color + ' rounded-full flex items-center justify-center text-lg shadow'}>
+                        {badge.icon}
+                      </div>
+                      <span className="absolute -bottom-1 -right-1 bg-white text-xs font-bold px-1 rounded-full border text-gray-600">
+                        {index + 1}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-800 text-sm">{student.name}</p>
+                      <span className={'inline-block text-xs px-1.5 py-0.5 rounded-full bg-gradient-to-r ' + badge.color + ' text-white font-bold'}>
+                        {t(badge.labelKey)}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    <div className="text-center">
+                      <p className="text-base font-bold text-green-600">{student.attendance_count || 0}</p>
+                      <p className="text-xs text-gray-400">{t('adm_att_col')}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-base font-bold text-purple-600">{newGathas}</p>
+                      <p className="text-xs text-gray-400">{t('adm_new_col')}</p>
+                    </div>
+                  </div>
+                </div>
+              </button>
+
+            </div>
+          );
+        })}
+      </div>
+
+      {filteredStudents.length === 0 && (
+        <div className="bg-white rounded-xl p-8 border-2 border-gray-200 text-center">
+          <Users className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+          <p className="text-gray-500">{t('adm_no_students')}</p>
+        </div>
+      )}
+    </div>
+  );
+
+  // ============ RENDER ANALYTICS ============
+  const renderAnalytics = () => (
+    <div className="space-y-4">
+      {renderDatePicker()}
+
+      <button
+        onClick={() => { fetchStudents(); fetchTopStudents(); }}
+        className="w-full bg-indigo-500 text-white py-2.5 rounded-xl active:scale-[0.98] text-sm font-bold flex items-center justify-center gap-2"
+      >
+        <RefreshCw className="w-4 h-4" />
+        {t('adm_refresh')}
+      </button>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl p-3 text-white shadow-lg">
+          <Calendar className="w-6 h-6 mb-1 opacity-80" />
+          <p className="text-2xl font-bold">{totalAttendanceCount}</p>
+          <p className="text-xs opacity-80">{t('adm_attendance')}</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl p-3 text-white shadow-lg">
+          <Star className="w-6 h-6 mb-1 opacity-80" />
+          <p className="text-2xl font-bold">{totalNewGathaCount}</p>
+          <p className="text-xs opacity-80">{t('adm_new_gatha')}</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-orange-400 to-yellow-500 rounded-xl p-3 text-white shadow-lg">
+          <Award className="w-6 h-6 mb-1 opacity-80" />
+          <p className="text-2xl font-bold">{totalAttendanceCount + totalNewGathaCount}</p>
+          <p className="text-xs opacity-80">{t('adm_total_score')}</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl p-3 text-white shadow-lg">
+          <Users className="w-6 h-6 mb-1 opacity-80" />
+          <p className="text-2xl font-bold">{activeStudentsCount}</p>
+          <p className="text-xs opacity-80">{t('adm_active_students')}</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl p-3 border-2 border-green-200 shadow-sm">
+        <h3 className="text-sm font-bold text-gray-800 mb-2">{t('adm_top5_att')}</h3>
+        <div className="space-y-1.5">
+          {topStudents.topAttendance?.slice(0, 5).map((student, index) => {
+            const medals = ['🥇', '🥈', '🥉', '4', '5'];
+            return (
+              <div key={student.username} className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{medals[index]}</span>
+                  <span className="font-semibold text-gray-800 text-sm">{student.name}</span>
+                </div>
+                <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold text-xs">
+                  {student.count} {t('adm_days_suffix')}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl p-3 border-2 border-purple-200 shadow-sm">
+        <h3 className="text-sm font-bold text-gray-800 mb-2">{t('adm_top5_gatha')}</h3>
+        <div className="space-y-1.5">
+          {topStudents.topGatha?.slice(0, 5).map((student, index) => {
+            const medals = ['🥇', '🥈', '🥉', '4', '5'];
+            return (
+              <div key={student.username} className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{medals[index]}</span>
+                  <span className="font-semibold text-gray-800 text-sm">{student.name}</span>
+                </div>
+                <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold text-xs">
+                  {student.count} {t('adm_gathas_suffix')}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ============ MAIN RETURN ============
+  return (
+    <div className="min-h-screen bg-pathshala p-3 pb-20">
+      <div className="max-w-lg mx-auto">
+        <div className="bg-white rounded-2xl shadow-temple mb-3 border border-sona-300/70 overflow-hidden">
+          <Toran />
+          <div className="p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-11 h-11 bg-gradient-to-br from-kumkum-600 to-kesar-600 rounded-full flex items-center justify-center shadow ring-2 ring-sona-400/60">
+                <Shield className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="font-display text-base font-bold text-kumkum-900 leading-tight">{user.name}</h2>
+                <PathshalaSwitcher fallbackLabel={t('adm_panel')} />
+                {user.openedBySuperAdmin && <p className="text-[10px] text-purple-600 font-bold">Super Admin view</p>}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleLang}
+                className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold text-xs px-2.5 py-1.5 rounded-xl border border-indigo-300 transition-colors"
+              >
+                {lang === 'gu' ? 'EN' : 'ગુ'}
+              </button>
+              <button
+                onClick={onLogout}
+                className="flex items-center gap-1 bg-red-100 text-red-600 px-2.5 py-1.5 rounded-xl active:scale-[0.98] text-xs font-bold"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                {t('adm_exit')}
+              </button>
+            </div>
+          </div>
+          </div>
+        </div>
+
+        {/* Floating, so they're seen wherever the page is scrolled to (hidden while a form shows its own error) */}
+        <Toasts error={showAddGroupModal ? '' : error} success={successMessage}
+          onCloseError={() => setError('')} onCloseSuccess={() => setSuccessMessage('')} />
+
+        {activeTab === 'overview' && !viewingStudentProfile && renderOverview()}
+        {activeTab === 'approvals' && !viewingStudentProfile && renderApprovals()}
+        {activeTab === 'students' && !viewingStudentProfile && renderStudentsList()}
+        {activeTab === 'analytics' && !viewingStudentProfile && renderAnalytics()}
+        {activeTab === 'users' && !viewingStudentProfile && renderUserManagement()}
+
+        {activeTab === 'bulk-attendance' && !viewingStudentProfile && (
+          <BulkAttendance students={students} familyGroups={familyGroups}
+            onSuccess={() => { fetchStudents(); fetchPendingData(false); }} />
+        )}
+        {activeTab === 'bulk-gatha' && !viewingStudentProfile && (
+          <BulkGatha students={students} familyGroups={familyGroups}
+            onSuccess={() => { fetchStudents(); fetchPendingData(false); }} />
+        )}
+        {activeTab === 'register' && !viewingStudentProfile && (
+          <AttendanceRegister />
+        )}
+
+
+        {viewingStudentProfile && (
+          <StudentProfile
+            username={viewingStudentProfile}
+            onBack={() => setViewingStudentProfile(null)}
+            onAddAttendance={(u) => {
+              setAddEntryData({ ...addEntryData, studentUsername: u });
+              setAddEntryType('attendance');
+              setShowAddEntryModal(true);
+            }}
+            onAddGatha={(u) => {
+              setAddEntryData({ ...addEntryData, studentUsername: u });
+              setAddEntryType('gatha');
+              setShowAddEntryModal(true);
+            }}
+          />
+        )}
+
+        {renderExportModal()}
+        {renderAddUserModal()}
+        {renderEditUserModal()}
+        {renderAddEntryModal()}
+
+        {/* More Menu Overlay */}
+        {showMoreMenu && (
+          <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setShowMoreMenu(false)}>
+            <div className="absolute bottom-16 left-0 right-0 bg-white rounded-t-3xl p-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+              <p className="text-sm font-bold text-gray-700 mb-3">{t('adm_more_options')}</p>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { key: 'bulk-attendance', icon: ClipboardList, labelKey: 'adm_bulk_attend', color: 'bg-green-100 text-green-600' },
+                  { key: 'bulk-gatha', icon: BookOpen, labelKey: 'adm_bulk_gatha', color: 'bg-purple-100 text-purple-600' },
+                  { key: 'register', icon: LayoutGrid, labelKey: 'adm_register', color: 'bg-blue-100 text-blue-600' },
+                  { key: 'users', icon: UserCog, labelKey: 'adm_manage_users', color: 'bg-orange-100 text-orange-600' },
+                  { key: 'analytics', icon: TrendingUp, labelKey: 'adm_analytics', color: 'bg-pink-100 text-pink-600' },
+                ].map(item => (
+                  <button key={item.key} onClick={() => { setActiveTab(item.key); setShowMoreMenu(false); setViewingStudentProfile(null); }}
+                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl active:scale-95 transition-all">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${item.color}`}>
+                      <item.icon className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-bold text-gray-600">{t(item.labelKey)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom Navigation - 5 Tabs */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-indigo-200 p-2 shadow-2xl z-40">
+          <div className="max-w-lg mx-auto grid grid-cols-5 gap-1">
+            {[
+              { key: 'overview', icon: BarChart3, labelKey: 'adm_home' },
+              { key: 'students', icon: Users, labelKey: 'adm_students' },
+              { key: 'bulk-attendance', icon: ClipboardList, labelKey: 'adm_bulk' },
+              { key: 'approvals', icon: Clock, labelKey: 'adm_pending_tab', badge: totalPending, alert: newPendingAlert },
+              { key: 'more', icon: Menu, labelKey: 'adm_more' },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => {
+                  if (tab.key === 'more') {
+                    setShowMoreMenu(!showMoreMenu);
+                  } else {
+                    setActiveTab(tab.key);
+                    setShowMoreMenu(false);
+                    setViewingStudentProfile(null);
+                  }
+                }}
+                className={`relative flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl text-xs font-bold transition-all ${
+                  tab.key === 'more'
+                    ? (showMoreMenu ? 'bg-indigo-500 text-white' : 'text-gray-500')
+                    : activeTab === tab.key
+                      ? 'bg-indigo-500 text-white'
+                      : 'text-gray-500'
+                } ${tab.alert ? 'animate-pulse' : ''}`}
+              >
+                <tab.icon className="w-5 h-5" />
+                <span className="text-[10px]">{t(tab.labelKey)}</span>
+                {tab.badge > 0 && (
+                  <span className={`absolute -top-1 -right-1 w-5 h-5 text-white text-[10px] font-bold rounded-full flex items-center justify-center ${
+                    tab.alert ? 'bg-red-500 animate-bounce' : 'bg-red-500'
+                  }`}>
+                    {tab.badge > 9 ? '9+' : tab.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <style>
+        {`
+          @keyframes slide-up {
+            from {
+              transform: translateY(100%);
+              opacity: 0;
+            }
+            to {
+              transform: translateY(0);
+              opacity: 1;
+            }
+          }
+          .animate-slide-up {
+            animation: slide-up 0.3s ease-out;
+          }
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+          .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+        `}
+      </style>
+    </div>
+  );
+}
