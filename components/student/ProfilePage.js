@@ -5,7 +5,14 @@ import { User, Phone, Lock, Save, Eye, EyeOff, Users, Info, Loader } from 'lucid
 import { useLanguage } from '../LanguageContext';
 
 const API_BASE = '/api';
-const EMPTY = { name: '', dateOfBirth: '', gender: '', guardianName: '', alternateMobile: '', email: '', school: '', standard: '', address: '' };
+const EMPTY = {
+  firstName: '', lastName: '', email: '', dateOfBirth: '', gender: '', whatsappNumber: '', address: '',
+  currentStatus: '', studyDetails: '', otherActivities: '', dharmicAbhyas: '', skills: '',
+};
+const STATUS_OPTIONS = ['school', 'college', 'working', 'business', 'homemaker', 'retired', 'other'];
+// Must match REQUIRED_FIELDS on the server (lib/server/controllers/profileController.js)
+const REQUIRED = ['firstName', 'lastName', 'dateOfBirth', 'gender', 'address', 'currentStatus'];
+const REQUIRED_LABELS = { firstName: 'pf_first_name', lastName: 'pf_last_name', dateOfBirth: 'pf_dob', gender: 'pf_gender', address: 'pf_address', currentStatus: 'pf_status' };
 
 const inputClass =
   'w-full px-4 py-3 bg-chandan-50 border-2 border-chandan-300 rounded-2xl focus:border-kesar-500 focus:bg-white focus:outline-none text-base text-gray-800 transition-colors';
@@ -43,6 +50,8 @@ export default function ProfilePage({ username, isViewingOther, onSaved, onError
   const [info, setInfo] = useState(null);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  // "Currently attending other classes?" — Yes shows the details box
+  const [hasOther, setHasOther] = useState(false);
   const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
   const [showPw, setShowPw] = useState(false);
   const [changingPw, setChangingPw] = useState(false);
@@ -61,6 +70,7 @@ export default function ProfilePage({ username, isViewingOther, onSaved, onError
         if (cancelled) return;
         setInfo(data);
         setForm(Object.fromEntries(Object.keys(EMPTY).map((k) => [k, data[k] || ''])));
+        setHasOther(!!data.otherActivities);
       })
       .catch((err) => { if (!cancelled) onError(err.message); });
     return () => { cancelled = true; };
@@ -71,7 +81,7 @@ export default function ProfilePage({ username, isViewingOther, onSaved, onError
 
   const saveDetails = async (e) => {
     e.preventDefault();
-    if (form.name.trim().length < 2) return onError(t('pf_name_err'));
+    if (!form.firstName.trim()) return onError(t('pf_first_name_err'));
     setSaving(true);
     try {
       const res = await fetch(`${API_BASE}/student/profile`, {
@@ -144,12 +154,33 @@ export default function ProfilePage({ username, isViewingOther, onSaved, onError
         )}
       </div>
 
-      {/* Basic details */}
+      {/* Still to fill (same list the reminder popup uses); updates as they type */}
+      {(() => {
+        const missing = REQUIRED.filter((k) => !String(form[k] || '').trim());
+        if (missing.length === 0) return null;
+        return (
+          <div className="bg-kesar-50 rounded-3xl p-4">
+            <p className="text-sm font-bold text-kesar-800">{t('pr_banner')}</p>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {missing.map((k) => (
+                <span key={k} className="text-xs font-semibold bg-white text-kumkum-700 rounded-full px-2.5 py-1">{t(REQUIRED_LABELS[k])}</span>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Student details (same fields as the pathshala registration form) */}
       <Card icon={User} title={t('pf_details_title')} subtitle={t('pf_details_sub')}>
         <form onSubmit={saveDetails} className="space-y-4">
-          <Field label={t('pf_name')}>
-            <input className={inputClass} value={form.name} onChange={set('name')} maxLength={60} autoComplete="name" />
-          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={t('pf_first_name')}>
+              <input className={inputClass} value={form.firstName} onChange={set('firstName')} maxLength={40} autoComplete="given-name" />
+            </Field>
+            <Field label={t('pf_last_name')}>
+              <input className={inputClass} value={form.lastName} onChange={set('lastName')} maxLength={40} autoComplete="family-name" />
+            </Field>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('pf_dob')}>
@@ -173,36 +204,76 @@ export default function ProfilePage({ username, isViewingOther, onSaved, onError
             </Field>
           </div>
 
-          <Field label={t('pf_guardian')} hint={t('pf_guardian_hint')}>
-            <input className={inputClass} value={form.guardianName} onChange={set('guardianName')} maxLength={60} />
-          </Field>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field label={t('pf_school')}>
-              <input className={inputClass} value={form.school} onChange={set('school')} maxLength={80} />
-            </Field>
-            <Field label={t('pf_standard')}>
-              <input className={inputClass} value={form.standard} onChange={set('standard')} maxLength={20} placeholder={t('pf_standard_ph')} />
-            </Field>
-          </div>
-
-          <Field label={t('pf_alt_mobile')} hint={t('pf_alt_mobile_hint')}>
-            <input
-              type="tel"
-              inputMode="numeric"
-              className={inputClass}
-              value={form.alternateMobile}
-              onChange={(e) => setForm((f) => ({ ...f, alternateMobile: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
-              placeholder={t('mobile_placeholder')}
-            />
-          </Field>
-
           <Field label={t('pf_email')}>
-            <input type="email" className={inputClass} value={form.email} onChange={set('email')} maxLength={80} autoComplete="email" />
+            <input type="email" inputMode="email" className={inputClass} value={form.email} onChange={set('email')} maxLength={80} autoComplete="email" placeholder="name@gmail.com" />
+          </Field>
+
+          {/* Locked: only the pathshala admin can change the mobile number */}
+          <Field label={t('pf_whatsapp')} hint={t('pf_whatsapp_locked')}>
+            <div className="relative">
+              <input
+                type="tel"
+                className={`${inputClass} pr-11 text-gray-500 cursor-not-allowed`}
+                value={form.whatsappNumber || '—'}
+                readOnly
+                disabled
+                aria-readonly="true"
+              />
+              <Lock className="w-4 h-4 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2" />
+            </div>
           </Field>
 
           <Field label={t('pf_address')}>
-            <textarea className={`${inputClass} resize-none`} rows={3} value={form.address} onChange={set('address')} maxLength={250} />
+            <textarea className={`${inputClass} resize-none`} rows={3} value={form.address} onChange={set('address')} maxLength={300} />
+          </Field>
+
+          <Field label={t('pf_status')}>
+            <div className="flex flex-wrap gap-2">
+              {STATUS_OPTIONS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, currentStatus: f.currentStatus === s ? '' : s }))}
+                  className={`px-3.5 py-2 rounded-full border-2 text-sm font-semibold transition-colors ${
+                    form.currentStatus === s ? 'bg-kesar-600 border-kesar-600 text-white' : 'bg-chandan-50 border-chandan-300 text-gray-700'
+                  }`}
+                >
+                  {t(`pf_status_${s}`)}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <Field label={t('pf_study')} hint={t('pf_study_hint')}>
+            <input className={inputClass} value={form.studyDetails} onChange={set('studyDetails')} maxLength={200} placeholder={t('pf_study_ph')} />
+          </Field>
+
+          <Field label={t('pf_other_activities')}>
+            <div className="grid grid-cols-2 gap-1.5 mb-2">
+              {[true, false].map((yes) => (
+                <button
+                  key={String(yes)}
+                  type="button"
+                  onClick={() => { setHasOther(yes); if (!yes) setForm((f) => ({ ...f, otherActivities: '' })); }}
+                  className={`py-2.5 rounded-2xl border-2 text-sm font-semibold transition-colors ${
+                    hasOther === yes ? 'bg-kumkum-600 border-kumkum-600 text-white' : 'bg-chandan-50 border-chandan-300 text-gray-700'
+                  }`}
+                >
+                  {t(yes ? 'pf_yes' : 'pf_no')}
+                </button>
+              ))}
+            </div>
+            {hasOther && (
+              <textarea className={`${inputClass} resize-none`} rows={2} value={form.otherActivities} onChange={set('otherActivities')} maxLength={300} placeholder={t('pf_other_ph')} />
+            )}
+          </Field>
+
+          <Field label={t('pf_dharmic')} hint={t('pf_dharmic_hint')}>
+            <textarea className={`${inputClass} resize-none`} rows={3} value={form.dharmicAbhyas} onChange={set('dharmicAbhyas')} maxLength={500} placeholder={t('pf_dharmic_ph')} />
+          </Field>
+
+          <Field label={t('pf_skills')}>
+            <textarea className={`${inputClass} resize-none`} rows={2} value={form.skills} onChange={set('skills')} maxLength={300} placeholder={t('pf_skills_ph')} />
           </Field>
 
           <button

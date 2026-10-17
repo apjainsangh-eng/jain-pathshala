@@ -51,3 +51,25 @@ export function TempleArch({ className = '' }) {
     </svg>
   );
 }
+
+// Pastel icon "bubble": colour lives in the icon, cards stay white and airy.
+// Full class strings (not built dynamically) so Tailwind keeps them.
+export const TONES = {
+  kesar: { bubble: 'bg-kesar-100 text-kesar-600', text: 'text-kesar-700', bar: 'bg-kesar-500', soft: 'bg-kesar-50' },
+  rose: { bubble: 'bg-kumkum-100 text-kumkum-600', text: 'text-kumkum-700', bar: 'bg-kumkum-500', soft: 'bg-kumkum-50' },
+  sun: { bubble: 'bg-amber-100 text-amber-600', text: 'text-amber-700', bar: 'bg-amber-400', soft: 'bg-amber-50' },
+  mint: { bubble: 'bg-emerald-100 text-emerald-600', text: 'text-emerald-700', bar: 'bg-emerald-500', soft: 'bg-emerald-50' },
+  sky: { bubble: 'bg-sky-100 text-sky-600', text: 'text-sky-700', bar: 'bg-sky-500', soft: 'bg-sky-50' },
+  lilac: { bubble: 'bg-violet-100 text-violet-600', text: 'text-violet-700', bar: 'bg-violet-500', soft: 'bg-violet-50' },
+  gray: { bubble: 'bg-gray-100 text-gray-500', text: 'text-gray-600', bar: 'bg-gray-400', soft: 'bg-gray-50' },
+};
+
+export function IconBubble({ icon: Icon, tone = 'kesar', size = 'md', children }) {
+  const box = size === 'lg' ? 'w-14 h-14 rounded-[1.25rem]' : size === 'sm' ? 'w-9 h-9 rounded-xl' : 'w-11 h-11 rounded-2xl';
+  const ico = size === 'lg' ? 'w-7 h-7' : size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
+  return (
+    <span className={`clay-bubble inline-flex items-center justify-center flex-shrink-0 ${box} ${(TONES[tone] || TONES.kesar).bubble}`}>
+      {Icon ? <Icon className={ico} /> : children}
+    </span>
+  );
+}

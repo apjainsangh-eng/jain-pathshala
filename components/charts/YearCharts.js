@@ -6,8 +6,8 @@ import BarChart from './BarChart';
 import { useLanguage } from '../LanguageContext';
 
 // Chart colours (validated as a pair for colour-blind safety): kesar = attendance, kumkum = gatha
-export const ATTENDANCE_COLOR = '#d9600f';
-export const GATHA_COLOR = '#a32640';
+export const ATTENDANCE_COLOR = '#ee6a0b';
+export const GATHA_COLOR = '#d81b60';
 
 const dateOf = (r) => String(r.date || r.created_at || '').slice(0, 10);
 

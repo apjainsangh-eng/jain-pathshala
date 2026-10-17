@@ -21,7 +21,7 @@ export default function BarChart({
   title,
   subtitle,
   data = [],
-  color = '#d9600f',
+  color = '#ee6a0b',
   height = 170,
   unit = '',
   emptyText = 'No data yet',

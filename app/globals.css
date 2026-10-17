@@ -92,11 +92,12 @@ html, body { height: 100%; }
 /* ===== PATHSHALA THEME ===== */
 /* Chandan (sandalwood) background with a faint saffron mandala, used by every screen's root */
 .bg-pathshala {
-  background-color: #fdf8ee;
+  background-color: #fff8ee;
   background-image:
-    radial-gradient(circle at 15% 0%, rgba(242, 118, 14, 0.10), transparent 45%),
-    radial-gradient(circle at 100% 30%, rgba(163, 38, 64, 0.07), transparent 40%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cg fill='none' stroke='%23d9600f' stroke-opacity='0.09' stroke-width='1'%3E%3Ccircle cx='48' cy='48' r='6'/%3E%3Ccircle cx='48' cy='48' r='14'/%3E%3Cpath d='M48 20c5 8 5 20 0 28c-5-8-5-20 0-28zM48 76c5-8 5-20 0-28c-5 8-5 20 0 28zM20 48c8-5 20-5 28 0c-8 5-20 5-28 0zM76 48c-8-5-20-5-28 0c8 5 20 5 28 0z'/%3E%3Cpath d='M28 28c9 1 17 9 20 20c-11-3-19-11-20-20zM68 68c-9-1-17-9-20-20c11 3 19 11 20 20zM68 28c-1 9-9 17-20 20c3-11 11-19 20-20zM28 68c1-9 9-17 20-20c-3 11-11 19-20 20z'/%3E%3C/g%3E%3C/svg%3E");
+    radial-gradient(circle at 10% 0%, rgba(255, 210, 63, 0.22), transparent 45%),
+    radial-gradient(circle at 100% 25%, rgba(234, 51, 111, 0.10), transparent 40%),
+    radial-gradient(circle at 50% 100%, rgba(255, 132, 24, 0.10), transparent 50%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cg fill='none' stroke='%23ff8418' stroke-opacity='0.10' stroke-width='1'%3E%3Ccircle cx='48' cy='48' r='6'/%3E%3Ccircle cx='48' cy='48' r='14'/%3E%3Cpath d='M48 20c5 8 5 20 0 28c-5-8-5-20 0-28zM48 76c5-8 5-20 0-28c-5 8-5 20 0 28zM20 48c8-5 20-5 28 0c-8 5-20 5-28 0zM76 48c-8-5-20-5-28 0c8 5 20 5 28 0z'/%3E%3Cpath d='M28 28c9 1 17 9 20 20c-11-3-19-11-20-20zM68 68c-9-1-17-9-20-20c11 3 19 11 20 20zM68 28c-1 9-9 17-20 20c3-11 11-19 20-20zM28 68c1-9 9-17 20-20c-3 11-11 19-20 20z'/%3E%3C/g%3E%3C/svg%3E");
   background-attachment: fixed;
 }
 
@@ -130,11 +131,11 @@ html, body { height: 100%; }
     inset 2px 2px 5px rgba(255, 255, 255, 0.85),
     inset -3px -3px 7px rgba(120, 60, 20, 0.08);
   --clay-colored:
-    10px 14px 26px rgba(134, 29, 53, 0.28),
+    10px 14px 26px rgba(216, 27, 96, 0.28),
     inset 5px 5px 12px rgba(255, 255, 255, 0.35),
     inset -7px -7px 16px rgba(60, 10, 20, 0.22);
   --clay-btn:
-    4px 6px 12px rgba(134, 29, 53, 0.2),
+    4px 6px 12px rgba(216, 27, 96, 0.2),
     inset 2px 2px 5px rgba(255, 255, 255, 0.5),
     inset -3px -4px 7px rgba(60, 10, 20, 0.16);
   --clay-pressed:
@@ -145,7 +146,7 @@ html, body { height: 100%; }
     inset -4px -4px 9px rgba(255, 255, 255, 0.95);
 
   font-family: var(--font-clay), var(--font-body), system-ui, sans-serif;
-  background-color: #f8ebdc;
+  background-color: #fff6ea;
 }
 .clay-ui .font-display { font-family: var(--font-clay), var(--font-display), serif; letter-spacing: 0; }
 
@@ -157,7 +158,7 @@ html, body { height: 100%; }
 /* White cards */
 .clay-ui .bg-white:is(.rounded-xl, .rounded-2xl, .rounded-3xl) {
   border-color: transparent !important;
-  background-color: #fffaf3;
+  background-color: #fffdf8;
   box-shadow: var(--clay-card) !important;
 }
 /* Tinted panels (bg-*-50 / bg-*-100) */
@@ -189,18 +190,18 @@ html, body { height: 100%; }
   transform: translateY(2px) scale(0.98);
 }
 /* White/tinted buttons read as soft clay rather than coloured blobs */
-.clay-ui button.bg-white:is(.rounded-lg, .rounded-xl, .rounded-2xl) { background-color: #fffaf3; box-shadow: var(--clay-soft); }
+.clay-ui button.bg-white:is(.rounded-lg, .rounded-xl, .rounded-2xl) { background-color: #fffdf8; box-shadow: var(--clay-soft); }
 
 /* Inputs look pressed into the surface */
 .clay-ui :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select) {
   border-color: transparent !important;
-  background-color: #fbf1e4 !important;
+  background-color: #fff6e9 !important;
   box-shadow: var(--clay-input) !important;
   border-radius: 1.1rem;
 }
 .clay-ui :is(input, textarea, select):focus {
   outline: none;
-  box-shadow: var(--clay-input), 0 0 0 3px rgba(217, 96, 15, 0.35) !important;
+  box-shadow: var(--clay-input), 0 0 0 3px rgba(255, 132, 24, 0.4) !important;
 }
 
 /* Small pills/badges inside cards: gentle depth only */
@@ -210,4 +211,12 @@ html, body { height: 100%; }
 
 @media (prefers-reduced-motion: reduce) {
   .clay-ui button:not(:disabled):active { transform: none; }
+}
+
+/* Pastel icon bubble: a small puffy clay chip */
+.clay-bubble {
+  box-shadow:
+    3px 4px 8px rgba(150, 80, 30, 0.14),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.85),
+    inset -2px -3px 5px rgba(0, 0, 0, 0.06);
 }

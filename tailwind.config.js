@@ -1,9 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 
-// Pathshala palette: kesar (saffron), kumkum (deep red), chandan (sandalwood cream), sona (gold)
+// Pathshala palette (bright): kesar (sunny saffron), kumkum (raspberry rose), chandan (light cream), sona (sunflower)
 const kumkum = {
-  50: '#fdf2f3', 100: '#fbe3e6', 200: '#f6c7cd', 300: '#ee9ea8', 400: '#e0687a',
-  500: '#c23a52', 600: '#a32640', 700: '#861d35', 800: '#6f1a2f', 900: '#5d1a2c', 950: '#350a16',
+  50: '#fff0f5', 100: '#ffe0eb', 200: '#ffc1d6', 300: '#ff8fb2', 400: '#f65a8d',
+  500: '#ea336f', 600: '#d81b60', 700: '#b0124c', 800: '#85103d', 900: '#640e31', 950: '#3a0519',
 };
 
 module.exports = {
@@ -16,18 +16,18 @@ module.exports = {
         // gives every screen the same temple palette without rewriting each class.
         indigo: kumkum,
         kesar: {
-          50: '#fff7ed', 100: '#ffedd5', 200: '#fed7aa', 300: '#fdba74', 400: '#fb923c',
-          500: '#f2760e', 600: '#d9600f', 700: '#b34a0c', 800: '#8f3c12', 900: '#743312',
+          50: '#fff8ed', 100: '#ffefd4', 200: '#ffdba8', 300: '#ffc070', 400: '#ff9f3d',
+          500: '#ff8418', 600: '#ee6a0b', 700: '#c4530a', 800: '#9a410f', 900: '#7c3610',
         },
-        chandan: { 50: '#fffdf8', 100: '#fdf8ee', 200: '#f8eed9', 300: '#f1dfba', 400: '#e6c88f' },
-        sona: { 300: '#f5d77a', 400: '#eec24a', 500: '#d4a017', 600: '#b0820f' },
+        chandan: { 50: '#fffdf9', 100: '#fff8ec', 200: '#fdefd8', 300: '#f9e2bf', 400: '#f2cd92' },
+        sona: { 300: '#ffe27a', 400: '#ffd23f', 500: '#f5b700', 600: '#c99400' },
       },
       fontFamily: {
         sans: ['var(--font-body)', 'system-ui', 'sans-serif'],
         display: ['var(--font-display)', 'var(--font-body)', 'serif'],
       },
       boxShadow: {
-        temple: '0 10px 30px -12px rgba(134, 29, 53, 0.35)',
+        temple: '0 12px 30px -12px rgba(216, 27, 96, 0.35)',
       },
     },
   },

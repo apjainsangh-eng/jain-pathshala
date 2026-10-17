@@ -222,14 +222,19 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
           {(() => {
             const d = student.details || {};
             const rows = [
+              [t('pf_first_name'), d.firstName],
+              [t('pf_last_name'), d.lastName],
               [t('mobile_label'), student.mobile],
-              [t('pf_alt_mobile'), d.alternateMobile],
+              [t('pf_whatsapp'), d.whatsappNumber],
+              [t('pf_email'), d.email],
               [t('pf_dob'), d.dateOfBirth ? formatDate(d.dateOfBirth) : ''],
               [t('pf_gender'), d.gender ? t(d.gender === 'male' ? 'pf_male' : 'pf_female') : ''],
-              [t('pf_guardian'), d.guardianName],
-              [t('pf_school'), [d.school, d.standard && `${t('pf_standard')} ${d.standard}`].filter(Boolean).join(' · ')],
-              [t('pf_email'), d.email],
               [t('pf_address'), d.address],
+              [t('pf_status'), d.currentStatus ? t(`pf_status_${d.currentStatus}`) : ''],
+              [t('pf_study'), d.studyDetails],
+              [t('pf_other_activities'), d.otherActivities],
+              [t('pf_dharmic'), d.dharmicAbhyas],
+              [t('pf_skills'), d.skills],
             ].filter(([, v]) => v);
             return (
               <div className="bg-white rounded-xl border-2 border-gray-200 p-3">

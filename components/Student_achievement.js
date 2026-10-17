@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import { useLanguage } from './LanguageContext';
 import {
   Award,
   BookOpen,
@@ -327,7 +328,7 @@ const MonthSelector = ({ selectedMonth, onMonthChange }) => {
 
 const XPBreakdownCard = ({ xpBreakdown, level }) => {
   return (
-    <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-4 text-white shadow-lg">
+    <div className="bg-gradient-to-br from-kesar-500 via-kesar-600 to-kumkum-500 rounded-3xl p-4 text-white shadow-temple">
       {/* Level Display */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -489,10 +490,20 @@ const MonthlyStatsSummary = ({ stats, workingDays }) => {
   );
 };
 
+// "How to earn it", shown on every badge (earned or not)
+const badgeRequirementText = (achievement, t) => {
+  const { type, count } = achievement.requirement;
+  if (type === 'monthly_attendance' && count === 'full') return t('badge_req_att_full');
+  const key = type === 'monthly_attendance' ? 'badge_req_att' : type === 'monthly_gatha' ? 'badge_req_gatha' : 'badge_req_streak';
+  return t(key).replace('{n}', count);
+};
+
 const AchievementCard = ({ achievement, stats, onClick }) => {
+  const { t } = useLanguage();
   const { unlocked, progress, current, target } = calculateAchievementProgress(achievement, stats);
   const Icon = achievement.icon;
   const colors = ACHIEVEMENT_COLORS[achievement.color] || ACHIEVEMENT_COLORS.bronze;
+  const requirement = badgeRequirementText(achievement, t);
 
   return (
     <button
@@ -508,17 +519,21 @@ const AchievementCard = ({ achievement, stats, onClick }) => {
         <Icon className={`w-6 h-6 ${unlocked ? 'text-white' : 'text-gray-400'}`} />
       </div>
       <p className={`text-xs font-bold text-center ${unlocked ? 'text-gray-800' : 'text-gray-500'}`}>{achievement.title}</p>
+      {/* How to earn it */}
+      <p className={`text-[11px] leading-snug text-center mt-1 ${unlocked ? 'text-gray-600' : 'text-gray-500'}`}>{requirement}</p>
       <div className="mt-2 text-center">
         <span className={`text-xs px-2 py-0.5 rounded-full ${unlocked ? colors.badge : 'bg-gray-100 text-gray-500'}`}>
           +{achievement.xp} XP
         </span>
       </div>
-      {!unlocked && progress > 0 && (
+      {unlocked ? (
+        <p className="text-[11px] font-bold text-green-600 text-center mt-1.5">✓ {t('badge_earned')}</p>
+      ) : (
         <div className="mt-2">
           <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
             <div className={`h-full bg-gradient-to-r ${colors.bg}`} style={{ width: `${progress * 100}%` }} />
           </div>
-          <p className="text-xs text-gray-400 text-center mt-1">{current}/{target}</p>
+          <p className="text-xs text-gray-500 text-center mt-1 tabular-nums">{current}/{target}</p>
         </div>
       )}
       {!unlocked && progress === 0 && (

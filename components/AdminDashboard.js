@@ -814,6 +814,7 @@ const toggleMemberSelection = (username) => {
         body: JSON.stringify({
           name: editingUser.name,
           mobile: editingUser.mobile,
+          whatsappNumber: editingUser.whatsappNumber || '',
           password: editingUser.password,
         }),
       });
@@ -1920,6 +1921,21 @@ const toggleMemberSelection = (username) => {
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-400"
               />
               <p className="text-xs text-gray-500 mt-1">{t('adm_mobile_hint')}</p>
+            </div>
+
+            {/* WhatsApp number on the student's profile (students can't change it themselves) */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">{t('pf_whatsapp')}</label>
+              <input
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                value={editingUser.whatsappNumber || ''}
+                onChange={(e) => setEditingUser({ ...editingUser, whatsappNumber: e.target.value.replace(/\D/g, '') })}
+                placeholder={t('adm_enter_mobile')}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-400"
+              />
+              <p className="text-xs text-gray-500 mt-1">{t('adm_whatsapp_hint')}</p>
             </div>
 
             <div>

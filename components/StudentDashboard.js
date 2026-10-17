@@ -4,9 +4,10 @@ import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useLanguage } from './LanguageContext';
 import { usePathshala } from './PathshalaContext';
 import Toasts from './Toast';
-import { Toran, Lotus } from './Decor';
+import { Toran, Lotus, IconBubble, TONES } from './Decor';
 import YearCharts from './charts/YearCharts';
 import ProfilePage from './student/ProfilePage';
+import ProfileReminder from './student/ProfileReminder';
 import {
   AlertCircle,
   AlertTriangle,
@@ -368,40 +369,33 @@ const LangToggleButton = () => {
 const StreakDisplay = ({ streak, maxStreak }) => {
   const { t } = useLanguage();
   const getStreakInfo = (s) => {
-    if (s >= 30) return { label: t('streak_legendary'), color: 'from-yellow-400 to-orange-500', emoji: '🔥', tier: 'diamond' };
-    if (s >= 14) return { label: t('streak_amazing'), color: 'from-purple-400 to-pink-500', emoji: '⚡', tier: 'gold' };
-    if (s >= 7) return { label: t('streak_great'), color: 'from-blue-400 to-indigo-500', emoji: '✨', tier: 'silver' };
-    if (s >= 3) return { label: t('streak_good'), color: 'from-green-400 to-emerald-500', emoji: '🌟', tier: 'bronze' };
-    if (s >= 1) return { label: t('streak_started'), color: 'from-cyan-400 to-blue-500', emoji: '🚀', tier: 'starter' };
-    return { label: t('streak_start_today'), color: 'from-gray-400 to-gray-500', emoji: '💪', tier: 'none' };
+    if (s >= 30) return { label: t('streak_legendary'), tone: 'kesar', emoji: '🔥' };
+    if (s >= 14) return { label: t('streak_amazing'), tone: 'rose', emoji: '⚡' };
+    if (s >= 7) return { label: t('streak_great'), tone: 'lilac', emoji: '✨' };
+    if (s >= 3) return { label: t('streak_good'), tone: 'mint', emoji: '🌟' };
+    if (s >= 1) return { label: t('streak_started'), tone: 'sky', emoji: '🚀' };
+    return { label: t('streak_start_today'), tone: 'sun', emoji: '💪' };
   };
 
   const info = getStreakInfo(streak);
+  const tone = TONES[info.tone];
 
   return (
-    <div className={`bg-gradient-to-r ${info.color} rounded-2xl p-4 text-white shadow-lg relative overflow-hidden`}>
-      <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
-      <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12" />
-
-      <div className="relative z-10">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Flame className="w-5 h-5 sm:w-6 sm:h-6" />
-            <span className="font-bold text-sm sm:text-base">{t('streak_current')}</span>
-          </div>
-          <span className="text-2xl sm:text-3xl">{info.emoji}</span>
+    <div className="bg-white rounded-3xl p-4 sm:p-5">
+      <div className="flex items-center gap-3">
+        <IconBubble icon={Flame} tone={info.tone} size="lg" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-500">{t('streak_current')}</p>
+          <p className="leading-none mt-1">
+            <span className="text-4xl font-extrabold text-gray-900 tabular-nums">{streak}</span>
+            <span className="text-sm font-semibold text-gray-500 ml-1.5">{t('days')}</span>
+          </p>
         </div>
-        <div className="flex items-end gap-3">
-          <div>
-            <p className="text-4xl sm:text-5xl font-bold">{streak}</p>
-            <p className="text-xs sm:text-sm opacity-80">{t('days')}</p>
-          </div>
-          <div className="flex-1 text-right">
-            <p className="text-base sm:text-lg font-bold">{info.label}</p>
-            <p className="text-xs opacity-80 flex items-center justify-end gap-1">
-              <Trophy className="w-3 h-3" /> {t('streak_best')}: {maxStreak} {t('days')}
-            </p>
-          </div>
+        <div className="text-right flex-shrink-0">
+          <p className={`text-base font-bold ${tone.text}`}>{info.emoji} {info.label}</p>
+          <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-gray-600 bg-chandan-100 rounded-full px-2.5 py-1">
+            <Trophy className="w-3 h-3 text-amber-500" /> {t('streak_best')}: {maxStreak}
+          </p>
         </div>
       </div>
     </div>
@@ -482,54 +476,41 @@ const AbsenceAwarenessCard = ({ attendanceHistory, todayMarked }) => {
   const absentDays = Math.max(adjustedWeekdays - presentCount, 0);
   const absenceInfo = getAbsenceMessage(absentDays, t);
   const attendancePercentage = adjustedWeekdays > 0 ? Math.round((presentCount / adjustedWeekdays) * 100) : 100;
-  const getBgGradient = () => {
-    if (absentDays === 0) return 'from-green-400 to-emerald-500';
-    if (absentDays <= 2) return 'from-blue-400 to-cyan-500';
-    if (absentDays <= 5) return 'from-amber-400 to-orange-500';
-    return 'from-red-400 to-rose-500';
-  };
+  // Status colour lives in the icon, the bar and the message chip; the card stays white
+  const toneName = absentDays === 0 ? 'mint' : absentDays <= 2 ? 'sky' : absentDays <= 5 ? 'sun' : 'rose';
+  const tone = TONES[toneName];
 
   return (
-    <div className={`bg-gradient-to-r ${getBgGradient()} rounded-2xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden card-animate card-animate-3 ${absentDays > 5 ? 'btn-glow-urgent' : ''}`}>
-      <div className="absolute top-0 right-0 w-28 h-28 bg-white/10 rounded-full -mr-14 -mt-14" />
-      <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/10 rounded-full -ml-10 -mb-10" />
-      <div className="relative z-10">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            {absentDays === 0 ? (
-              <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6" />
-            ) : (
-              <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6" />
-            )}
-            <span className="font-bold text-sm sm:text-base">{t('att_tracker')}</span>
-          </div>
-          <span className="text-2xl sm:text-3xl">{absentDays === 0 ? '🌟' : absentDays <= 2 ? '👍' : absentDays <= 5 ? '⚠️' : '🚨'}</span>
+    <div className="bg-white rounded-3xl p-4 sm:p-5 card-animate card-animate-3">
+      <div className="flex items-center gap-3 mb-4">
+        <IconBubble icon={absentDays === 0 ? CheckCircle : TrendingDown} tone={toneName} />
+        <span className="font-bold text-base text-gray-900 flex-1">{t('att_tracker')}</span>
+        <span className="text-2xl">{absentDays === 0 ? '🌟' : absentDays <= 2 ? '👍' : absentDays <= 5 ? '⚠️' : '🚨'}</span>
+      </div>
+
+      <div className="flex items-end gap-4 mb-3">
+        <div className="flex-shrink-0">
+          <p className="text-4xl sm:text-5xl font-extrabold text-gray-900 number-pop leading-none tabular-nums">{absentDays}</p>
+          <p className="text-xs sm:text-sm font-semibold text-gray-500 mt-1">{t('att_days_absent')}</p>
         </div>
-        <div className="flex items-end gap-4 mb-3">
-          <div>
-            <p className="text-4xl sm:text-5xl font-bold number-pop">{absentDays}</p>
-            <p className="text-xs sm:text-sm opacity-90">{t('att_days_absent')}</p>
+        <div className="flex-1">
+          <div className="flex items-center justify-between text-xs font-semibold text-gray-600 mb-1.5">
+            <span>{presentCount} {t('att_present')}</span>
+            <span>{adjustedWeekdays} {t('att_working_days')}</span>
           </div>
-          <div className="flex-1">
-            <div className="bg-white/20 rounded-full p-1 mb-1">
-              <div className="flex items-center justify-between text-xs px-1">
-                <span>{presentCount} {t('att_present')}</span>
-                <span>{adjustedWeekdays} {t('att_working_days')}</span>
-              </div>
-            </div>
-            <div className="h-3 bg-white/20 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-white rounded-full progress-animate"
-                style={{ width: `${attendancePercentage}%` }}
-              />
-            </div>
-            <p className="text-xs opacity-80 mt-1 text-right">{attendancePercentage}% attendance</p>
+          <div className="h-3 bg-chandan-200 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full progress-animate ${tone.bar}`}
+              style={{ width: `${attendancePercentage}%` }}
+            />
           </div>
+          <p className={`text-xs font-bold mt-1 text-right ${tone.text}`}>{attendancePercentage}%</p>
         </div>
-        <div className="bg-white/15 backdrop-blur rounded-xl p-2 sm:p-3">
-          <p className="text-xs sm:text-sm font-medium">{absenceInfo.text}</p>
-          <p className="text-xs opacity-70 mt-1">{t('att_sundays_note')}</p>
-        </div>
+      </div>
+
+      <div className={`rounded-2xl p-3 ${tone.soft}`}>
+        <p className={`text-sm font-semibold ${tone.text}`}>{absenceInfo.text}</p>
+        <p className="text-xs text-gray-500 mt-1">{t('att_sundays_note')}</p>
       </div>
     </div>
   );
@@ -1040,21 +1021,20 @@ const LeaderboardSection = ({ currentUserId, currentUserName, year, month }) => 
 
   return (
     <div className="bg-white rounded-2xl border-2 border-blue-200 shadow-sm overflow-hidden">
-      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-3 sm:p-4 text-white">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 sm:w-6 sm:h-6" />
-            <h3 className="text-base sm:text-lg font-bold">🏆 Leaderboard</h3>
-          </div>
-          <button
-            onClick={fetchLeaderboard}
-            disabled={isLoading}
-            className="p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </button>
+      <div className="p-4 flex items-center gap-3">
+        <IconBubble icon={Trophy} tone="sun" />
+        <div className="flex-1 min-w-0">
+          <h3 className="text-base sm:text-lg font-bold text-gray-900">Leaderboard</h3>
+          <p className="text-xs font-semibold text-gray-500">{monthNames[month - 1]} {year}</p>
         </div>
-        <p className="text-xs sm:text-sm opacity-80 mt-1">{monthNames[month - 1]} {year}</p>
+        <button
+          onClick={fetchLeaderboard}
+          disabled={isLoading}
+          aria-label="Refresh"
+          className="p-2.5 bg-chandan-100 text-kesar-700 rounded-xl"
+        >
+          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       <div className="flex p-2 bg-gray-100 gap-2">
@@ -2015,26 +1995,24 @@ const PendingPage = ({ pendingStatus, onRefresh, onEdit, onDelete, isSubmitting 
         </div>
       </div>
 
-      <div className="bg-gradient-to-r from-yellow-400 to-orange-400 rounded-2xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
-        <div className="relative z-10">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
-              <span className="font-bold text-base sm:text-lg">{t('pending_approvals')}</span>
-            </div>
-            <button
-              onClick={onRefresh}
-              disabled={isSubmitting}
-              className="p-2 sm:p-2.5 bg-white/20 rounded-xl hover:bg-white/30 transition-colors"
-            >
-              <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${isSubmitting ? 'animate-spin' : ''}`} />
-            </button>
+      <div className="bg-white rounded-3xl p-4 sm:p-5">
+        <div className="flex items-center gap-3">
+          <IconBubble icon={Clock} tone={totalPendingCount === 0 ? 'mint' : 'sun'} size="lg" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-500">{t('pending_approvals')}</p>
+            <p className="text-4xl font-extrabold text-gray-900 leading-none mt-1 tabular-nums">{totalPendingCount}</p>
+            <p className={`text-xs font-semibold mt-1 ${totalPendingCount === 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {totalPendingCount === 0 ? t('all_caught_up_big') : t('items_waiting')}
+            </p>
           </div>
-          <p className="text-4xl sm:text-5xl font-bold">{totalPendingCount}</p>
-          <p className="text-xs sm:text-sm opacity-80 mt-1">
-            {totalPendingCount === 0 ? t('all_caught_up_big') : t('items_waiting')}
-          </p>
+          <button
+            onClick={onRefresh}
+            disabled={isSubmitting}
+            aria-label="Refresh"
+            className="p-2.5 bg-chandan-100 text-kesar-700 rounded-xl"
+          >
+            <RefreshCw className={`w-5 h-5 ${isSubmitting ? 'animate-spin' : ''}`} />
+          </button>
         </div>
       </div>
 
@@ -2335,6 +2313,10 @@ export default function StudentDashboard({ user, onLogout }) {
 
   // Inactive students can log in and look at their history, but can't add attendance or gatha
   const [activeUserInactive, setActiveUserInactive] = useState(false);
+  // Profile details still to fill for the member being viewed (drives the reminder popup)
+  const [profileMissing, setProfileMissing] = useState([]);
+  const [statusVersion, setStatusVersion] = useState(0);
+  const [reminderDismissed, setReminderDismissed] = useState({});
   useEffect(() => {
     if (!activeUsername) return;
     let cancelled = false;
@@ -2342,12 +2324,27 @@ export default function StudentDashboard({ user, onLogout }) {
       headers: { Authorization: `Bearer ${localStorage.getItem('jainPathshalaToken')}` },
     })
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => { if (!cancelled && data) setActiveUserInactive(data.isActive === false); })
+      .then((data) => {
+        if (cancelled || !data) return;
+        setActiveUserInactive(data.isActive === false);
+        setProfileMissing(Array.isArray(data.missingFields) ? data.missingFields : []);
+      })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [activeUsername]);
+  }, [activeUsername, statusVersion]);
+
+  // "Later" hides the reminder until the app is opened again (per member)
+  const isReminderDismissed = (username) => {
+    if (reminderDismissed[username]) return true;
+    try { return sessionStorage.getItem(`jpProfileReminderLater:${username}`) === '1'; } catch { return false; }
+  };
+  const dismissReminder = (username) => {
+    setReminderDismissed((d) => ({ ...d, [username]: true }));
+    try { sessionStorage.setItem(`jpProfileReminderLater:${username}`, '1'); } catch { /* ignore */ }
+  };
 
   const handleProfileSaved = (username, newName) => {
+    setStatusVersion((v) => v + 1);
     if (!newName) return;
     if (activeUser?.username === username) setActiveUser((u) => ({ ...u, name: newName }));
     setGroupMembers((members) => members.map((m) => (m.username === username ? { ...m, name: newName } : m)));
@@ -3082,7 +3079,7 @@ export default function StudentDashboard({ user, onLogout }) {
                 ? 'bg-green-100 border-2 border-green-300'
                 : todayAttendanceStatus === 'pending'
                 ? 'bg-yellow-100 border-2 border-yellow-300'
-                : 'bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-lg btn-glow-blue'
+                : 'bg-gradient-to-br from-kesar-400 to-kesar-600 text-white'
             }`}
           >
             {todayAttendanceStatus === 'approved' ? (
@@ -3111,7 +3108,7 @@ export default function StudentDashboard({ user, onLogout }) {
               setEditingGatha(null);
               setShowGathaModal(true);
             }}
-            className="relative p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-purple-400 to-purple-600 text-white shadow-lg active:scale-[0.97] transition-transform btn-glow-purple"
+            className="relative p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-kumkum-400 to-kumkum-600 text-white active:scale-[0.97] transition-transform"
           >
             <BookOpen className="w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-1 sm:mb-2" />
             <p className="font-bold text-sm">{t('add_gatha')}</p>
@@ -3235,14 +3232,15 @@ export default function StudentDashboard({ user, onLogout }) {
 
       <NextBadges stats={statsForCurrentMonth} onBadgeClick={setSelectedAchievement} />
 
-      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-3 sm:p-4 text-white shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-20 sm:w-24 h-20 sm:h-24 bg-white/10 rounded-full -mr-10 sm:-mr-12 -mt-10 sm:-mt-12" />
-        <div className="relative z-10 flex items-start gap-2 sm:gap-3">
-          <span className="text-3xl sm:text-4xl flex-shrink-0">{dailyQuote.emoji}</span>
+      {/* Thought for the day */}
+      <div className="bg-white rounded-3xl p-4 sm:p-5 relative overflow-hidden">
+        <Lotus className="absolute -right-4 -bottom-4 w-24 h-24 opacity-10" />
+        <div className="relative flex items-start gap-3">
+          <IconBubble tone="sun" size="lg"><span className="text-2xl">{dailyQuote.emoji}</span></IconBubble>
           <div className="min-w-0">
-            <p className="text-base sm:text-lg font-bold">{dailyQuote.text}</p>
-            <p className="text-xs sm:text-sm text-indigo-100 mt-1">{dailyQuote.meaning}</p>
-            <p className="text-xs text-indigo-200 mt-2">— {dailyQuote.lang} {t('proverb_suffix')}</p>
+            <p className="font-display text-lg sm:text-xl font-bold text-kumkum-800 leading-snug">{dailyQuote.text}</p>
+            <p className="text-sm text-gray-600 mt-1">{dailyQuote.meaning}</p>
+            <p className="text-xs font-semibold text-kesar-700 mt-2">— {dailyQuote.lang} {t('proverb_suffix')}</p>
           </div>
         </div>
       </div>
@@ -3354,7 +3352,7 @@ export default function StudentDashboard({ user, onLogout }) {
       <Toasts error={globalError} success={successMessage}
         onCloseError={() => setGlobalError('')} onCloseSuccess={() => setSuccessMessage('')} />
 
-      <div className="sticky top-0 z-40 bg-[#fffaf3]/95 backdrop-blur-sm rounded-b-[1.75rem] shadow-[0_10px_24px_rgba(150,80,30,0.16)] overflow-hidden">
+      <div className="sticky top-0 z-40 bg-[#fffdf8]/95 backdrop-blur-sm rounded-b-[1.75rem] shadow-[0_10px_24px_rgba(150,80,30,0.16)] overflow-hidden">
       <div className="px-3 sm:px-4 py-2 sm:py-3">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -3430,6 +3428,16 @@ export default function StudentDashboard({ user, onLogout }) {
           {pathshala.sanghName && <p className="text-gray-400 text-xs">© {new Date().getFullYear()} {pathshala.sanghName}</p>}
         </div>
       </div>
+
+      {/* Please complete your details */}
+      {profileMissing.length > 0 && currentPage !== PAGES.PROFILE && !isReminderDismissed(activeUsername) && (
+        <ProfileReminder
+          name={activeUser?.name || activeUsername}
+          missing={profileMissing}
+          onFill={() => setCurrentPage(PAGES.PROFILE)}
+          onLater={() => dismissReminder(activeUsername)}
+        />
+      )}
 
       <GathaEntryModal
         isOpen={showGathaModal}
