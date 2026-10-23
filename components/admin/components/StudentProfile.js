@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   ArrowLeft, Calendar, BookOpen, CheckCircle,
   TrendingUp, Plus, FileText, RefreshCw,
-  AlertTriangle, Users, Activity
+  AlertTriangle, Users, Activity, Pencil, Trash2
 } from 'lucide-react';
 import CalendarHeatmap from './shared/CalendarHeatmap';
 import { useLanguage } from '../../LanguageContext';
@@ -25,6 +25,11 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
   const [addingNote, setAddingNote] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  // Correcting approved records: one row at a time is being edited or asked "delete?"
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [savingId, setSavingId] = useState(null);
 
   const fetchProfile = useCallback(async () => {
     const token = localStorage.getItem('jainPathshalaToken');
@@ -70,6 +75,75 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
       setAddingNote(false);
     }
   };
+
+  const flash = (msg) => {
+    setError('');
+    setSuccess(msg);
+    setTimeout(() => setSuccess(''), 2500);
+  };
+
+  // kind: 'attendance' | 'gatha'
+  const deleteRecord = async (kind, id) => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    setSavingId(id);
+    try {
+      const res = await fetch(`${API_BASE}/admin/${kind}/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error);
+      setConfirmDeleteId(null);
+      flash(t('sp_deleted'));
+      fetchProfile();
+    } catch (err) {
+      setError(err.message || t('sp_action_failed'));
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const startEdit = (g) => {
+    setConfirmDeleteId(null);
+    setEditingId(g.id);
+    setEditForm({ date: g.date, sutra_name: g.sutraName || '', which_gatha: g.whichGatha || '', total_gatha: g.totalGatha ?? '' });
+  };
+
+  const saveGathaEdit = async (g) => {
+    const token = localStorage.getItem('jainPathshalaToken');
+    const isGatha = g.type === 'new' || g.type === 'revision';
+    const body = isGatha ? { ...editForm, total_gatha: Number(editForm.total_gatha) } : { date: editForm.date };
+    setSavingId(g.id);
+    try {
+      const res = await fetch(`${API_BASE}/admin/gatha/${g.id}`, {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error);
+      setEditingId(null);
+      flash(t('sp_saved'));
+      fetchProfile();
+    } catch (err) {
+      setError(err.message || t('sp_action_failed'));
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  // Delete button that asks "Delete?" in place before doing it
+  const DeleteControl = ({ kind, id }) => (
+    confirmDeleteId === id ? (
+      <div className="flex items-center gap-1.5 mt-2">
+        <span className="text-[11px] font-semibold text-red-700 flex-1">{t('sp_delete_confirm')}</span>
+        <button onClick={() => setConfirmDeleteId(null)} className="px-2.5 py-1 bg-white border border-gray-300 text-gray-600 rounded-lg text-[11px] font-bold">{t('cancel')}</button>
+        <button onClick={() => deleteRecord(kind, id)} disabled={savingId === id}
+          className="px-2.5 py-1 bg-red-500 text-white rounded-lg text-[11px] font-bold disabled:opacity-50">{t('delete_btn')}</button>
+      </div>
+    ) : null
+  );
+
+  const iconBtn = 'p-1.5 rounded-lg bg-white border border-gray-200 active:scale-95';
+  const inputClass = 'w-full px-2.5 py-2 border-2 border-gray-200 rounded-lg text-xs focus:outline-none focus:border-indigo-400';
 
   if (loading) {
     return (
@@ -164,6 +238,13 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
         <div className="bg-green-50 border-l-4 border-green-500 p-2.5 rounded-xl flex items-center gap-2">
           <CheckCircle className="w-4 h-4 text-green-500" />
           <p className="text-xs text-green-700 font-semibold">{success}</p>
+        </div>
+      )}
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-2.5 rounded-xl flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+          <p className="text-xs text-red-700 font-semibold flex-1">{error}</p>
+          <button onClick={() => setError('')} className="text-red-400 text-xs font-bold px-1" aria-label={t('cancel')}>✕</button>
         </div>
       )}
 
@@ -299,13 +380,21 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
           <div className="bg-white rounded-xl border-2 border-gray-200 p-3">
             <p className="text-sm font-bold text-gray-700 mb-2">{t('sp_att_history')} ({(attendanceHistory||[]).length} {t('sp_days')})</p>
             <div className="space-y-1 max-h-96 overflow-y-auto">
-              {(attendanceHistory || []).map((a, i) => (
-                <div key={i} className="flex items-center justify-between bg-green-50 rounded-lg p-2.5 border border-green-100">
-                  <div>
-                    <p className="text-xs font-bold text-gray-700">{formatDate(a.date)}</p>
-                    <p className="text-[10px] text-gray-400">{t('sp_marked_by')}: {a.markedBy} · {t('sp_approved_by')}: {a.approvedBy}</p>
+              {(attendanceHistory || []).map((a) => (
+                <div key={a.id} className={`bg-green-50 rounded-lg p-2.5 border ${confirmDeleteId === a.id ? 'border-red-300' : 'border-green-100'}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-gray-700">{formatDate(a.date)}</p>
+                      <p className="text-[10px] text-gray-400">{t('sp_marked_by')}: {a.markedBy} · {t('sp_approved_by')}: {a.approvedBy}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-bold">{t('sp_stat_present')}</span>
+                      <button onClick={() => { setEditingId(null); setConfirmDeleteId(a.id); }} className={iconBtn} aria-label={t('delete_btn')}>
+                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                      </button>
+                    </div>
                   </div>
-                  <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-bold">{t('sp_stat_present')}</span>
+                  <DeleteControl kind="attendance" id={a.id} />
                 </div>
               ))}
               {(attendanceHistory || []).length === 0 && <p className="text-center text-gray-400 text-sm py-4">{t('sp_no_att_records')}</p>}
@@ -330,9 +419,38 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
           <div className="bg-white rounded-xl border-2 border-gray-200 p-3">
             <p className="text-sm font-bold text-gray-700 mb-2">{t('sp_gatha_history')} ({(gathaHistory || []).length} {t('sp_entries')})</p>
             <div className="space-y-1 max-h-96 overflow-y-auto">
-              {(gathaHistory || []).map((g, i) => (
-                <div key={i} className="bg-purple-50 rounded-lg p-2.5 border border-purple-100">
-                  <div className="flex items-center justify-between">
+              {(gathaHistory || []).map((g) => editingId === g.id ? (
+                <div key={g.id} className="bg-white rounded-lg p-2.5 border-2 border-indigo-300 space-y-2">
+                  <p className="text-xs font-bold text-indigo-700">{t('edit_entry')}</p>
+                  <label className="block text-[11px] font-semibold text-gray-600">{t('sp_date_label')}
+                    <input type="date" value={editForm.date} max={new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })}
+                      onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))} className={`${inputClass} mt-1`} />
+                  </label>
+                  {(g.type === 'new' || g.type === 'revision') && (
+                    <>
+                      <label className="block text-[11px] font-semibold text-gray-600">{t('sutra_name')}
+                        <input value={editForm.sutra_name} onChange={e => setEditForm(f => ({ ...f, sutra_name: e.target.value }))} className={`${inputClass} mt-1`} />
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="block text-[11px] font-semibold text-gray-600">{t('which_gatha')}
+                          <input value={editForm.which_gatha} onChange={e => setEditForm(f => ({ ...f, which_gatha: e.target.value }))} className={`${inputClass} mt-1`} />
+                        </label>
+                        <label className="block text-[11px] font-semibold text-gray-600">{t('sp_count_label')}
+                          <input type="number" min="1" max="1000" inputMode="numeric" value={editForm.total_gatha}
+                            onChange={e => setEditForm(f => ({ ...f, total_gatha: e.target.value }))} className={`${inputClass} mt-1`} />
+                        </label>
+                      </div>
+                    </>
+                  )}
+                  <div className="flex gap-2">
+                    <button onClick={() => setEditingId(null)} className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold">{t('cancel')}</button>
+                    <button onClick={() => saveGathaEdit(g)} disabled={savingId === g.id}
+                      className="flex-1 py-2 bg-indigo-500 text-white rounded-lg text-xs font-bold disabled:opacity-50">{t('save')}</button>
+                  </div>
+                </div>
+              ) : (
+                <div key={g.id} className={`bg-purple-50 rounded-lg p-2.5 border ${confirmDeleteId === g.id ? 'border-red-300' : 'border-purple-100'}`}>
+                  <div className="flex items-center justify-between gap-2">
                     <div>
                       {(g.type === 'new' || g.type === 'revision') && <p className="text-xs font-bold text-gray-700">{g.sutraName || t('gatha_label')}</p>}
                       {(g.type === 'new' || g.type === 'revision') && <p className="text-[10px] text-gray-500">{g.whichGatha} · {t('sp_count_col')}: {g.totalGatha}</p>}
@@ -344,14 +462,23 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
                         </p>
                       )}
                       <p className="text-[10px] text-gray-400">{formatDate(g.date)} · {t('sp_by_col')}: {g.addedBy}</p>
+                      {g.editedBy && <p className="text-[10px] text-indigo-500">{t('sp_edited_by')}: {g.editedBy}</p>}
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex-shrink-0">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${g.type === 'new' ? 'bg-purple-500 text-white' : g.type === 'revision' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-700'}`}>
                         {g.type === 'new' ? t('new_learning') : g.type === 'revision' ? t('revision') : 'Other'}
                       </span>
-                      <p className="text-[10px] text-green-600 mt-0.5 font-semibold">{g.status}</p>
+                      <div className="flex justify-end gap-1.5 mt-1.5">
+                        <button onClick={() => startEdit(g)} className={iconBtn} aria-label={t('edit_entry')}>
+                          <Pencil className="w-3.5 h-3.5 text-indigo-500" />
+                        </button>
+                        <button onClick={() => { setEditingId(null); setConfirmDeleteId(g.id); }} className={iconBtn} aria-label={t('delete_btn')}>
+                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                        </button>
+                      </div>
                     </div>
                   </div>
+                  <DeleteControl kind="gatha" id={g.id} />
                 </div>
               ))}
               {(gathaHistory || []).length === 0 && <p className="text-center text-gray-400 text-sm py-4">{t('sp_no_gatha_records')}</p>}

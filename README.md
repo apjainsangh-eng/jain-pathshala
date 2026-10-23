@@ -106,6 +106,7 @@ Type these in a connected chat (`/help` lists them):
 | `/pending` | Lists requests waiting, with **Approve all** |
 | `/today` | Today's present / absent / new gathas / pending |
 | `/week` | Last week's report (Sunday to Saturday) |
+| `/birthday` or `/birthday 7` | Birthdays in the next 30 (or N) days, from the date of birth students add on their profile |
 | `/absent` or `/absent 14` | Students not seen for N days, with a phone number to call |
 | `/present Aditi, Ariha, Ashvi` | Marks them present after you confirm. Start with `yesterday` or a date (`/present 20/10 Aditi`) for another day |
 

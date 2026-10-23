@@ -1,6 +1,13 @@
 const T = {
   en: {
     // Login
+    sp_delete_confirm: "Delete this approved entry?",
+    sp_deleted: "Entry deleted",
+    sp_saved: "Entry updated",
+    sp_action_failed: "Could not save. Please try again.",
+    sp_count_label: "Gatha count",
+    sp_date_label: "Date",
+    sp_edited_by: "Edited by",
     tgs_title: "Scheduled messages",
     tgs_summary: "Midnight summary (present, absent, gathas, pending)",
     tgs_midnight_note: "Arrives between 12:30 and 1:30 AM and covers the day that just ended. Skipped on days with no pathshala.",
@@ -14,7 +21,7 @@ const T = {
     tgs_sending: "Sending…",
     tgs_sent: "Sent ✓",
     tgs_failed: "Could not send",
-    tgs_commands: "In the chat you can type: /pending, /today, /week, /absent, or /present Aditi, Ariha to mark attendance. Type /help for details.",
+    tgs_commands: "In the chat you can type: /pending, /today, /week, /birthday, /absent, or /present Aditi, Ariha to mark attendance. Type /help for details.",
     tgc_title: "Telegram notifications",
     tgc_off: "Off — tap to connect",
     tgc_connected_n: "On · {n} chat(s) connected",
@@ -650,6 +657,13 @@ const T = {
 
   gu: {
     // Login
+    sp_delete_confirm: "આ મંજૂર થયેલી નોંધ હટાવવી છે?",
+    sp_deleted: "નોંધ હટાવી",
+    sp_saved: "નોંધ સુધારી",
+    sp_action_failed: "સાચવી ન શકાયું. ફરી પ્રયત્ન કરો.",
+    sp_count_label: "ગાથા સંખ્યા",
+    sp_date_label: "તારીખ",
+    sp_edited_by: "સુધારનાર",
     tgs_title: "નિયત સમયે સંદેશા",
     tgs_summary: "મધ્યરાત્રિનો સારાંશ (હાજર, ગેરહાજર, ગાથા, બાકી)",
     tgs_midnight_note: "રાત્રે 12:30 થી 1:30 વચ્ચે આવશે, હમણાં પૂરા થયેલા દિવસનો. જે દિવસે પાઠશાળા ન હોય તે દિવસે નહીં આવે.",
@@ -663,7 +677,7 @@ const T = {
     tgs_sending: "મોકલાય છે…",
     tgs_sent: "મોકલ્યો ✓",
     tgs_failed: "મોકલી ન શકાયો",
-    tgs_commands: "Chat માં લખી શકાય: /pending, /today, /week, /absent, અથવા /present Aditi, Ariha (હાજરી નોંધવા). વધુ માટે /help.",
+    tgs_commands: "Chat માં લખી શકાય: /pending, /today, /week, /birthday, /absent, અથવા /present Aditi, Ariha (હાજરી નોંધવા). વધુ માટે /help.",
     tgc_title: "Telegram સૂચનાઓ",
     tgc_off: "બંધ — જોડવા માટે દબાવો",
     tgc_connected_n: "ચાલુ · {n} chat જોડાયેલ",
