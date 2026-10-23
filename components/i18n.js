@@ -1,6 +1,20 @@
 const T = {
   en: {
     // Login
+    tgs_title: "Scheduled messages",
+    tgs_summary: "Midnight summary (present, absent, gathas, pending)",
+    tgs_midnight_note: "Arrives between 12:30 and 1:30 AM and covers the day that just ended. Skipped on days with no pathshala.",
+    tgs_absent: "Absent alerts (students to call)",
+    tgs_absent_days: "Days absent",
+    tgs_absent_after: "Not seen for {n}+ days",
+    tgs_test: "Test daily summary",
+    tgs_test_weekly: "Test weekly report",
+    tgs_weekly: "Weekly report on Sunday (Sunday to Saturday)",
+    tgs_weekly_note: "Arrives Sunday around 12 noon (11:30 AM – 12:30 PM): attendance, gathas, who came every day and who did not come.",
+    tgs_sending: "Sending…",
+    tgs_sent: "Sent ✓",
+    tgs_failed: "Could not send",
+    tgs_commands: "In the chat you can type: /pending, /today, /week, /absent, or /present Aditi, Ariha to mark attendance. Type /help for details.",
     tgc_title: "Telegram notifications",
     tgc_off: "Off — tap to connect",
     tgc_connected_n: "On · {n} chat(s) connected",
@@ -636,6 +650,20 @@ const T = {
 
   gu: {
     // Login
+    tgs_title: "નિયત સમયે સંદેશા",
+    tgs_summary: "મધ્યરાત્રિનો સારાંશ (હાજર, ગેરહાજર, ગાથા, બાકી)",
+    tgs_midnight_note: "રાત્રે 12:30 થી 1:30 વચ્ચે આવશે, હમણાં પૂરા થયેલા દિવસનો. જે દિવસે પાઠશાળા ન હોય તે દિવસે નહીં આવે.",
+    tgs_absent: "ગેરહાજરીની સૂચના (ફોન કરવાના વિદ્યાર્થી)",
+    tgs_absent_days: "ગેરહાજર દિવસ",
+    tgs_absent_after: "{n}+ દિવસથી દેખાયા નથી",
+    tgs_test: "રોજના સારાંશનો test",
+    tgs_test_weekly: "સાપ્તાહિક અહેવાલનો test",
+    tgs_weekly: "રવિવારે સાપ્તાહિક અહેવાલ (રવિવારથી શનિવાર)",
+    tgs_weekly_note: "રવિવારે બપોરે આશરે 12 વાગ્યે (11:30 થી 12:30) આવશે: હાજરી, ગાથા, રોજ કોણ આવ્યું અને કોણ ન આવ્યું.",
+    tgs_sending: "મોકલાય છે…",
+    tgs_sent: "મોકલ્યો ✓",
+    tgs_failed: "મોકલી ન શકાયો",
+    tgs_commands: "Chat માં લખી શકાય: /pending, /today, /week, /absent, અથવા /present Aditi, Ariha (હાજરી નોંધવા). વધુ માટે /help.",
     tgc_title: "Telegram સૂચનાઓ",
     tgc_off: "બંધ — જોડવા માટે દબાવો",
     tgc_connected_n: "ચાલુ · {n} chat જોડાયેલ",

@@ -97,6 +97,34 @@ Every new attendance or gatha request is sent to the pathshala's linked Telegram
 4. Each pathshala admin: **Overview → Telegram notifications → Connect my Telegram** (or **Connect a group**
    after adding the bot to the group) and press **Start** in Telegram. Send `/stop` in a chat to turn it off.
 
+### Chat commands and scheduled messages
+
+Type these in a connected chat (`/help` lists them):
+
+| Command | What it does |
+|---|---|
+| `/pending` | Lists requests waiting, with **Approve all** |
+| `/today` | Today's present / absent / new gathas / pending |
+| `/week` | Last week's report (Sunday to Saturday) |
+| `/absent` or `/absent 14` | Students not seen for N days, with a phone number to call |
+| `/present Aditi, Ariha, Ashvi` | Marks them present after you confirm. Start with `yesterday` or a date (`/present 20/10 Aditi`) for another day |
+
+Every new request also shows an **Approve all (N)** button once two or more are waiting.
+
+**Midnight summary:** every night a summary of the day that just ended (present, absent, new gathas, pending,
+students not seen for N days) is sent with **Approve all**. Turn it on/off and pick N in the dashboard card.
+It runs on Vercel Cron (`vercel.json`, 19:00 UTC = 12:30 AM IST). On the free plan Vercel may run it any time
+in that hour, so it arrives between 12:30 and 1:30 AM. Nothing is sent on days with no attendance and nothing
+pending (e.g. Sundays).
+
+**Sunday weekly report:** every Sunday around 12 noon (cron 06:00 UTC, so 11:30 AM – 12:30 PM IST) a report of the
+Sunday-to-Saturday week that just ended: pathshala days, attendance (and change from last week), day by day,
+new and revised gathas, who came every day, top gatha learners, and who did not come at all.
+
+1. Add `CRON_SECRET=<any long random string>` in Vercel → Settings → Environment Variables, then redeploy.
+   Vercel sends it with each cron call by itself; without it the call is refused.
+2. Use **Test daily summary** / **Test weekly report** in the dashboard to see them right away.
+
 Only chats linked to a pathshala can approve its requests; tapping a button on a request that was already
 decided in the dashboard just shows "Already approved/rejected".
 

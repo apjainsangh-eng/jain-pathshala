@@ -39,8 +39,13 @@ const hook = await call('setWebhook', {
 });
 await call('setMyCommands', {
   commands: [
-    { command: 'start', description: 'Connect this chat (use the link from the admin dashboard)' },
-    { command: 'stop', description: 'Stop approval notifications in this chat' },
+    { command: 'pending', description: 'Requests waiting for approval (with Approve all)' },
+    { command: 'today', description: "Today's present, absent and gathas" },
+    { command: 'week', description: "Last week's report (Sunday to Saturday)" },
+    { command: 'absent', description: 'Students not seen for a while' },
+    { command: 'present', description: 'Mark students present: /present Aditi, Ariha' },
+    { command: 'help', description: 'What this bot can do' },
+    { command: 'stop', description: 'Stop notifications in this chat' },
   ],
 });
 
