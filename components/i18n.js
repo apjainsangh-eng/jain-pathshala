@@ -1,6 +1,17 @@
 const T = {
   en: {
     // Login
+    tgc_title: "Telegram notifications",
+    tgc_off: "Off — tap to connect",
+    tgc_connected_n: "On · {n} chat(s) connected",
+    tgc_not_setup: "Not set up yet",
+    tgc_not_setup_desc: "The Telegram bot has not been set up for this app yet. Ask the super admin.",
+    tgc_desc: "Get a Telegram message for every new attendance or gatha request, with Approve / Reject buttons.",
+    tgc_connect_me: "Connect my Telegram",
+    tgc_connect_group: "Connect a group",
+    tgc_waiting: "Press \"Start\" in Telegram, then come back here…",
+    tgc_remove: "Disconnect",
+    tgc_remove_confirm: "Stop sending approval requests to \"{name}\"?",
     badge_req_att: "Present {n} days this month",
     badge_req_att_full: "Present every pathshala day this month",
     badge_req_gatha: "Learn {n} new gathas this month",
@@ -625,6 +636,17 @@ const T = {
 
   gu: {
     // Login
+    tgc_title: "Telegram સૂચનાઓ",
+    tgc_off: "બંધ — જોડવા માટે દબાવો",
+    tgc_connected_n: "ચાલુ · {n} chat જોડાયેલ",
+    tgc_not_setup: "હજી સેટઅપ નથી",
+    tgc_not_setup_desc: "આ app માટે Telegram bot હજી સેટ થયો નથી. Super admin ને કહો.",
+    tgc_desc: "દરેક નવી હાજરી કે ગાથાની વિનંતી Telegram પર Approve / Reject બટન સાથે આવશે.",
+    tgc_connect_me: "મારું Telegram જોડો",
+    tgc_connect_group: "Group જોડો",
+    tgc_waiting: "Telegram માં \"Start\" દબાવો, પછી અહીં પાછા આવો…",
+    tgc_remove: "જોડાણ કાઢો",
+    tgc_remove_confirm: "\"{name}\" પર મંજૂરીની સૂચનાઓ મોકલવાનું બંધ કરવું છે?",
     badge_req_att: "આ મહિને {n} દિવસ હાજરી",
     badge_req_att_full: "આ મહિને પાઠશાળાના બધા દિવસ હાજરી",
     badge_req_gatha: "આ મહિને {n} નવી ગાથા શીખો",

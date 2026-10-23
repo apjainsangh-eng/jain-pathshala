@@ -76,6 +76,30 @@ npm run dev                    # http://localhost:3000
 At `/superadmin`: **New pathshala** (name, sangh, short code) → **Admins** → add an admin with their
 mobile number and a password → send them the site link. Their admin adds students with mobile numbers.
 
+## Telegram approval notifications (optional)
+
+Every new attendance or gatha request is sent to the pathshala's linked Telegram chats with
+**Approve / Reject** buttons. One bot serves all pathshalas; each pathshala links its own chats.
+
+1. In Telegram, message **@BotFather** → `/newbot` → choose a name and a username ending in `bot`.
+   Copy the **token** it gives you.
+2. Add to `.env.local` **and** to Vercel → Settings → Environment Variables:
+   ```
+   TELEGRAM_BOT_TOKEN=<token from BotFather>
+   TELEGRAM_BOT_USERNAME=<your bot's username, without @>
+   TELEGRAM_WEBHOOK_SECRET=<any long random string>
+   APP_URL=https://<your site>
+   ```
+3. Deploy, then once (and again if the site address changes):
+   ```powershell
+   node --env-file=.env.local scripts/telegram-setup.mjs https://<your site>
+   ```
+4. Each pathshala admin: **Overview → Telegram notifications → Connect my Telegram** (or **Connect a group**
+   after adding the bot to the group) and press **Start** in Telegram. Send `/stop` in a chat to turn it off.
+
+Only chats linked to a pathshala can approve its requests; tapping a button on a request that was already
+decided in the dashboard just shows "Already approved/rejected".
+
 ## How data is kept separate
 
 Every pathshala record (`users`, `attendance`, `gatha`, `pending_*`, `family_groups`, `activity_types`,

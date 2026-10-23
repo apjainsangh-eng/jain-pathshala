@@ -12,6 +12,7 @@ import PathshalaSwitcher from './admin/components/PathshalaSwitcher';
 import Toasts from './Toast';
 import { Toran } from './Decor';
 import TrendsPanel from './admin/components/TrendsPanel';
+import TelegramCard from './admin/components/TelegramCard';
 import {
   BookOpen,
   Calendar,
@@ -2600,6 +2601,8 @@ const toggleMemberSelection = (username) => {
           </div>
         </div>
       </div>
+
+      <TelegramCard />
 
       <TrendsPanel />
 
