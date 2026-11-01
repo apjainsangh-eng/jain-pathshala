@@ -2316,7 +2316,6 @@ export default function StudentDashboard({ user, onLogout }) {
   // Profile details still to fill for the member being viewed (drives the reminder popup)
   const [profileMissing, setProfileMissing] = useState([]);
   const [statusVersion, setStatusVersion] = useState(0);
-  const [reminderDismissed, setReminderDismissed] = useState({});
   useEffect(() => {
     if (!activeUsername) return;
     let cancelled = false;
@@ -2332,16 +2331,6 @@ export default function StudentDashboard({ user, onLogout }) {
       .catch(() => {});
     return () => { cancelled = true; };
   }, [activeUsername, statusVersion]);
-
-  // "Later" hides the reminder until the app is opened again (per member)
-  const isReminderDismissed = (username) => {
-    if (reminderDismissed[username]) return true;
-    try { return sessionStorage.getItem(`jpProfileReminderLater:${username}`) === '1'; } catch { return false; }
-  };
-  const dismissReminder = (username) => {
-    setReminderDismissed((d) => ({ ...d, [username]: true }));
-    try { sessionStorage.setItem(`jpProfileReminderLater:${username}`, '1'); } catch { /* ignore */ }
-  };
 
   const handleProfileSaved = (username, newName) => {
     setStatusVersion((v) => v + 1);
@@ -3430,12 +3419,11 @@ export default function StudentDashboard({ user, onLogout }) {
       </div>
 
       {/* Please complete your details */}
-      {profileMissing.length > 0 && currentPage !== PAGES.PROFILE && !isReminderDismissed(activeUsername) && (
+      {profileMissing.length > 0 && currentPage !== PAGES.PROFILE && (
         <ProfileReminder
           name={activeUser?.name || activeUsername}
           missing={profileMissing}
           onFill={() => setCurrentPage(PAGES.PROFILE)}
-          onLater={() => dismissReminder(activeUsername)}
         />
       )}
 

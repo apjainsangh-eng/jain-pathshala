@@ -5,7 +5,8 @@ import { UserPen, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { IconBubble } from '../Decor';
 
-// Popup asking a student to complete their profile; "Fill details now" opens My Profile
+// Popup asking a student to complete their profile; "Fill details now" opens My Profile.
+// Without `onLater` it can't be dismissed: the student has to fill the missing details.
 export default function ProfileReminder({ name, missing, onFill, onLater }) {
   const { t } = useLanguage();
 
@@ -39,9 +40,11 @@ export default function ProfileReminder({ name, missing, onFill, onLater }) {
         >
           {t('pr_fill_now')} <ArrowRight className="w-5 h-5" />
         </button>
-        <button onClick={onLater} className="mt-2 w-full py-2.5 text-sm font-semibold text-gray-500 rounded-2xl">
-          {t('pr_later')}
-        </button>
+        {onLater && (
+          <button onClick={onLater} className="mt-2 w-full py-2.5 text-sm font-semibold text-gray-500 rounded-2xl">
+            {t('pr_later')}
+          </button>
+        )}
       </div>
     </div>
   );
