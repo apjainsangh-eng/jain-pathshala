@@ -1,4 +1,5 @@
 import { Hind_Vadodara, Rasa, Baloo_Bhai_2 } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 
 // Hind Vadodara is designed for Gujarati (with matching Latin); Rasa gives headings a traditional feel
@@ -23,7 +24,11 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="gu" className={`${body.variable} ${display.variable} ${clay.variable}`}>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        {children}
+        {/* Vercel Web Analytics: page views only (no cookies); shows in Vercel → Analytics */}
+        <Analytics />
+      </body>
     </html>
   );
 }
