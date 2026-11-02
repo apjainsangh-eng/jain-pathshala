@@ -141,6 +141,7 @@ try {
       });
     }
     console.log(`\nSaved ${toAdd.length} students.`);
+    console.log('Next: Admin dashboard → નિયમ યાત્રા card → "Sync students" to create their Niyam Yatra members.');
   }
 } finally {
   await client.close();

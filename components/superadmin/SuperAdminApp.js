@@ -289,7 +289,7 @@ function AdminsPanel({ pathshala, notify, onChanged }) {
 function PathshalaCard({ p, notify, reload }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [edit, setEdit] = useState({ name: p.name, sanghName: p.sanghName });
+  const [edit, setEdit] = useState({ name: p.name, sanghName: p.sanghName, niyamEnabled: p.niyamEnabled !== false });
   const [busy, setBusy] = useState(false);
   // Same login page for every pathshala; the mobile number decides which one
   const link = typeof window !== 'undefined' ? `${window.location.origin}/` : '/';
@@ -338,8 +338,12 @@ function PathshalaCard({ p, notify, reload }) {
         <div className="space-y-2">
           <input className={inputClass} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} placeholder="Pathshala name" />
           <input className={inputClass} value={edit.sanghName} onChange={(e) => setEdit({ ...edit, sanghName: e.target.value })} placeholder="Sangh name" />
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" checked={edit.niyamEnabled} onChange={(e) => setEdit({ ...edit, niyamEnabled: e.target.checked })} />
+            નિયમ યાત્રા (Niyam Yatra) for this pathshala's students and admins
+          </label>
           <div className="flex gap-2 justify-end">
-            <button onClick={() => { setEditing(false); setEdit({ name: p.name, sanghName: p.sanghName }); }} className={ghostBtn + ' border-gray-200 text-gray-600'}><X className="w-3.5 h-3.5" /> Cancel</button>
+            <button onClick={() => { setEditing(false); setEdit({ name: p.name, sanghName: p.sanghName, niyamEnabled: p.niyamEnabled !== false }); }} className={ghostBtn + ' border-gray-200 text-gray-600'}><X className="w-3.5 h-3.5" /> Cancel</button>
             <button disabled={busy || !edit.name.trim()} onClick={() => update(edit, 'Pathshala updated')} className={ghostBtn + ' border-indigo-300 text-white bg-indigo-500'}><Check className="w-3.5 h-3.5" /> Save</button>
           </div>
         </div>
@@ -351,6 +355,7 @@ function PathshalaCard({ p, notify, reload }) {
               {!p.isActive && <span className="text-[10px] font-bold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">INACTIVE</span>}
             </div>
             {p.sanghName && <p className="text-xs text-gray-500 truncate">{p.sanghName}</p>}
+            {p.niyamEnabled === false && <p className="text-[11px] text-gray-500">નિયમ યાત્રા: off</p>}
             <p className="text-xs text-indigo-600 font-mono mt-0.5 truncate">/{p.slug}</p>
           </div>
           <button title="Edit" onClick={() => setEditing(true)} className="p-1.5 text-gray-400 hover:text-indigo-600"><Pencil className="w-4 h-4" /></button>

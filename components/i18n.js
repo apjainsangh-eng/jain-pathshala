@@ -1,6 +1,15 @@
 const T = {
   en: {
     // Login
+    niyam_admin_desc: "Niyams, points and leaderboard for this pathshala's families",
+    niyam_open_admin: "Open Niyam admin",
+    niyam_sync: "Sync students",
+    niyam_sync_done: "Done: {created} added to Niyam Yatra, {linked} linked.",
+    niyam_sync_failed: "Could not sync. Please try again.",
+    nav_niyam: "Niyam Yatra",
+    niyam_open_failed: "Could not open Niyam Yatra. Please try again.",
+    att_no_days: "No pathshala days yet this month",
+    att_held_note: "* Counted only on days the pathshala was held",
     sp_delete_confirm: "Delete this approved entry?",
     sp_deleted: "Entry deleted",
     sp_saved: "Entry updated",
@@ -657,6 +666,15 @@ const T = {
 
   gu: {
     // Login
+    niyam_admin_desc: "આ પાઠશાળાના પરિવારો માટે નિયમ, પોઇન્ટ અને લીડરબોર્ડ",
+    niyam_open_admin: "નિયમ યાત્રા એડમિન ખોલો",
+    niyam_sync: "વિદ્યાર્થીઓ મોકલો",
+    niyam_sync_done: "થઈ ગયું: {created} નિયમ યાત્રામાં ઉમેર્યા, {linked} જોડ્યા.",
+    niyam_sync_failed: "મોકલી ન શકાયું. ફરી પ્રયત્ન કરો.",
+    nav_niyam: "નિયમ યાત્રા",
+    niyam_open_failed: "નિયમ યાત્રા ખોલી ન શકાઈ. ફરી પ્રયત્ન કરો.",
+    att_no_days: "આ મહિને હજી પાઠશાળાનો કોઈ દિવસ થયો નથી",
+    att_held_note: "* ફક્ત પાઠશાળા થઈ હોય તે દિવસો ગણાય છે",
     sp_delete_confirm: "આ મંજૂર થયેલી નોંધ હટાવવી છે?",
     sp_deleted: "નોંધ હટાવી",
     sp_saved: "નોંધ સુધારી",

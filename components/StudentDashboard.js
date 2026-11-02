@@ -455,14 +455,13 @@ const HelpTooltip = ({ text }) => {
 // ABSENCE AWARENESS CARD
 // ============================================
 
-const AbsenceAwarenessCard = ({ attendanceHistory, todayMarked }) => {
+const AbsenceAwarenessCard = ({ attendanceHistory, todayMarked, heldDays, todayIso }) => {
   const { t } = useLanguage();
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
   const monthStart = new Date(currentYear, currentMonth, 1);
   const todayDate = new Date(currentYear, currentMonth, now.getDate());
-  const totalWeekdays = countWeekdaysExcludingSundays(monthStart, todayDate);
   const presentDates = new Set(
     attendanceHistory
       .filter(r => {
@@ -471,13 +470,27 @@ const AbsenceAwarenessCard = ({ attendanceHistory, todayMarked }) => {
       })
       .map(r => r.date)
   );
-  let presentCount = presentDates.size;
-  const adjustedWeekdays = todayMarked ? totalWeekdays : Math.max(totalWeekdays - (now.getDay() !== 0 ? 1 : 0), 0);
-  const absentDays = Math.max(adjustedWeekdays - presentCount, 0);
+  // Working days = days the pathshala really held class before today, plus today once this student
+  // is marked (today is never "absent" while there is still time to mark). Without the list from the
+  // server it falls back to every day except Sundays.
+  let workingCount;
+  let presentCount;
+  if (Array.isArray(heldDays)) {
+    const counted = new Set(heldDays.filter(d => d < todayIso));
+    if (todayMarked) counted.add(todayIso);
+    workingCount = counted.size;
+    presentCount = [...counted].filter(d => presentDates.has(d)).length;
+  } else {
+    const totalWeekdays = countWeekdaysExcludingSundays(monthStart, todayDate);
+    presentCount = presentDates.size;
+    workingCount = todayMarked ? totalWeekdays : Math.max(totalWeekdays - (now.getDay() !== 0 ? 1 : 0), 0);
+  }
+  const noDays = workingCount === 0;
+  const absentDays = Math.max(workingCount - presentCount, 0);
   const absenceInfo = getAbsenceMessage(absentDays, t);
-  const attendancePercentage = adjustedWeekdays > 0 ? Math.round((presentCount / adjustedWeekdays) * 100) : 100;
+  const attendancePercentage = workingCount > 0 ? Math.round((presentCount / workingCount) * 100) : 0;
   // Status colour lives in the icon, the bar and the message chip; the card stays white
-  const toneName = absentDays === 0 ? 'mint' : absentDays <= 2 ? 'sky' : absentDays <= 5 ? 'sun' : 'rose';
+  const toneName = noDays ? 'sky' : absentDays === 0 ? 'mint' : absentDays <= 2 ? 'sky' : absentDays <= 5 ? 'sun' : 'rose';
   const tone = TONES[toneName];
 
   return (
@@ -485,7 +498,7 @@ const AbsenceAwarenessCard = ({ attendanceHistory, todayMarked }) => {
       <div className="flex items-center gap-3 mb-4">
         <IconBubble icon={absentDays === 0 ? CheckCircle : TrendingDown} tone={toneName} />
         <span className="font-bold text-base text-gray-900 flex-1">{t('att_tracker')}</span>
-        <span className="text-2xl">{absentDays === 0 ? '🌟' : absentDays <= 2 ? '👍' : absentDays <= 5 ? '⚠️' : '🚨'}</span>
+        <span className="text-2xl">{noDays ? '🌱' : absentDays === 0 ? '🌟' : absentDays <= 2 ? '👍' : absentDays <= 5 ? '⚠️' : '🚨'}</span>
       </div>
 
       <div className="flex items-end gap-4 mb-3">
@@ -496,7 +509,7 @@ const AbsenceAwarenessCard = ({ attendanceHistory, todayMarked }) => {
         <div className="flex-1">
           <div className="flex items-center justify-between text-xs font-semibold text-gray-600 mb-1.5">
             <span>{presentCount} {t('att_present')}</span>
-            <span>{adjustedWeekdays} {t('att_working_days')}</span>
+            <span>{workingCount} {t('att_working_days')}</span>
           </div>
           <div className="h-3 bg-chandan-200 rounded-full overflow-hidden">
             <div
@@ -504,13 +517,13 @@ const AbsenceAwarenessCard = ({ attendanceHistory, todayMarked }) => {
               style={{ width: `${attendancePercentage}%` }}
             />
           </div>
-          <p className={`text-xs font-bold mt-1 text-right ${tone.text}`}>{attendancePercentage}%</p>
+          <p className={`text-xs font-bold mt-1 text-right ${tone.text}`}>{noDays ? '—' : `${attendancePercentage}%`}</p>
         </div>
       </div>
 
       <div className={`rounded-2xl p-3 ${tone.soft}`}>
-        <p className={`text-sm font-semibold ${tone.text}`}>{absenceInfo.text}</p>
-        <p className="text-xs text-gray-500 mt-1">{t('att_sundays_note')}</p>
+        <p className={`text-sm font-semibold ${tone.text}`}>{noDays ? t('att_no_days') : absenceInfo.text}</p>
+        <p className="text-xs text-gray-500 mt-1">{t(Array.isArray(heldDays) ? 'att_held_note' : 'att_sundays_note')}</p>
       </div>
     </div>
   );
@@ -520,7 +533,7 @@ const AbsenceAwarenessCard = ({ attendanceHistory, todayMarked }) => {
 // MONTHLY WEEK STRIP
 // ============================================
 
-const MonthlyWeekStrip = ({ attendanceHistory, todayIso }) => {
+const MonthlyWeekStrip = ({ attendanceHistory, todayIso, heldDays }) => {
   const { t } = useLanguage();
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -554,7 +567,10 @@ const MonthlyWeekStrip = ({ attendanceHistory, todayIso }) => {
     const isToday = dateStr === todayIso;
     const isFuture = date > now;
     const isPresent = presentDates.has(dateStr);
-    const isAbsent = !isSunday && !isFuture && !isPresent && day <= now.getDate();
+    // Absent = a past day the pathshala really held class and this student wasn't marked. Today is never
+    // absent (there is still time to mark), and days with no pathshala stay neutral.
+    const wasHeld = Array.isArray(heldDays) ? heldDays.includes(dateStr) : !isSunday;
+    const isAbsent = !isFuture && !isPresent && dateStr < todayIso && wasHeld;
     days.push({ day, dateStr, isSunday, isToday, isFuture, isPresent, isAbsent, dayName: dayNames[date.getDay()] });
   }
 
@@ -578,7 +594,7 @@ const MonthlyWeekStrip = ({ attendanceHistory, todayIso }) => {
               ${d.isToday ? 'ring-2 ring-orange-400 ring-offset-1' : ''}
               ${d.isPresent ? 'bg-gradient-to-b from-green-400 to-green-500 text-white shadow-md' : ''}
               ${d.isAbsent ? 'bg-gradient-to-b from-red-100 to-red-200 text-red-600' : ''}
-              ${d.isSunday ? 'bg-gray-100 text-gray-400' : ''}
+              ${d.isSunday && !d.isPresent && !d.isAbsent ? 'bg-gray-100 text-gray-400' : ''}
               ${d.isFuture && !d.isSunday ? 'bg-gray-50 text-gray-300' : ''}
               ${!d.isPresent && !d.isAbsent && !d.isSunday && !d.isFuture ? 'bg-gray-50 text-gray-400' : ''}
             `}
@@ -2315,6 +2331,9 @@ export default function StudentDashboard({ user, onLogout }) {
   const [activeUserInactive, setActiveUserInactive] = useState(false);
   // Profile details still to fill for the member being viewed (drives the reminder popup)
   const [profileMissing, setProfileMissing] = useState([]);
+  const [monthHeldDays, setMonthHeldDays] = useState(null); // days this month the pathshala held class
+  const [niyamEnabled, setNiyamEnabled] = useState(false); // this pathshala has Niyam Yatra (single login tab)
+  const [openingNiyam, setOpeningNiyam] = useState(false);
   const [statusVersion, setStatusVersion] = useState(0);
   useEffect(() => {
     if (!activeUsername) return;
@@ -2327,10 +2346,30 @@ export default function StudentDashboard({ user, onLogout }) {
         if (cancelled || !data) return;
         setActiveUserInactive(data.isActive === false);
         setProfileMissing(Array.isArray(data.missingFields) ? data.missingFields : []);
+        setMonthHeldDays(Array.isArray(data.monthHeldDays) ? data.monthHeldDays : null);
+        setNiyamEnabled(!!data.niyamEnabled);
       })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [activeUsername, statusVersion]);
+
+  // Opens Niyam Yatra already signed in as this family (no second password), on the member being viewed
+  const openNiyam = async () => {
+    setOpeningNiyam(true);
+    try {
+      const res = await fetch(`${API_BASE}/niyam/handoff`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('jainPathshalaToken')}` },
+        body: JSON.stringify({ selected: activeUsername }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.url) throw new Error(data.error || t('niyam_open_failed'));
+      window.location.assign(data.url);
+    } catch (err) {
+      setGlobalError(err.message || t('niyam_open_failed'));
+      setOpeningNiyam(false);
+    }
+  };
 
   const handleProfileSaved = (username, newName) => {
     setStatusVersion((v) => v + 1);
@@ -3027,6 +3066,8 @@ export default function StudentDashboard({ user, onLogout }) {
       <AbsenceAwarenessCard
         attendanceHistory={attendanceHistory}
         todayMarked={todayAttendanceMarked}
+        heldDays={monthHeldDays}
+        todayIso={todayIso}
       />
 
       {/* Monthly Week Strip */}
@@ -3034,6 +3075,7 @@ export default function StudentDashboard({ user, onLogout }) {
         <MonthlyWeekStrip
           attendanceHistory={attendanceHistory}
           todayIso={todayIso}
+          heldDays={monthHeldDays}
         />
       </div>
 
@@ -3384,7 +3426,7 @@ export default function StudentDashboard({ user, onLogout }) {
       </div>
 
       <div className="max-w-lg mx-auto px-3 sm:px-4 py-3 sm:py-4">
-        <div className="grid grid-cols-4 gap-1 sm:gap-2 mb-3 sm:mb-4">
+        <div className={`grid ${niyamEnabled ? 'grid-cols-5' : 'grid-cols-4'} gap-1 sm:gap-2 mb-3 sm:mb-4`}>
           {[
             { key: PAGES.HOME, icon: Home, label: t('nav_home') },
             { key: PAGES.STATS, icon: Award, label: t('nav_stats'), badge: unlockedBadgesCount },
@@ -3409,6 +3451,16 @@ export default function StudentDashboard({ user, onLogout }) {
               )}
             </button>
           ))}
+          {niyamEnabled && (
+            <button
+              onClick={openNiyam}
+              disabled={openingNiyam}
+              className="relative flex flex-col items-center gap-0.5 sm:gap-1 p-2 sm:p-3 rounded-xl sm:rounded-2xl font-bold text-xs transition-all active:scale-[0.97] bg-white text-kumkum-800 disabled:opacity-60"
+            >
+              {openingNiyam ? <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" /> : <BookMarked className="w-4 h-4 sm:w-5 sm:h-5" />}
+              <span className="text-xs">{t('nav_niyam')}</span>
+            </button>
+          )}
         </div>
 
         {renderContent()}

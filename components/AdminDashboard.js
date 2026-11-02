@@ -13,6 +13,7 @@ import Toasts from './Toast';
 import { Toran } from './Decor';
 import TrendsPanel from './admin/components/TrendsPanel';
 import TelegramCard from './admin/components/TelegramCard';
+import NiyamCard from './admin/components/NiyamCard';
 import {
   BookOpen,
   Calendar,
@@ -2602,6 +2603,7 @@ const toggleMemberSelection = (username) => {
         </div>
       </div>
 
+      <NiyamCard />
       <TelegramCard />
 
       <TrendsPanel />
