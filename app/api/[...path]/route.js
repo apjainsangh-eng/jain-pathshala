@@ -7,6 +7,7 @@ const INACTIVE_MESSAGE = "This account is inactive, so attendance and gatha can'
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;   // e.g. "Sync students to Niyam" for a whole pathshala
 
 // The controllers were written for Express. This builds the small slice of
 // req/res they use (body, params, query, headers, user / status, json, send, setHeader).
