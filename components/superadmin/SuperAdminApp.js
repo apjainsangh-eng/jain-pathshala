@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Shield, Plus, Copy, ExternalLink, LogOut, Users, UserCog, KeyRound, Trash2, Power,
-  Pencil, Check, X, ChevronDown, ChevronUp, RefreshCw, BookOpen,
+  Pencil, Check, X, ChevronDown, ChevronUp, RefreshCw, BookOpen, Eye,
 } from 'lucide-react';
 
 const API_BASE = '/api';
@@ -145,7 +145,7 @@ function NewPathshalaForm({ onCreated, onCancel }) {
 
 function AdminsPanel({ pathshala, notify, onChanged }) {
   const [admins, setAdmins] = useState(null);
-  const [form, setForm] = useState({ name: '', mobile: '', password: '' });
+  const [form, setForm] = useState({ name: '', mobile: '', password: '', access: 'full' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   // { id, field: 'password' | 'mobile' } for the inline editor that's open
@@ -183,7 +183,7 @@ function AdminsPanel({ pathshala, notify, onChanged }) {
   const addAdmin = async (e) => {
     e.preventDefault();
     const ok = await run(() => api(`/superadmin/pathshalas/${pathshala.id}/admins`, { method: 'POST', body: form }), null);
-    if (ok) setForm({ name: '', mobile: '', password: '' });
+    if (ok) setForm({ name: '', mobile: '', password: '', access: form.access });
   };
 
   const openEditor = (id, field, value = '') => {
@@ -215,7 +215,12 @@ function AdminsPanel({ pathshala, notify, onChanged }) {
             <li key={a.id} className={`rounded-xl border p-2.5 ${a.isActive ? 'border-gray-200 bg-gray-50' : 'border-gray-200 bg-gray-100 opacity-70'}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-800 truncate">{a.name}</p>
+                  <p className="text-sm font-semibold text-gray-800 truncate">
+                    {a.name}
+                    <span className={`ml-1.5 align-middle text-[10px] font-bold px-1.5 py-0.5 rounded-full ${a.access === 'view' ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {a.access === 'view' ? 'View only' : 'Full access'}
+                    </span>
+                  </p>
                   {a.mobile ? (
                     <p className="text-xs text-gray-500 truncate">📱 {a.mobile}{!a.isActive && ' · disabled'}</p>
                   ) : (
@@ -228,6 +233,10 @@ function AdminsPanel({ pathshala, notify, onChanged }) {
                   )}
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
+                  <button title={a.access === 'view' ? 'Give full access (this pathshala)' : 'Make view-only (this pathshala)'} disabled={busy}
+                    onClick={() => run(() => api(`/superadmin/admins/${a.id}`, { method: 'PUT', body: { pathshalaId: pathshala.id, access: a.access === 'view' ? 'full' : 'view' } }),
+                      a.access === 'view' ? `${a.name} now has full access` : `${a.name} is now view-only`)}
+                    className={ghostBtn + ' border-sky-200 text-sky-600 bg-white'}>{a.access === 'view' ? <Pencil className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}</button>
                   <button title="Change mobile number" disabled={busy} onClick={() => openEditor(a.id, 'mobile', a.mobile || '')}
                     className={ghostBtn + ' border-indigo-200 text-indigo-600 bg-white'}><Pencil className="w-3.5 h-3.5" /></button>
                   <button title="Reset password" disabled={busy} onClick={() => openEditor(a.id, 'password')}
@@ -272,6 +281,13 @@ function AdminsPanel({ pathshala, notify, onChanged }) {
             value={form.mobile} onChange={(e) => setForm({ ...form, mobile: mobileDigits(e.target.value) })} />
           <input className={inputClass + ' py-2'} placeholder="Password (min 6)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
         </div>
+        <label className="block">
+          <span className="text-[11px] font-semibold text-gray-600">Access in this pathshala</span>
+          <select className={inputClass + ' py-2 mt-1'} value={form.access} onChange={(e) => setForm({ ...form, access: e.target.value })}>
+            <option value="full">Full access — can approve, add, edit and delete</option>
+            <option value="view">View only — can see data and analytics, cannot change anything</option>
+          </select>
+        </label>
         <p className="text-[11px] text-gray-500">
           The admin logs in on the main page with this mobile number and password.
           To give an existing admin (from another pathshala) access here, just enter their mobile number; name and password are kept.

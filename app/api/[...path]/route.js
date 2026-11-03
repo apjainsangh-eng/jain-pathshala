@@ -5,6 +5,9 @@ import { runWithPathshala, isPathshalaActive, isAdminOf, isStudentActive } from 
 
 const INACTIVE_MESSAGE = "This account is inactive, so attendance and gatha can't be added. Please ask your pathshala admin to make you active.";
 
+// The only writes a view-only admin may make: switch pathshala and manage their own login
+const VIEW_ONLY_ALLOWED = new Set(['POST /admin/switch-pathshala', 'POST /change-password', 'PUT /profile']);
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;   // e.g. "Sync students to Niyam" for a whole pathshala
@@ -88,9 +91,15 @@ async function handle(request, { params }) {
       }
       // Admins may have been removed from this pathshala (or disabled) since they logged in.
       // Super admin "open admin panel" tokens are exempt.
-      if (req.user.role === 'admin' && !req.user.impersonatedBy
-          && !(await isAdminOf(req.user.id, pathshalaId, getGlobalCollection))) {
-        return Response.json({ error: 'You are no longer an admin of this pathshala' }, { status: 401 });
+      if (req.user.role === 'admin' && !req.user.impersonatedBy) {
+        const adminAccess = await isAdminOf(req.user.id, pathshalaId, getGlobalCollection);
+        if (!adminAccess) {
+          return Response.json({ error: 'You are no longer an admin of this pathshala' }, { status: 401 });
+        }
+        // View-only admins can read everything (lists, analytics, exports) but nothing may change
+        if (adminAccess === 'view' && request.method !== 'GET' && !VIEW_ONLY_ALLOWED.has(`${request.method} /${path.join('/')}`)) {
+          return Response.json({ error: 'You have view-only access. Ask the super admin for full access to make changes.', viewOnly: true }, { status: 403 });
+        }
       }
       // Inactive students can log in and look around, but not add attendance or gatha
       // (for themselves, or a family member acting for them)

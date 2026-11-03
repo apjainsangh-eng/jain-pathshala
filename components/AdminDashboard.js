@@ -3084,6 +3084,7 @@ const toggleMemberSelection = (username) => {
                 <h2 className="font-display text-base font-bold text-kumkum-900 leading-tight">{user.name}</h2>
                 <PathshalaSwitcher fallbackLabel={t('adm_panel')} />
                 {user.openedBySuperAdmin && <p className="text-[10px] text-purple-600 font-bold">Super Admin view</p>}
+                {user.viewOnly && <p className="text-[10px] text-sky-700 font-bold">👁 View only — changes are not allowed</p>}
               </div>
             </div>
             <div className="flex items-center gap-2">
