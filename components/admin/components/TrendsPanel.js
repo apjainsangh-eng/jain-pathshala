@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Users, CalendarDays, BookOpen, RefreshCw } from 'lucide-react';
 import BarChart from '../../charts/BarChart';
 import { ATTENDANCE_COLOR, GATHA_COLOR } from '../../charts/YearCharts';
-import { useLanguage } from '../../LanguageContext';
+import { useLanguage, localeFor } from '../../LanguageContext';
 
 const API_BASE = '/api';
 const RANGES = [7, 30, 90];
@@ -12,7 +12,7 @@ const RANGES = [7, 30, 90];
 // Admin overview analytics: day-by-day attendance and new gathas, plus the weekday pattern
 export default function TrendsPanel() {
   const { t, lang } = useLanguage();
-  const locale = lang === 'gu' ? 'gu-IN' : 'en-IN';
+  const locale = localeFor(lang);
   const [days, setDays] = useState(30);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);

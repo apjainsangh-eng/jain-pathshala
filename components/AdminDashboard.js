@@ -181,7 +181,7 @@ const getPerformanceBadge = (attendance, gatha) => {
 // ============================================
 
 export default function AdminDashboard({ user, onLogout }) {
-  const { t, lang, toggleLang } = useLanguage();
+  const { t, toggleLang } = useLanguage();
 
   // ============ STATE VARIABLES ============
   const [pendingData, setPendingData] = useState({ attendance: [], gatha: [] });
@@ -3092,7 +3092,7 @@ const toggleMemberSelection = (username) => {
                 onClick={toggleLang}
                 className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold text-xs px-2.5 py-1.5 rounded-xl border border-indigo-300 transition-colors"
               >
-                {lang === 'gu' ? 'EN' : 'ગુ'}
+                {t('lang_toggle')}
               </button>
               <button
                 onClick={onLogout}

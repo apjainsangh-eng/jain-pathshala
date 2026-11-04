@@ -23,8 +23,8 @@ module.exports = {
         sona: { 300: '#ffe27a', 400: '#ffd23f', 500: '#f5b700', 600: '#c99400' },
       },
       fontFamily: {
-        sans: ['var(--font-body)', 'system-ui', 'sans-serif'],
-        display: ['var(--font-display)', 'var(--font-body)', 'serif'],
+        sans: ['var(--font-body)', 'var(--font-body-deva)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)', 'var(--font-body)', 'var(--font-body-deva)', 'serif'],
       },
       boxShadow: {
         temple: '0 12px 30px -12px rgba(216, 27, 96, 0.35)',

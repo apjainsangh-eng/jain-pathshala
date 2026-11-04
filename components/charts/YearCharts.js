@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { CalendarCheck, BookOpen, Trophy } from 'lucide-react';
 import BarChart from './BarChart';
-import { useLanguage } from '../LanguageContext';
+import { useLanguage, localeFor } from '../LanguageContext';
 
 // Chart colours (validated as a pair for colour-blind safety): kesar = attendance, kumkum = gatha
 export const ATTENDANCE_COLOR = '#ee6a0b';
@@ -14,7 +14,7 @@ const dateOf = (r) => String(r.date || r.created_at || '').slice(0, 10);
 // Last 12 months of one student's attendance days and new gathas
 export default function YearCharts({ attendanceHistory = [], gathaEntries = [] }) {
   const { t, lang } = useLanguage();
-  const locale = lang === 'gu' ? 'gu-IN' : 'en-IN';
+  const locale = localeFor(lang);
 
   const months = useMemo(() => {
     const now = new Date();

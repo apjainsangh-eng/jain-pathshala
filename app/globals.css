@@ -145,10 +145,10 @@ html, body { height: 100%; }
     inset 4px 4px 9px rgba(150, 80, 30, 0.14),
     inset -4px -4px 9px rgba(255, 255, 255, 0.95);
 
-  font-family: var(--font-clay), var(--font-body), system-ui, sans-serif;
+  font-family: var(--font-clay), var(--font-clay-deva), var(--font-body), system-ui, sans-serif;
   background-color: #fff6ea;
 }
-.clay-ui .font-display { font-family: var(--font-clay), var(--font-display), serif; letter-spacing: 0; }
+.clay-ui .font-display { font-family: var(--font-clay), var(--font-clay-deva), var(--font-display), serif; letter-spacing: 0; }
 
 /* Puffier corners */
 .clay-ui .rounded-xl { border-radius: 1.1rem; }
