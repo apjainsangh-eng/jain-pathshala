@@ -16,7 +16,8 @@ const formatDate = (s) => {
   return new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-export default function StudentProfile({ username, onBack, onAddAttendance, onAddGatha }) {
+// readOnly: view-only admins see everything but get no add / edit / delete / note controls
+export default function StudentProfile({ username, onBack, onAddAttendance, onAddGatha, readOnly = false }) {
   const { t } = useLanguage();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -219,6 +220,7 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
 
         {/* Quick action buttons */}
         <div className="flex gap-2 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border-t border-indigo-100">
+          {!readOnly && (<>
           <button onClick={() => onAddAttendance && onAddAttendance(username)}
             className="flex-1 flex items-center justify-center gap-1.5 bg-green-500 text-white py-2 rounded-xl text-xs font-bold active:scale-95">
             <Plus className="w-3.5 h-3.5" /> {t('sp_add_attendance')}
@@ -227,8 +229,9 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
             className="flex-1 flex items-center justify-center gap-1.5 bg-purple-500 text-white py-2 rounded-xl text-xs font-bold active:scale-95">
             <Plus className="w-3.5 h-3.5" /> {t('sp_add_gatha')}
           </button>
+          </>)}
           <button onClick={fetchProfile}
-            className="flex items-center justify-center gap-1.5 bg-indigo-100 text-indigo-700 py-2 px-3 rounded-xl text-xs font-bold active:scale-95">
+            className={`${readOnly ? 'flex-1 ' : ''}flex items-center justify-center gap-1.5 bg-indigo-100 text-indigo-700 py-2 px-3 rounded-xl text-xs font-bold active:scale-95`}>
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -389,9 +392,11 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-bold">{t('sp_stat_present')}</span>
+                      {!readOnly && (
                       <button onClick={() => { setEditingId(null); setConfirmDeleteId(a.id); }} className={iconBtn} aria-label={t('delete_btn')}>
                         <Trash2 className="w-3.5 h-3.5 text-red-500" />
                       </button>
+                      )}
                     </div>
                   </div>
                   <DeleteControl kind="attendance" id={a.id} />
@@ -468,7 +473,7 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
                       <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${g.type === 'new' ? 'bg-purple-500 text-white' : g.type === 'revision' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-700'}`}>
                         {g.type === 'new' ? t('new_learning') : g.type === 'revision' ? t('revision') : 'Other'}
                       </span>
-                      <div className="flex justify-end gap-1.5 mt-1.5">
+                      <div className={`flex justify-end gap-1.5 mt-1.5 ${readOnly ? 'hidden' : ''}`}>
                         <button onClick={() => startEdit(g)} className={iconBtn} aria-label={t('edit_entry')}>
                           <Pencil className="w-3.5 h-3.5 text-indigo-500" />
                         </button>
@@ -554,7 +559,7 @@ export default function StudentProfile({ username, onBack, onAddAttendance, onAd
         <div className="space-y-3">
           <div className="bg-white rounded-xl border-2 border-gray-200 p-3">
             <p className="text-sm font-bold text-gray-700 mb-2">{t('sp_admin_notes')}</p>
-            <div className="flex gap-2">
+            <div className={`flex gap-2 ${readOnly ? 'hidden' : ''}`}>
               <input type="text" value={noteText} onChange={e => setNoteText(e.target.value)} placeholder={t('sp_add_note_ph')}
                 className="flex-1 px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400" />
               <button onClick={handleAddNote} disabled={addingNote || !noteText.trim()}

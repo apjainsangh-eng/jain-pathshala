@@ -182,6 +182,8 @@ const getPerformanceBadge = (attendance, gatha) => {
 
 export default function AdminDashboard({ user, onLogout }) {
   const { t, toggleLang } = useLanguage();
+  // View-only admins (set by the super admin) can look and analyse; the server refuses their changes anyway
+  const canEdit = !user?.viewOnly;
 
   // ============ STATE VARIABLES ============
   const [pendingData, setPendingData] = useState({ attendance: [], gatha: [] });
@@ -2171,6 +2173,7 @@ const toggleMemberSelection = (username) => {
           <Users className="w-5 h-5 text-purple-500" />
           {t('adm_family_groups')}
         </h3>
+        {canEdit && (
         <button
           onClick={() => {
             setSelectedMembers([]);
@@ -2184,6 +2187,7 @@ const toggleMemberSelection = (username) => {
           <Plus className="w-4 h-4" />
           {t('adm_create_group')}
         </button>
+        )}
       </div>
 
       <div className="bg-purple-50 rounded-xl p-3 border-2 border-purple-200">
@@ -2224,7 +2228,7 @@ const toggleMemberSelection = (username) => {
                     {group.members.length} {t('adm_members')}
                   </p>
                 </div>
-                <div className="flex gap-1.5">
+                <div className={`flex gap-1.5 ${canEdit ? '' : 'hidden'}`}>
                 <button
                   onClick={() => {
                     setEditingGroupId(group.id);
@@ -2413,7 +2417,7 @@ const toggleMemberSelection = (username) => {
       {renderAddGroupModal()}
 
       {/* Action Buttons */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className={`grid grid-cols-2 gap-3 ${canEdit ? '' : 'hidden'}`}>
         <button
           onClick={() => setShowAddUserModal(true)}
           className="flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-xl font-bold active:scale-[0.98] shadow-lg"
@@ -2501,7 +2505,7 @@ const toggleMemberSelection = (username) => {
                   )}
                 </div>
 
-                <div className="flex gap-1.5 ml-2 items-start">
+                <div className={`flex gap-1.5 ml-2 items-start ${canEdit ? '' : 'hidden'}`}>
                   <button
                     onClick={() => handleToggleUserActive(u)}
                     disabled={actionLoading === 'active-user-' + u.id}
@@ -2603,8 +2607,8 @@ const toggleMemberSelection = (username) => {
         </div>
       </div>
 
-      <NiyamCard />
-      <TelegramCard />
+      {canEdit && <NiyamCard />}
+      {canEdit && <TelegramCard />}
 
       <TrendsPanel />
 
@@ -2743,7 +2747,7 @@ const toggleMemberSelection = (username) => {
         <h3 className="text-lg font-bold text-gray-800">{t('adm_pending_section')}</h3>
       </div>
 
-      {totalPending > 0 && (
+      {totalPending > 0 && canEdit && (
         <button
           onClick={handleApproveAll}
           disabled={actionLoading === 'approve-all'}
@@ -2796,7 +2800,7 @@ const toggleMemberSelection = (username) => {
                   <p className="text-xs text-gray-500 ml-6">{formatDate(item.date)}</p>
                 </div>
 
-                <div className="flex gap-2 flex-shrink-0">
+                <div className={`flex gap-2 flex-shrink-0 ${canEdit ? '' : 'hidden'}`}>
                   <button
                     onClick={() => handleApprove('attendance', item.id)}
                     disabled={actionLoading === 'approve-attendance-' + item.id}
@@ -2846,7 +2850,7 @@ const toggleMemberSelection = (username) => {
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1.5 flex-shrink-0">
+                <div className={`flex flex-col gap-1.5 flex-shrink-0 ${canEdit ? '' : 'hidden'}`}>
                   <button
                     onClick={() => handleApprove('gatha', item.id)}
                     disabled={actionLoading === 'approve-gatha-' + item.id}
@@ -3116,11 +3120,11 @@ const toggleMemberSelection = (username) => {
         {activeTab === 'analytics' && !viewingStudentProfile && renderAnalytics()}
         {activeTab === 'users' && !viewingStudentProfile && renderUserManagement()}
 
-        {activeTab === 'bulk-attendance' && !viewingStudentProfile && (
+        {activeTab === 'bulk-attendance' && canEdit && !viewingStudentProfile && (
           <BulkAttendance students={students} familyGroups={familyGroups}
             onSuccess={() => { fetchStudents(); fetchPendingData(false); }} />
         )}
-        {activeTab === 'bulk-gatha' && !viewingStudentProfile && (
+        {activeTab === 'bulk-gatha' && canEdit && !viewingStudentProfile && (
           <BulkGatha students={students} familyGroups={familyGroups}
             onSuccess={() => { fetchStudents(); fetchPendingData(false); }} />
         )}
@@ -3132,6 +3136,7 @@ const toggleMemberSelection = (username) => {
         {viewingStudentProfile && (
           <StudentProfile
             username={viewingStudentProfile}
+            readOnly={!canEdit}
             onBack={() => setViewingStudentProfile(null)}
             onAddAttendance={(u) => {
               setAddEntryData({ ...addEntryData, studentUsername: u });
@@ -3164,7 +3169,7 @@ const toggleMemberSelection = (username) => {
                   { key: 'register', icon: LayoutGrid, labelKey: 'adm_register', color: 'bg-blue-100 text-blue-600' },
                   { key: 'users', icon: UserCog, labelKey: 'adm_manage_users', color: 'bg-orange-100 text-orange-600' },
                   { key: 'analytics', icon: TrendingUp, labelKey: 'adm_analytics', color: 'bg-pink-100 text-pink-600' },
-                ].map(item => (
+                ].filter(item => canEdit || !item.key.startsWith('bulk-')).map(item => (
                   <button key={item.key} onClick={() => { setActiveTab(item.key); setShowMoreMenu(false); setViewingStudentProfile(null); }}
                     className="flex flex-col items-center gap-1.5 p-3 rounded-xl active:scale-95 transition-all">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${item.color}`}>
@@ -3184,7 +3189,8 @@ const toggleMemberSelection = (username) => {
             {[
               { key: 'overview', icon: BarChart3, labelKey: 'adm_home' },
               { key: 'students', icon: Users, labelKey: 'adm_students' },
-              { key: 'bulk-attendance', icon: ClipboardList, labelKey: 'adm_bulk' },
+              // View-only admins get the attendance register here instead of bulk entry
+              canEdit ? { key: 'bulk-attendance', icon: ClipboardList, labelKey: 'adm_bulk' } : { key: 'register', icon: LayoutGrid, labelKey: 'adm_register' },
               { key: 'approvals', icon: Clock, labelKey: 'adm_pending_tab', badge: totalPending, alert: newPendingAlert },
               { key: 'more', icon: Menu, labelKey: 'adm_more' },
             ].map((tab) => (
