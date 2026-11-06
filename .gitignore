@@ -5,3 +5,6 @@ out/
 .env*.local
 .vercel
 *.log
+
+# Old admin/student passwords used once by migrate-to-multi-pathshala.mjs; never commit
+scripts/legacy-pathshala-data.mjs
