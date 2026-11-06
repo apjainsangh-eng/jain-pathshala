@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import AdminDashboard from './AdminDashboard';
 import StudentDashboard from './StudentDashboard';
 import { LanguageProvider, useLanguage } from './LanguageContext';
@@ -174,6 +175,7 @@ function LoginScreen({ onLogin }) {
             <span className="mx-1.5">·</span>
             <a href="mailto:mehtamoksh.mm@gmail.com" className="hover:text-kumkum-700 underline-offset-2 hover:underline">mehtamoksh.mm@gmail.com</a>
           </p>
+          <p><Link href="/privacy" className="hover:text-kumkum-700 underline-offset-2 hover:underline">Privacy policy</Link></p>
         </div>
       </div>
     </div>
@@ -207,9 +209,14 @@ function AppInner() {
     setFamilyGroup(readJSON(KEYS.family));
     setPathshala(info);
 
-    // Drop sessions the server no longer accepts (expired, pathshala deactivated, or an old-style token)
-    fetch(`${API_BASE}/activity-types`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((res) => { if (res.status === 401) handleLogout(); })
+    // Keep the login alive while the app is used (a fresh 90-day token, at most once a day), and drop
+    // sessions the server no longer accepts (expired, pathshala deactivated, account removed, old token)
+    fetch(`${API_BASE}/session/renew`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      .then(async (res) => {
+        if (res.status === 401) return handleLogout();
+        const data = await res.json().catch(() => ({}));
+        if (data.token && localStorage.getItem(KEYS.token) === token) localStorage.setItem(KEYS.token, data.token);
+      })
       .catch(() => {});
   }, []);
 

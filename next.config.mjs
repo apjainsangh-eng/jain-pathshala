@@ -6,9 +6,12 @@ const nextConfig = {
   // /niyam, so families and admins never leave the Pathshala website. beforeFiles: ahead of app/[slug].
   async rewrites() {
     const origin = (process.env.NIYAM_ORIGIN || '').replace(/\/+$/, '');
-    if (!origin) return [];
+    // Android app link check (lib/server/androidApp.js)
+    const assetLinks = { source: '/.well-known/assetlinks.json', destination: '/api/app/assetlinks' };
+    if (!origin) return { beforeFiles: [assetLinks] };
     return {
       beforeFiles: [
+        assetLinks,
         { source: '/niyam', destination: `${origin}/niyam` },
         { source: '/niyam/:path*', destination: `${origin}/niyam/:path*` },
       ],

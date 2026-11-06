@@ -1,5 +1,6 @@
 import { Hind_Vadodara, Hind, Rasa, Baloo_Bhai_2, Baloo_2 } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/next';
+import ServiceWorker from '@/components/ServiceWorker';
 import './globals.css';
 
 // Hind Vadodara is designed for Gujarati (with matching Latin); Rasa gives headings a traditional feel
@@ -15,7 +16,8 @@ export const metadata = {
   title: 'Jain Pathshala Portal',
   description: 'Jain Pathshala Portal - Track attendance, submit gatha progress, and view analytics for Jain learning sessions.',
   manifest: '/manifest.json',
-  icons: { icon: '/favicon.ico', apple: '/logo192.png' },
+  applicationName: 'Jain Pathshala',
+  icons: { icon: [{ url: '/favicon.ico' }, { url: '/icon-192.png', type: 'image/png' }], apple: '/apple-touch-icon.png' },
 };
 
 export const viewport = {
@@ -31,6 +33,7 @@ export default function RootLayout({ children }) {
         {children}
         {/* Vercel Web Analytics: page views only (no cookies); shows in Vercel → Analytics */}
         <Analytics />
+        <ServiceWorker />
       </body>
     </html>
   );

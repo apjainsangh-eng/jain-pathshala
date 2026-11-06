@@ -1,13 +1,21 @@
 {
+  "id": "/",
+  "name": "Jain Pathshala",
   "short_name": "Pathshala",
-  "name": "Jain Pathshala Portal",
-  "icons": [
-    { "src": "favicon.ico", "sizes": "64x64 32x32 24x24 16x16", "type": "image/x-icon" },
-    { "src": "logo192.png", "type": "image/png", "sizes": "192x192" },
-    { "src": "logo512.png", "type": "image/png", "sizes": "512x512" }
-  ],
+  "description": "Pathshala attendance, gatha and Niyam Yatra for students, families and admins.",
+  "lang": "gu",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "theme_color": "#f97316",
-  "background_color": "#fff7ed"
+  "orientation": "portrait",
+  "theme_color": "#d81b60",
+  "background_color": "#fff8ec",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "નિયમ યાત્રા", "short_name": "નિયમ યાત્રા", "url": "/niyam", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
 }
