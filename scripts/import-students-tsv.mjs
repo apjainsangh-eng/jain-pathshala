@@ -1,6 +1,6 @@
 // Adds students (with their profile details) to one pathshala from a tab-separated sheet.
 //
-//   node --env-file=.env.local scripts/import-students-tsv.mjs <file.tsv> <pathshala-slug> [--apply] [--skip=2,3] [--blank-dob=18]
+//   node --env-file=.env.local scripts/import-students-tsv.mjs <file.tsv> <pathshala-slug> [--apply] [--skip=2,3] [--blank-dob=18] [--fill-existing]
 //
 // Columns, in order: email, first name, last name, date of birth (dd/mm/yyyy), gender, mobile, address,
 // status (School Student / Homemaker / College Student / Job / Service / Business), school or study details,
@@ -10,6 +10,8 @@
 // duplicates; --blank-dob leaves the date of birth empty on those lines so the student is asked for it on login.
 // Everyone gets the starting password in IMPORT_PASSWORD (set it in the shell; it is never printed).
 // Students who share a mobile number share one login. Safe to run again: students already added are skipped.
+// --fill-existing: for students already there, also fill in the details that are still empty (a detail that
+// is already filled is never changed).
 import fs from 'node:fs';
 import { MongoClient } from 'mongodb';
 import bcrypt from 'bcryptjs';
@@ -18,6 +20,7 @@ const args = process.argv.slice(2);
 const [file, slug] = args.filter((a) => !a.startsWith('--'));
 const flag = (name) => args.find((a) => a.startsWith(`--${name}=`))?.split('=')[1];
 const apply = args.includes('--apply');
+const fillExisting = args.includes('--fill-existing');
 const list = (v) => new Set((v || '').split(',').filter(Boolean).map(Number));
 const skip = list(flag('skip'));
 const blankDob = list(flag('blank-dob'));
@@ -27,10 +30,9 @@ if (!file || !slug || !process.env.MONGODB_URI) {
   console.error('Usage: node --env-file=.env.local scripts/import-students-tsv.mjs <file.tsv> <pathshala-slug> [--apply] [--skip=2,3] [--blank-dob=18]');
   process.exit(1);
 }
-if (apply && (!password || password.length < 6)) {
-  console.error('Set IMPORT_PASSWORD (at least 6 characters) before using --apply.');
-  process.exit(1);
-}
+const needPassword = () => {
+  if (!password || password.length < 6) throw new Error('Set IMPORT_PASSWORD (at least 6 characters) for the new logins, then run again. Nothing was saved.');
+};
 
 const STATUS = {
   'school student': 'school', 'college student': 'college', homemaker: 'homemaker',
@@ -94,9 +96,11 @@ try {
   const users = db.collection('users');
   const accounts = db.collection('accounts');
 
-  const existingUsers = await users.find({ pathshalaId }, { projection: { username: 1, name: 1, mobile: 1 } }).toArray();
+  const existingUsers = await users.find({ pathshalaId }, { projection: { username: 1, name: 1, mobile: 1, profile: 1 } }).toArray();
   const taken = new Set(existingUsers.map((u) => u.username.toLowerCase()));
-  const already = new Set(existingUsers.map((u) => `${u.mobile}|${String(u.name).toLowerCase()}`));
+  const already = new Map(existingUsers.map((u) => [`${u.mobile}|${String(u.name).toLowerCase()}`, u]));
+  // Details from the sheet that are still empty on a student who is already there
+  const missingFrom = (u, profile) => Object.fromEntries(Object.entries(profile).filter(([k, v]) => v && !u.profile?.[k]));
   const accountByMobile = Object.fromEntries((await accounts.find({ mobile: { $in: [...new Set(students.map((s) => s.mobile))] } }).toArray()).map((a) => [a.mobile, a]));
 
   const usernameFor = (name) => {
@@ -110,7 +114,11 @@ try {
   const plan = [];
   const newMobiles = new Set();
   for (const s of students) {
-    if (already.has(`${s.mobile}|${s.name.toLowerCase()}`)) { plan.push({ ...s, action: 'already added' }); continue; }
+    const existing = already.get(`${s.mobile}|${s.name.toLowerCase()}`);
+    if (existing) {
+      plan.push({ ...s, action: 'already added', existingId: existing._id, fill: fillExisting ? missingFrom(existing, s.profile) : {} });
+      continue;
+    }
     const acc = accountByMobile[s.mobile];
     if (acc && acc.pathshalaId !== pathshalaId) { issues.push(`line ${s.line}: ${s.name}: mobile ${s.mobile} belongs to another pathshala, skipped`); continue; }
     const login = acc || newMobiles.has(s.mobile) ? 'shared login' : 'new login';
@@ -125,11 +133,14 @@ try {
     const missing = ['dateOfBirth', 'gender', 'address', 'currentStatus'].filter((f) => !p.profile[f]);
     console.log(`${String(p.line).padStart(3)}  ${p.action === 'add' ? '+' : '='}  ${p.name.padEnd(30)} ${p.mobile}  ${(p.profile.dateOfBirth || '—').padEnd(10)} ${p.profile.currentStatus.padEnd(9)} ${p.login || ''}${missing.length ? `   asks for: ${missing.join(', ')}` : ''}`);
   }
+  const toFill = plan.filter((p) => p.fill && Object.keys(p.fill).length);
+  for (const p of toFill) console.log(`     ${p.name}: will fill ${Object.keys(p.fill).join(', ')}`);
   if (issues.length) console.log(`\nNotes:\n${issues.map((x) => `  - ${x}`).join('\n')}`);
 
   if (!apply) {
     console.log('\nDry run only: nothing was saved. Add --apply to save.');
   } else {
+    if (toAdd.some((p) => p.login === 'new login')) needPassword();
     const now = new Date().toISOString();
     for (const mobile of new Set(toAdd.filter((p) => p.login === 'new login').map((p) => p.mobile))) {
       await accounts.insertOne({ mobile, pathshalaId, password_hash: await bcrypt.hash(password, 10), created_at: now });
@@ -140,7 +151,11 @@ try {
         profile: p.profile, profile_updated_at: now, created_at: now,
       });
     }
-    console.log(`\nSaved ${toAdd.length} students.`);
+    for (const p of toFill) {
+      const set = Object.fromEntries(Object.entries(p.fill).map(([k, v]) => [`profile.${k}`, v]));
+      await users.updateOne({ _id: p.existingId }, { $set: { ...set, profile_updated_at: now } });
+    }
+    console.log(`\nSaved ${toAdd.length} students${toFill.length ? `, filled details for ${toFill.length} already there` : ''}.`);
     console.log('Next: Admin dashboard → નિયમ યાત્રા card → "Sync students" to create their Niyam Yatra members.');
   }
 } finally {

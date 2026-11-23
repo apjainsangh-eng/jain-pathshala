@@ -5,8 +5,8 @@ import { runWithPathshala, isPathshalaActive, isAdminOf, isStudentActive } from 
 
 const INACTIVE_MESSAGE = "This account is inactive, so attendance and gatha can't be added. Please ask your pathshala admin to make you active.";
 
-// The only writes a view-only admin may make: switch pathshala and manage their own login
-const VIEW_ONLY_ALLOWED = new Set(['POST /admin/switch-pathshala', 'POST /change-password', 'PUT /profile']);
+// The only writes a view-only admin may make: switch pathshala, manage their own login and their phone's notifications
+const VIEW_ONLY_ALLOWED = new Set(['POST /admin/switch-pathshala', 'POST /change-password', 'PUT /profile', 'POST /push/register', 'POST /push/unregister']);
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
